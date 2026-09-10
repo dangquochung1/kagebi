@@ -1,0 +1,41 @@
+# ---------------------------------------------------------------------------
+# Original asset packs (161 MB) and font downloads.
+# Kept on disk as the reproducible source for tools/build_assets.py, but never
+# committed: several packs forbid redistribution (Mystic Woods, Sprout Lands).
+# ---------------------------------------------------------------------------
+_raw/
+
+# Derived asset trees - regenerate with:  python tools/build_assets.py
+assets/gfx/
+assets/audio/
+assets/atlas/
+
+# Build output
+build/
+*/build/
+.gradle/
+out/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Scratch
+tools/__pycache__/
+*.pyc
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS junk - the very thing we cleaned out of the asset packs
+.DS_Store
+__MACOSX/
+Thumbs.db
+desktop.ini
+
+# Regenerable dev previews
+tools/preview/
