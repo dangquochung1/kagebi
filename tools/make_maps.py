@@ -452,6 +452,25 @@ DEPTHS_CHEST = (3, 8)
 DEPTHS_TORCHES = [(0, 9), (1, 9)]           # lit wall torches
 DEPTHS_STANDS = [(3, 9), (5, 9)]            # floor candelabra
 DEPTHS_BONES = [(4, 6), (7, 7), (8, 6)]
+DEPTHS_CHEST_OPEN = (5, 8)                  # (4,8) is the silver-trimmed one
+DEPTHS_LOOT = {"coin": (6, 8), "key": (8, 8), "gold_key": (9, 9),
+               "flask_blue": (7, 8), "flask_red": (9, 8)}
+
+# ---- asked for, and absent ----------------------------------------------
+#
+# Three pieces a tile survey would normally list, and why each is missing:
+#
+#   Inner corners. Every room is a plain rectangle, so the perimeter only ever
+#     turns outward and no inner corner is needed. The ruins set does draw
+#     them - rows 6-9 of each 8x10 quadrant of tilesetinterior.png - but as
+#     part of an architectural mock-up, and they were not decoded.
+#   Door frames. Neither pack has one. A doorway is a gap in the wall; sealing
+#     an unused one is the screen's job (RoomTemplate.DOOR_X / DOOR_Y).
+#   Stairs. Neither pack has a stairs tile. The nearest art is the ruins
+#     double door, RUINS_DOOR, and the depths wooden posts at (6..8, 4..5),
+#     which read as ladder rails on the grid but have not been checked in a
+#     rendered room. EXIT is therefore a spawn marker only: whoever draws the
+#     stairs owns the sprite.
 
 
 # --------------------------------------------------------------------------
