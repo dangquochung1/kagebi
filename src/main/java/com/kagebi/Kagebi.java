@@ -1,22 +1,37 @@
 package com.kagebi;
 
-import com.badlogic.gdx.Game;
+import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.assets.AssetManager;
+import com.badlogic.gdx.assets.loaders.SkinLoader;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.BufferUtils;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.kagebi.assets.Assets;
+import com.kagebi.audio.AudioService;
+import com.kagebi.input.InputMap;
+import com.kagebi.input.InputService;
+import com.kagebi.screen.MainMenuScreen;
+import com.kagebi.screen.ScreenStack;
+import com.kagebi.settings.Settings;
+import com.kagebi.ui.I18n;
 
-/**
- * Entry point. Owns the objects that outlive any single screen.
- *
- * <p>Screens are added in later milestones; right now it boots straight into a
- * smoke screen that proves the asset pipeline renders end to end.
- */
-public class Kagebi extends Game {
+/** Entry point. Owns everything that outlives a single screen. */
+public class Kagebi extends ApplicationAdapter {
 
     private SpriteBatch batch;
+    private AssetManager assets;
+    private Skin skin;
+    private Settings settings;
+    private I18n i18n;
+    private AudioService audio;
+    private InputMap inputMap;
+    private InputService input;
+    private ScreenStack screens;
 
     /** Frames to render before saving a screenshot and quitting; -1 to disable. */
     private final int screenshotAfterFrames;
@@ -28,9 +43,8 @@ public class Kagebi extends Game {
     }
 
     /**
-     * Screenshot mode. Art direction is the one thing that cannot be unit
-     * tested, so the game can render a few frames, write a PNG and exit,
-     * letting a build step or a reviewer look at what actually shipped.
+     * Screenshot mode. Art direction is the one thing no test can check, so the
+     * game has to be able to show its work to a build step or a reviewer.
      */
     public Kagebi(int screenshotAfterFrames, String screenshotPath) {
         this.screenshotAfterFrames = screenshotAfterFrames;
@@ -41,13 +55,73 @@ public class Kagebi extends Game {
         return batch;
     }
 
+    public Skin skin() {
+        return skin;
+    }
+
+    public Settings settings() {
+        return settings;
+    }
+
+    public I18n i18n() {
+        return i18n;
+    }
+
+    public AudioService audio() {
+        return audio;
+    }
+
+    public InputService input() {
+        return input;
+    }
+
+    public ScreenStack screens() {
+        return screens;
+    }
+
+    @Override
+    public void create() {
+        batch = new SpriteBatch();
+        settings = new Settings();
+        i18n = new I18n(settings.language());
+        audio = new AudioService(settings);
+        inputMap = new InputMap();
+        input = new InputService(inputMap);
+
+        assets = new AssetManager();
+        // SkinLoader otherwise looks for the atlas next to the skin file; ours
+        // lives under assets/atlas/, so the path has to be passed explicitly.
+        assets.load(Assets.ATLAS_UI, TextureAtlas.class);
+        assets.load(Assets.SKIN, Skin.class, new SkinLoader.SkinParameter(Assets.ATLAS_UI));
+        assets.finishLoading();
+        skin = assets.get(Assets.SKIN, Skin.class);
+
+        // Worth knowing for real rather than trusting documentation: if these
+        // differ, the viewport is being scaled and pixel art will shimmer.
+        Gdx.app.log("kagebi", "window " + Gdx.graphics.getWidth() + "x" + Gdx.graphics.getHeight()
+            + "  backbuffer " + Gdx.graphics.getBackBufferWidth() + "x"
+            + Gdx.graphics.getBackBufferHeight());
+
+        screens = new ScreenStack();
+        screens.push(new MainMenuScreen(this));
+    }
+
     @Override
     public void render() {
-        super.render();
+        float delta = Gdx.graphics.getDeltaTime();
+        ScreenUtils.clear(0.05f, 0.04f, 0.07f, 1f);
+        audio.update(delta);
+        screens.render(delta);
+
         if (screenshotAfterFrames >= 0 && ++framesRendered >= screenshotAfterFrames) {
             saveScreenshot(screenshotPath);
             Gdx.app.exit();
         }
+    }
+
+    @Override
+    public void resize(int width, int height) {
+        screens.resize(width, height);
     }
 
     private static void saveScreenshot(String path) {
@@ -62,17 +136,21 @@ public class Kagebi extends Game {
     }
 
     @Override
-    public void create() {
-        Gdx.app.log("kagebi", "working dir: " + new java.io.File(".").getAbsolutePath());
-        batch = new SpriteBatch();
-        setScreen(new SmokeScreen(this));
-    }
-
-    @Override
     public void dispose() {
-        if (getScreen() != null) {
-            getScreen().dispose();
+        if (screens != null) {
+            screens.dispose();
         }
-        batch.dispose();
+        if (audio != null) {
+            audio.dispose();
+        }
+        if (settings != null) {
+            settings.save();
+        }
+        if (assets != null) {
+            assets.dispose();
+        }
+        if (batch != null) {
+            batch.dispose();
+        }
     }
 }
