@@ -3,10 +3,10 @@ package com.kagebi.gen;
 /**
  * A marker read out of a room's Tiled object layer.
  *
- * <p>Positions are in pixels relative to the room's bottom-left corner, in the
- * same y-up space libGDX renders in - the .tmx writer is responsible for
- * flipping Tiled's y-down coordinates, so that nothing downstream has to
- * remember to.
+ * <p>Positions are in pixels from the room's bottom-left corner, y-up, which is
+ * the space libGDX renders in. Tiled stores objects y-down from the top, so the
+ * reader flips them once, here at the edge, rather than leaving every consumer
+ * to remember which way up it is.
  */
 public final class SpawnPoint {
 

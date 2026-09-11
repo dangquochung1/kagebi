@@ -27,12 +27,12 @@ TILE = 16
 class Tileset:
     """One tileset image, and where its ids start in the map's global space."""
 
-    def __init__(self, name, filename, firstgid):
+    def __init__(self, name, filename, firstgid, folder=None):
         self.name = name
         self.filename = filename
         self.firstgid = firstgid
         from PIL import Image
-        with Image.open(os.path.join(TILES, filename)) as im:
+        with Image.open(os.path.join(folder or TILES, filename)) as im:
             self.width, self.height = im.size
         self.columns = self.width // TILE
         self.rows = self.height // TILE
@@ -85,7 +85,8 @@ class Layer:
         return True
 
 
-def write_tmx(path, width, height, tilesets, layers):
+def write_tmx(path, width, height, tilesets, layers,
+              tiles_rel="../gfx/tiles/overworld/", objects=None):
     m = ET.Element("map", {
         "version": "1.10", "tiledversion": "1.10.2",
         "orientation": "orthogonal", "renderorder": "right-down",
@@ -102,7 +103,7 @@ def write_tmx(path, width, height, tilesets, layers):
         })
         # Tiled and libGDX both resolve this relative to the .tmx file.
         ET.SubElement(node, "image", {
-            "source": "../gfx/tiles/overworld/" + ts.filename,
+            "source": tiles_rel + ts.filename,
             "width": str(ts.width), "height": str(ts.height),
         })
     for i, layer in enumerate(layers, start=1):
@@ -116,6 +117,15 @@ def write_tmx(path, width, height, tilesets, layers):
             rows.append(",".join(str(g) for g in
                                  layer.data[y * width:(y + 1) * width]))
         data.text = "\n" + ",\n".join(rows) + "\n"
+
+    if objects:
+        group = ET.SubElement(m, "objectgroup",
+                              {"id": str(len(layers) + 1), "name": "spawns"})
+        for i, (kind, ox, oy, tag) in enumerate(objects, start=1):
+            attrs = {"id": str(i), "name": tag or "", "type": kind,
+                     "x": str(ox), "y": str(oy)}
+            ET.SubElement(group, "object", attrs)
+        m.set("nextobjectid", str(len(objects) + 1))
 
     ET.indent(m, space=" ")
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -218,6 +228,74 @@ def village(width=30, height=18, seed=7):
     return path
 
 
+# --------------------------------------------------------------------------
+# Rooms
+# --------------------------------------------------------------------------
+
+# 20 x 11 tiles is 320 x 176 px: see gen/RoomTemplate for why the camera snaps
+# per room rather than scrolling, and why this is the grid that fits.
+ROOM_W, ROOM_H = 20, 11
+DOOR_SPAN = 3                       # tiles of opening in the middle of a wall
+
+
+def placeholder_room(name="ruins/placeholder"):
+    """One structurally correct room, drawn in the wrong tileset on purpose.
+
+    The dungeon screen needs a room to load before the real biome rooms exist,
+    and a room it cannot load blocks that work entirely. So this uses the
+    overworld tiles whose coordinates are already measured above rather than
+    holding everything up for a tileset survey - it is the right SHAPE, with
+    walls, four doorways and a spawn layer, and it is meant to be deleted the
+    moment real rooms land.
+    """
+    sets, gid = {}, 1
+    for key, filename in (("floor", "tilesetfloor.png"), ("nature", "tilesetnature.png")):
+        ts = Tileset(key, filename, gid)
+        sets[key] = ts
+        gid += ts.count
+    floor, nature = sets["floor"], sets["nature"]
+
+    ground = Layer("ground", ROOM_W, ROOM_H)
+    decor = Layer("decor", ROOM_W, ROOM_H)
+    walls = Layer("walls", ROOM_W, ROOM_H)
+    props = Layer("props", ROOM_W, ROOM_H)
+    overhead = Layer("overhead", ROOM_W, ROOM_H)
+
+    for y in range(ROOM_H):
+        for x in range(ROOM_W):
+            ground.put(x, y, floor.gid(*GRASS))
+
+    # A solid border, then a gap in the middle of each side. Every room carries
+    # all four doorways; the screen seals the ones that lead nowhere.
+    gap_x = range((ROOM_W - DOOR_SPAN) // 2, (ROOM_W + DOOR_SPAN) // 2)
+    gap_y = range((ROOM_H - DOOR_SPAN) // 2, (ROOM_H + DOOR_SPAN) // 2)
+    wall = nature.gid(*ROCK)
+    for x in range(ROOM_W):
+        if x not in gap_x:
+            walls.put(x, 0, wall)
+            walls.put(x, ROOM_H - 1, wall)
+    for y in range(ROOM_H):
+        if y not in gap_y:
+            walls.put(0, y, wall)
+            walls.put(ROOM_W - 1, y, wall)
+
+    # Tiled stores object y downwards from the top; the Java reader flips it.
+    cx, cy = ROOM_W * TILE // 2, ROOM_H * TILE // 2
+    objects = [("ENTRY", cx, cy, ""),
+               ("ENEMY", cx - 64, cy, ""),
+               ("ENEMY", cx + 64, cy, ""),
+               ("CHEST", cx, cy - 32, "")]
+
+    path = os.path.join(OUT, "rooms", name + ".tmx")
+    write_tmx(path, ROOM_W, ROOM_H, [floor, nature],
+              [ground, decor, walls, props, overhead],
+              tiles_rel="../../../gfx/tiles/overworld/", objects=objects)
+    print("  rooms/%s.tmx  %dx%d tiles, 4 doorways, %d spawns"
+          % (name, ROOM_W, ROOM_H, len(objects)))
+    return path
+
+
 if __name__ == "__main__":
     print("generating maps")
     village()
+    placeholder_room()
