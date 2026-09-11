@@ -1,0 +1,97 @@
+// The five held weapons the pack draws overlaid on the player sprite, plus
+// the two thrown ones.
+//
+// The design target is that no two of these play the same way, which means
+// theoretical DPS has to be roughly EQUAL and everything else has to differ.
+// A weapon that is simply better is not a choice. Cycle length is
+// windup + active + recover, in steps at 60 to the second:
+//
+//   katana    7 dmg / 18 steps = 3.33 swings/s = 23.3 dps   reach 22 width  9
+//   axe      12 dmg / 28 steps = 2.14 swings/s = 25.7 dps   reach 26 width 14
+//   hammer   26 dmg / 46 steps = 1.30 swings/s = 33.9 dps   reach 28 width 22
+//   pickaxe   9 dmg / 22 steps = 2.73 swings/s = 24.5 dps   reach 30 width  7
+//   net       4 dmg / 36 steps = 1.67 swings/s =  6.7 dps   reach 24 width 20
+//   kunai     6 dmg / 20 steps = 3.00 throws/s = 18.0 dps   range 140
+//   shuriken  4 dmg / 16 steps = 3.75 throws/s = 15.0 dps   range 170
+//
+// The hammer's 33.9 is a lie told on purpose: rootSteps 24 pins the player for
+// over half its cycle, so against anything that moves it lands far below the
+// katana. Against something rooted, slowed or cornered it is the best weapon
+// in the game by a wide margin. That is the trade, and it is entirely in these
+// numbers rather than in code.
+//
+// The two thrown weapons sit deliberately below melee. Range is worth about
+// 25% of damage here; anything closer and there is no reason to walk up to
+// something.
+{
+  "weapons": [
+    {
+      "id": "katana", "nameKey": "weapon.katana.name", "descKey": "weapon.katana.desc",
+      "sprite": "player/weapons/katana", "icon": "weapon_katana",
+      "damage": 7, "reach": 22, "width": 9,
+      // Nothing else in the game recovers in 11 steps. The katana's identity is
+      // that it never takes the player's feet away: rootSteps 0.
+      "windupSteps": 4, "activeSteps": 3, "recoverSteps": 11,
+      "knockback": 40, "rootSteps": 0
+    },
+    {
+      "id": "axe", "nameKey": "weapon.axe.name", "descKey": "weapon.axe.desc",
+      "sprite": "player/weapons/axe", "icon": "weapon_axe",
+      // Width 14 is a wide enough arc to catch two enemies standing shoulder to
+      // shoulder at 16px each, which is what makes it the answer to a mouse pack.
+      "damage": 12, "reach": 26, "width": 14,
+      "windupSteps": 8, "activeSteps": 4, "recoverSteps": 16,
+      "knockback": 80, "rootSteps": 6
+    },
+    {
+      "id": "hammer", "nameKey": "weapon.hammer.name", "descKey": "weapon.hammer.desc",
+      "sprite": "player/weapons/hammer", "icon": "weapon_hammer",
+      "damage": 26, "reach": 28, "width": 22,
+      "windupSteps": 16, "activeSteps": 5, "recoverSteps": 25,
+      // 190 knockback throws anything under 0.5 resist clear across a room, and
+      // 24 root steps means the player watches it go from where they stood.
+      "knockback": 190, "rootSteps": 24
+    },
+    {
+      "id": "pickaxe", "nameKey": "weapon.pickaxe.name", "descKey": "weapon.pickaxe.desc",
+      "sprite": "player/weapons/pickaxe", "icon": "weapon_pickaxe",
+      // The longest melee reach on the narrowest arc: 30 out, 7 across. It
+      // outranges a skeleton's 24 and hits exactly one thing while doing it.
+      "damage": 9, "reach": 30, "width": 7,
+      "windupSteps": 6, "activeSteps": 3, "recoverSteps": 13,
+      "knockback": 55, "rootSteps": 2
+    },
+    {
+      "id": "net", "nameKey": "weapon.net.name", "descKey": "weapon.net.desc",
+      "sprite": "player/weapons/net", "icon": "weapon_rope",
+      // 6.7 dps is not a mistake. The net roots what it catches for 90 steps,
+      // and the hammer does 26 a swing to something that cannot walk away. Until
+      // WeaponDef has an onHit field (notes/d.md section 5) combat has to
+      // special-case the id, which is ugly and is written down as such.
+      "damage": 4, "reach": 24, "width": 20,
+      "windupSteps": 10, "activeSteps": 6, "recoverSteps": 20,
+      "knockback": 15, "rootSteps": 8
+    },
+    {
+      "id": "kunai", "nameKey": "weapon.kunai.name", "descKey": "weapon.kunai.desc",
+      // Thrown: sprite is the projectile's own, because there is no in-hand art
+      // for it. reach is travel distance, not swing length - 140px crosses most
+      // of a 320px room. Suggested travel speed 240 px/s.
+      "sprite": "fx/projectile/kunai/spritesheet", "icon": "weapon_dagger",
+      "damage": 6, "reach": 140, "width": 5,
+      "windupSteps": 5, "activeSteps": 2, "recoverSteps": 13,
+      "knockback": 30, "rootSteps": 3,
+      "projectile": "kunai"
+    },
+    {
+      "id": "shuriken", "nameKey": "weapon.shuriken.name", "descKey": "weapon.shuriken.desc",
+      "sprite": "fx/projectile/shuriken/spritesheet", "icon": "weapon_star",
+      // Lower damage, longer range, faster hand. Meant to pierce, which the
+      // schema cannot say yet. Suggested travel speed 300 px/s.
+      "damage": 4, "reach": 170, "width": 6,
+      "windupSteps": 4, "activeSteps": 2, "recoverSteps": 10,
+      "knockback": 18, "rootSteps": 2,
+      "projectile": "shuriken"
+    }
+  ]
+}

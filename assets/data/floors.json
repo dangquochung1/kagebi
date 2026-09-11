@@ -1,0 +1,111 @@
+// The five floors, descending from the well under the village to the flame
+// that took the master.
+//
+// nameKey points at floor.1 .. floor.5, which already exist in the interface
+// strings and are not mine to move.
+//
+// MUSIC IS NAMED, NOT PATHED. A value that matches a constant on
+// assets/Assets.java (MUSIC_DUNGEON, MUSIC_FIGHT, ...) resolves to that
+// constant; anything else is read as a bare track filename under
+// Assets.MUSIC_DIR. Either way the directory lives in Assets and this file
+// never writes a path, which is what house rule 1 is protecting. Ambience
+// resolves the same way under Assets.SFX_DIR + "ambient/".
+//
+// BIOMES are folder names under assets/maps/rooms/. The ruins interior
+// tileset ships in three colourways and procgen generated each as its own
+// biome, so the three ruins floors each get one: brown for the well,
+// green for the flooded catacombs, orange for the shrine. Naming all three
+// "ruins" would draw every one of them from the brown set and make floors
+// 1 to 3 indistinguishable.
+//
+// PACING. Room counts and pack sizes come from a 25-to-40-minute target for
+// the whole descent. Working from an effective player DPS of 14/17/21/26/32
+// and the floor hit-point averages in enemies.json, with 2.6x overhead for
+// approach and dodging and 7 seconds of walking per room:
+//
+//   floor 1   13.5 rooms   38 enemies    194s   3.2 min
+//   floor 2   14.5 rooms   42 enemies    268s   4.5 min
+//   floor 3   14.5 rooms   45 + boss     419s   7.0 min
+//   floor 4   15.5 rooms   55 enemies    449s   7.5 min
+//   floor 5   15.5 rooms   55 + boss     606s  10.1 min
+//                                       ----   -----
+//                                       1936s  32.3 min
+//
+// A player who skips the optional rooms lands near 25; one who opens every
+// door and reads every relic lands near 40. If a playtest says otherwise the
+// fix is roomsMax and packMax here, in that order, and no rebuild.
+{
+  "floors": [
+    {
+      "number": 1, "nameKey": "floor.1", "biome": "ruins",
+      // The Old Well. Dripping water under a dungeon bed - the story starts
+      // with the player climbing down a hole behind their own village.
+      "music": "MUSIC_DUNGEON", "ambient": "river.wav",
+      "roomsMin": 12, "roomsMax": 15,
+      "treasureRooms": 1, "shopRooms": 1,
+      // Slime is weighted heaviest because it is the enemy the whole combat
+      // system is taught on: it telegraphs, it is slow, it cannot chase.
+      "enemies":      ["slime", "mouse", "bluebat", "larva"],
+      "enemyWeights": [30,      28,      22,        20],
+      "packMin": 3, "packMax": 5
+    },
+    {
+      "number": 2, "nameKey": "floor.2", "biome": "ruins_green",
+      // Flooded Catacombs. 18_aquatic is the only track in the set with the
+      // right amount of water in it.
+      "music": "18_aquatic.ogg", "ambient": "wave.wav",
+      "roomsMin": 13, "roomsMax": 16,
+      "treasureRooms": 1, "shopRooms": 1,
+      // Octopus is the lightest weight on the floor and the most important
+      // one: it is the first thing that can hit the player from across a room.
+      "enemies":      ["axolot", "kappagreen", "kappared", "octopus", "mollusc"],
+      "enemyWeights": [26,       24,           16,         16,        18],
+      "packMin": 3, "packMax": 5
+    },
+    {
+      "number": 3, "nameKey": "floor.3", "biome": "ruins_orange",
+      // Broken Shrine, and the first boss. 12_temple for the floor,
+      // MUSIC_FIGHT for the frog.
+      "music": "12_temple.ogg", "ambient": "wind.wav",
+      "bossMusic": "MUSIC_FIGHT",
+      "roomsMin": 13, "roomsMax": 16,
+      // Two treasure rooms, because floor 3 is where a first-time player dies
+      // and the run before that death should be the richest one so far.
+      "treasureRooms": 2, "shopRooms": 1,
+      "enemies":      ["mushroom", "mushroom2", "spirit", "reptile"],
+      "enemyWeights": [30,         22,          26,       22],
+      "packMin": 4, "packMax": 5,
+      "boss": "giantfrog2"
+    },
+    {
+      "number": 4, "nameKey": "floor.4", "biome": "depths",
+      // The Cursed Depths. The pack changes here and so does the palette -
+      // the outlines go to #25131A and the Ninja Adventure monsters stop.
+      // No boss: floor 4's job is to be long and grim, and putting a fight at
+      // the end of it would make the run's last twenty minutes two bosses in
+      // a row.
+      "music": "10_dark_castle.ogg", "ambient": "wind2.wav",
+      "roomsMin": 14, "roomsMax": 17,
+      "treasureRooms": 2, "shopRooms": 1,
+      "enemies":      ["skeleton1", "skeleton2", "vampire"],
+      "enemyWeights": [40,          30,          30],
+      "packMin": 4, "packMax": 6
+    },
+    {
+      "number": 5, "nameKey": "floor.5", "biome": "depths",
+      // The Flame Core. MUSIC_FINAL for the floor and the boss both - the
+      // track already escalates, and cutting away from it at the door would
+      // throw away the only build-up the audio does on its own.
+      "music": "MUSIC_FINAL", "ambient": "storm.wav",
+      "bossMusic": "MUSIC_FINAL",
+      "roomsMin": 14, "roomsMax": 17,
+      "treasureRooms": 2, "shopRooms": 1,
+      // Weighted to average 84.7 hit points: 66*18 + 74*18 + 92*22 + 72*14
+      // + 58*10 + 130*18, over 100. bonelord at 18 is what pulls it up.
+      "enemies":      ["wraith", "acolyte", "zealot", "skeleton2", "vampire", "bonelord"],
+      "enemyWeights": [18,       18,        22,       14,          10,        18],
+      "packMin": 4, "packMax": 6,
+      "boss": "tengured"
+    }
+  ]
+}
