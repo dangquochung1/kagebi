@@ -13,12 +13,16 @@ import com.badlogic.gdx.utils.BufferUtils;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.kagebi.assets.Assets;
 import com.kagebi.audio.AudioService;
+import com.kagebi.data.ContentLoader;
+import com.kagebi.data.ContentRegistry;
 import com.kagebi.input.InputMap;
 import com.kagebi.input.InputService;
-import com.kagebi.screen.MainMenuScreen;
+import com.kagebi.run.RunState;
+import com.kagebi.save.Profile;
+import com.kagebi.save.SaveManager;
+import com.kagebi.screen.GameScreen;
 import com.kagebi.screen.ScreenStack;
-import com.kagebi.screen.SettingsScreen;
-import com.kagebi.screen.StyleSheetScreen;
+import com.kagebi.screen.Screens;
 import com.kagebi.settings.Settings;
 import com.kagebi.ui.I18n;
 
@@ -34,6 +38,11 @@ public class Kagebi extends ApplicationAdapter {
     private InputMap inputMap;
     private InputService input;
     private ScreenStack screens;
+    private ContentRegistry content;
+    private SaveManager saves;
+    private Profile profile;
+    /** The run in progress, or null outside one. Set by the screens. */
+    private RunState run;
 
     /**
      * Launch options. Art direction is the one thing no test can check, so the
@@ -87,6 +96,26 @@ public class Kagebi extends ApplicationAdapter {
         return screens;
     }
 
+    public ContentRegistry content() {
+        return content;
+    }
+
+    public Profile profile() {
+        return profile;
+    }
+
+    public SaveManager saves() {
+        return saves;
+    }
+
+    public RunState run() {
+        return run;
+    }
+
+    public void setRun(RunState run) {
+        this.run = run;
+    }
+
     @Override
     public void create() {
         batch = new SpriteBatch();
@@ -113,14 +142,13 @@ public class Kagebi extends ApplicationAdapter {
             + "  backbuffer " + Gdx.graphics.getBackBufferWidth() + "x"
             + Gdx.graphics.getBackBufferHeight());
 
+        content = ContentLoader.load();
+        saves = new SaveManager();
+        profile = saves.load();
+
         screens = new ScreenStack();
-        if ("style".equals(boot.screen)) {
-            screens.push(new StyleSheetScreen(this, boot.page));
-        } else {
-            screens.push(new MainMenuScreen(this));
-            if ("settings".equals(boot.screen)) {
-                screens.push(new SettingsScreen(this, boot.page - 1));
-            }
+        for (GameScreen screen : Screens.build(this, boot.screen, boot.page)) {
+            screens.push(screen);
         }
     }
 
