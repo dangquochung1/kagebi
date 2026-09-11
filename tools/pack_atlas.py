@@ -158,6 +158,13 @@ ATLASES = {
                   ("monsters", os.path.join(GFX, "actors", "monsters")),
                   ("bosses", os.path.join(GFX, "actors", "bosses")),
                   ("depths", os.path.join(GFX, "actors", "depths"))],
+        # The combined player sheet repeats every frame the separate files
+        # already carry, and at 256x544 it is the single largest image here.
+        "exclude_files": ["player/ninjagreen/spritesheet"],
+        # Sits directly in actors/ rather than in one of the roots above, but a
+        # drop shadow under every actor is what stops a top-down sprite looking
+        # like a sticker on the floor.
+        "extra_images": [(os.path.join(GFX, "actors", "shadow.png"), "shadow")],
         "size": 2048,
     },
     "npc": {

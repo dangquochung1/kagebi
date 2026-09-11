@@ -177,6 +177,12 @@ def build_player():
               os.path.join(OUT, "gfx/actors/player/weapons"), flatten=True)
     copy_file(os.path.join(NINJA, "Actor/Character/Shadow.png"),
               os.path.join(OUT, "gfx/actors/shadow.png"))
+    # Only NinjaGreen ships the twelve animations a player needs; the other
+    # sixteen ninjas are NPC-grade walk cycles. The five siblings are recoloured
+    # from it, using each variant's own cloth ramp. See tools/make_ninjas.py.
+    if not DRY:
+        import make_ninjas
+        make_ninjas.build(report=True)
 
 
 def build_actors():

@@ -44,6 +44,11 @@ public final class Assets {
     // ---- tilesets (referenced by .tmx, never packed) ---------------------
     public static final String TILES_DIR = "assets/gfx/tiles/";
     public static final String MAPS_DIR = "assets/maps/";
+    /** Generated room templates, one .tmx each, under a per-biome folder. */
+    public static final String ROOMS_DIR = "assets/maps/rooms/";
+
+    // ---- content -----------------------------------------------------------
+    public static final String DATA_DIR = "assets/data/";
 
     // ---- audio -----------------------------------------------------------
     public static final String MUSIC_DIR = "assets/audio/music/";
@@ -108,19 +113,46 @@ public final class Assets {
 
     /** Region names in {@link #ATLAS_ACTORS}. */
     public static final class Actor {
-        private static final String P = "player/ninjagreen/";
 
-        public static final String PLAYER_IDLE = P + "idle";
-        public static final String PLAYER_WALK = P + "walk";
-        public static final String PLAYER_ATTACK = P + "attack";
-        public static final String PLAYER_ROLL = P + "roll";
-        public static final String PLAYER_HIT = P + "hit";
-        public static final String PLAYER_DEAD = P + "dead";
-        public static final String PLAYER_PICKUP = P + "pickup";
+        /**
+         * The six playable characters.
+         *
+         * <p>Only NinjaGreen ships the full set of animations; the pack's other
+         * sixteen ninjas are NPC-grade 16x16 walk cycles and cannot be played.
+         * The other five here are recoloured from it by
+         * {@code tools/make_ninjas.py}, each using the cloth ramp of the pack's
+         * own variant of that name, so they are in the pack's palette rather
+         * than hue-rotated out of it.
+         */
+        public static final String[] CHARACTERS = {
+            "ninjagreen", "ninjared", "ninjablue",
+            "ninjadark", "ninjafire", "ninjawater",
+        };
+
+        /**
+         * The animations every character has. Climb, swim, push, jump and item
+         * exist in the source pack but are not packed: a top-down dungeon
+         * crawler never uses them, and six characters times twelve animations
+         * does not fit on one 2048 page.
+         */
+        public static final String[] PLAYER_ANIMS = {
+            "idle", "walk", "attack", "roll", "hit", "dead", "pickup",
+        };
+
+        /** e.g. {@code player(CHARACTERS[0], "walk")} -> player/ninjagreen/walk */
+        public static String player(String characterId, String animation) {
+            return "player/" + characterId + "/" + animation;
+        }
+
+        public static final String DEFAULT_CHARACTER = CHARACTERS[0];
 
         public static final String WEAPON_KATANA = "player/weapons/katana";
         public static final String WEAPON_AXE = "player/weapons/axe";
         public static final String WEAPON_HAMMER = "player/weapons/hammer";
+        public static final String WEAPON_PICKAXE = "player/weapons/pickaxe";
+        public static final String WEAPON_NET = "player/weapons/net";
+
+        public static final String SHADOW = "shadow";
 
         /** Trash mobs: a 64x64 sheet of 4 directions x 4 frames of 16x16. */
         public static String monster(String id) {
