@@ -26,8 +26,9 @@ public final class Progression {
      *
      * <p>Gold banks in full. A roguelite that taxes death teaches the player to
      * quit runs early rather than to push them, and the shop is priced for it:
-     * the cheapest upgrade is 150 because a first run that dies on floor 2
-     * brings home about 240.
+     * a first-timer dies on floor 3 with about 635 banked, and the two
+     * cheapest upgrades are 350 and 380 so that the first death buys exactly
+     * one.
      *
      * <p>A win restores the flame, so the village returns to full light. A
      * loss dims it by one step, less the {@code darknessResist} the

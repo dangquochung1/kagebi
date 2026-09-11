@@ -4,12 +4,13 @@
 //
 // HIT POINT BUDGET. Floors are tuned to an *effective* player DPS, which is
 // roughly 60% of a weapon's theoretical rate once approach, dodging and the
-// target's hurtInvulnSteps are paid for. Measured against the starting katana
-// (7 damage on an 18-step cycle = 23.3 theoretical, 14 effective) the floor
-// averages are 14 / 26 / 40 / 62 / 84 hit points. They rise faster than the
-// player's DPS does (14 / 17 / 21 / 26 / 32 with the relics a floor is
-// expected to hand out), which is what makes floor 3 the wall it is meant to
-// be. Arithmetic is in notes/d.md.
+// target's hurtInvulnSteps are paid for. Against the starting katana (7
+// damage on an 18-step cycle = 23.3 theoretical, 14 effective) the
+// spawn-weighted floor averages are 13.5 / 27.0 / 39.3 / 61.4 / 84.7 hit
+// points. They rise faster than the player's DPS does (14 / 17 / 20.5 / 25 /
+// 30 with two 10% relics per floor cleared), which is what makes floor 3 the
+// wall it is meant to be. BalanceTest recomputes all of this from this file
+// and fails if an edit breaks the pacing.
 //
 // All *Steps are fixed simulation steps at 60 to the second. All speeds are
 // virtual pixels per second - the player runs at 78, so anything above that
@@ -72,10 +73,11 @@
     },
 
     // ================= FLOOR 2 - Flooded Catacombs ====================
-    // The first ranged attacker and the first ambush. Average hit points
-    // nearly double while the player has at most two relics, which is why a
-    // careless first-timer dies here: 42 enemies landing 30% of their hits at
-    // 7.5 damage is 95 against a 100-point bar.
+    // The first ranged attacker and the first ambush, and the floor where
+    // damage first outruns healing. A first-timer who takes half a hit per
+    // enemy met loses 159 here against 151 found, and so reaches floor 3
+    // with about 90 of 100 - which floor 3 then takes. A careless one dies
+    // here instead.
 
     {
       "id": "axolot", "nameKey": "enemy.axolot.name",

@@ -22,6 +22,13 @@
     // The chance of any drop climbs 26 -> 29 -> 31 -> 34 -> 36 across the
     // floors, which is small on purpose. The felt increase in loot comes from
     // gold values tripling, not from the tables.
+    //
+    // Healing per kill is what these tables really set, and it is held
+    // around 3 to 3.6 hit points on EVERY floor rather than rising with
+    // enemy damage. When floors 4 and 5 dropped large hearts instead, BalanceTest
+    // measured a competent player finishing floor 5 with 622 points of healing
+    // found against 425 taken - the last boss fought at full health with
+    // potions to spare. At these weights the same player ends floor 5 near 40.
 
     {
       "id": "trash_f1", "rolls": 1, "nothingWeight": 74,
@@ -56,34 +63,36 @@
     {
       "id": "trash_f4", "rolls": 1, "nothingWeight": 66,
       "entries": [
-        { "itemId": "heart_large",  "weight": 12, "min": 1, "max": 1 },
-        { "itemId": "potion_small", "weight": 9,  "min": 1, "max": 1 },
-        { "itemId": "potion_large", "weight": 3,  "min": 1, "max": 1 },
-        { "itemId": "key_iron",     "weight": 6,  "min": 1, "max": 1 },
-        { "itemId": "gold_pouch",   "weight": 4,  "min": 1, "max": 2 }
+        { "itemId": "heart_small",  "weight": 12, "min": 1, "max": 1 },
+        { "itemId": "potion_small", "weight": 7,  "min": 1, "max": 1 },
+        { "itemId": "potion_large", "weight": 1,  "min": 1, "max": 1 },
+        { "itemId": "key_iron",     "weight": 7,  "min": 1, "max": 1 },
+        { "itemId": "gold_pouch",   "weight": 7,  "min": 1, "max": 2 }
       ]
     },
     {
       "id": "trash_f5", "rolls": 1, "nothingWeight": 64,
       "entries": [
-        { "itemId": "heart_large",  "weight": 13, "min": 1, "max": 1 },
-        { "itemId": "potion_small", "weight": 9,  "min": 1, "max": 1 },
-        { "itemId": "potion_large", "weight": 4,  "min": 1, "max": 1 },
-        { "itemId": "key_iron",     "weight": 6,  "min": 1, "max": 1 },
-        { "itemId": "gold_pouch",   "weight": 4,  "min": 1, "max": 3 }
+        { "itemId": "heart_small",  "weight": 13, "min": 1, "max": 1 },
+        { "itemId": "potion_small", "weight": 7,  "min": 1, "max": 1 },
+        { "itemId": "potion_large", "weight": 1,  "min": 1, "max": 1 },
+        { "itemId": "key_iron",     "weight": 7,  "min": 1, "max": 1 },
+        { "itemId": "gold_pouch",   "weight": 8,  "min": 1, "max": 3 }
       ]
     },
     {
       // The one non-boss table worth seeking out. Two rolls at 75% each, so
       // an elite drops 1.5 things on average and drops nothing at all only
-      // 6% of the time.
+      // 6% of the time. Rewarding in keys and gold rather than in healing:
+      // bonelords are 18% of floor 5, and when this table carried large
+      // potions each one was worth 23 hit points - more than it dealt.
       "id": "elite", "rolls": 2, "nothingWeight": 25,
       "entries": [
-        { "itemId": "gold_pouch",   "weight": 25, "min": 1, "max": 2 },
-        { "itemId": "potion_large", "weight": 14, "min": 1, "max": 1 },
-        { "itemId": "heart_large",  "weight": 14, "min": 1, "max": 1 },
-        { "itemId": "key_iron",     "weight": 12, "min": 1, "max": 1 },
-        { "itemId": "soul_ember",   "weight": 6,  "min": 1, "max": 1 },
+        { "itemId": "gold_pouch",   "weight": 30, "min": 1, "max": 2 },
+        { "itemId": "key_iron",     "weight": 16, "min": 1, "max": 1 },
+        { "itemId": "heart_large",  "weight": 10, "min": 1, "max": 1 },
+        { "itemId": "potion_small", "weight": 10, "min": 1, "max": 1 },
+        { "itemId": "soul_ember",   "weight": 5,  "min": 1, "max": 1 },
         { "itemId": "gold_cache",   "weight": 4,  "min": 1, "max": 1 }
       ]
     },

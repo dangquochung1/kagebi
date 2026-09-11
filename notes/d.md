@@ -113,32 +113,46 @@ keeps region names out of the content files that do not need them.
 ## 4. Seams other agents call
 
 ```java
-ContentLoader.load()                     // as before; Kagebi already calls it
-ContentLoader.load(FileHandle dataDir)   // same, from an explicit directory
-ShopCatalog.load()                       // village shop; see below
-LootRoller.roll(table, registry::lootTable, seed)          // Array<LootRoller.Drop>
-LootRoller.roll(table, registry::lootTable, seed, luck)    // with luck_add applied
+// content - Kagebi already calls the first; it throws listing every problem
+ContentLoader.load()                              // Gdx.files.internal, parse + validate
+ContentLoader.load(Function<String, FileHandle>)  // same checks, any file resolver
+ContentLoader.parse(FileHandle dataDir)           // parse only, no cross-checks
+
+// loot - pure, seeded; any distinct long per drop, consecutive seeds are fine
+LootRoller.roll(LootTableDef table, long seed)              // Array<LootRoller.Drop>
+LootRoller.roll(LootTableDef table, long seed, float luck)  // luck = summed luck_add
+LootRoller.gold(EnemyDef enemy, long seed)                  // coin paid on a kill
+// A Drop is (itemId, count). One Drop per successful roll, so a 3-roll chest
+// can return the same item twice - spawn one pickup per Drop.
+
+// village shop
+ShopCatalog shop = ShopCatalog.load();
+shop.upgrades(); shop.unlocks();                  // Array<Upgrade>, Array<Unlock>
+ShopCatalog.cost(upgrade, profile)                // next level's price, -1 when maxed
+ShopCatalog.canBuy(upgrade|unlock, profile)
+ShopCatalog.buy(upgrade|unlock, profile)          // debits gold; false if it cannot
+ShopCatalog.requirementMet(unlock, profile)       // pure
+shop.upgradeValue("max_hp_add", profile)          // combined value at owned levels
+shop.character("ninjared")                        // the Unlock carrying its perk, or null
+shop.bank(profile, runSummary)                    // game-over / victory: banks the run
+
+// saves
+SaveManager.load()                                // as before
+SaveManager.save(profile)                         // now returns boolean; false = old save kept
 ```
 
-**`ShopCatalog` is not in `ContentRegistry`.** `ContentRegistry` is frozen for
-this session and I may not add a map to it, so the village upgrades and the
-character/weapon unlocks load through `com.kagebi.data.ShopCatalog`. The
-village screen calls `ShopCatalog.load()` and then:
+**`ShopCatalog` is not in `ContentRegistry`.** The registry was frozen for
+this milestone, so the village upgrades and the character/weapon unlocks load
+through `com.kagebi.data.ShopCatalog`. `ContentLoader.load()` validates them at
+boot all the same.
 
-```java
-catalog.upgrades()                            // Array<ShopCatalog.Upgrade>
-catalog.unlocks()                             // Array<ShopCatalog.Unlock>
-catalog.cost(upgrade, profile)                // price of the NEXT level, -1 if maxed
-ShopCatalog.requirementMet(unlock, profile)   // pure; no Gdx
-catalog.buy(upgrade, profile)                 // debits gold, bumps the level
-catalog.buy(unlock, profile)                  // debits gold, adds to the unlocked set
-```
+`upgradeValue` compounds effects ending in `_mult` (two levels of 1.08 is
+1.1664) and adds everything else. Run start should call it once per upgrade
+effect, then apply the chosen character's perk (`shop.character(id)`), which is
+spelt the same way and stacks the same way.
 
-`Upgrade.effect` is one of the eight upgrade effects above.
 `Unlock.requirement` is one of `none`, `deepest_floor`, `wins`, `runs`,
 `bestiary`, compared against `requirementValue`.
-
----
 
 ## 5. Fields I wish the schema had
 
@@ -201,9 +215,14 @@ happens. In the order I would add them.
   purse and it pays on every kill. The tables carry the occasional physical
   pickup on top, which is why `nothingWeight` is around 70 there and 0 in a
   chest.
-- **`RunSummary.gold` banks in full.** Nothing is taxed on death. The cheapest
-  village upgrade is 150 so that a first run, which ends on floor 2 with around
-  240 banked, buys exactly one thing and has change.
+- **`RunSummary.gold` banks in full.** Nothing is taxed on death. Call
+  `ShopCatalog.bank(profile, summary)` from the game-over and victory screens;
+  it applies the flamekeeper upgrade and then `Progression.bank`. A
+  first-timer dies on floor 3 with about 635 banked (after spending a fifth in
+  the dungeon's shops) and the two cheapest upgrades are 350 and 380, so the
+  first death buys exactly one. `BalanceTest` pins that.
+- **`Progression.MAX_DARKNESS` is 10** - my guess at how many dimming steps the
+  hub can show before the art is unreadable. It is the hub's number to change.
 - **Biomes are `ruins`, `ruins_green`, `ruins_orange`, `depths`** - the folder
   names procgen writes under `assets/maps/rooms/`. Floors 1/2/3 take one ruins
   colourway each and 4/5 share `depths`. `ContentValidator.BIOMES` holds the

@@ -10,7 +10,7 @@
 // MAGNITUDE BUDGET. A common relic is worth about 10% of a player's effective
 // power, a rare about 20%, an epic about 35%. A run that reaches floor 5 picks
 // up roughly eight, which is where the DPS curve in enemies.json comes from:
-// 1.10^8 is 2.14, and the floor hit-point averages rise by 6.0x across the
+// 1.10^8 is 2.14, and the floor hit-point averages rise by 6.3x across the
 // same span. The player is meant to end the run stronger than they started and
 // still behind the dungeon.
 //

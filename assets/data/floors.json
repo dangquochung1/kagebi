@@ -20,17 +20,18 @@
 // 1 to 3 indistinguishable.
 //
 // PACING. Room counts and pack sizes come from a 25-to-40-minute target for
-// the whole descent. Working from an effective player DPS of 14/17/21/26/32
-// and the floor hit-point averages in enemies.json, with 2.6x overhead for
-// approach and dodging and 7 seconds of walking per room:
+// the whole descent. BalanceTest computes this table from the shipped files:
+// effective DPS of 14/17/20.5/25/30, the spawn-weighted hit points in
+// enemies.json, 2.6x overhead on trash for approach and dodging, 2.2x on a
+// boss, and 7 seconds of walking per room.
 //
-//   floor 1   13.5 rooms   38 enemies    194s   3.2 min
-//   floor 2   14.5 rooms   42 enemies    268s   4.5 min
-//   floor 3   14.5 rooms   45 + boss     419s   7.0 min
-//   floor 4   15.5 rooms   55 enemies    449s   7.5 min
-//   floor 5   15.5 rooms   55 + boss     606s  10.1 min
-//                                       ----   -----
-//                                       1936s  32.3 min
+//   floor 1   13.5 rooms   38.0 kills          190s   3.2 min
+//   floor 2   14.5 rooms   42.0 kills          276s   4.6 min
+//   floor 3   14.5 rooms   38.3 kills + boss   389s   6.5 min
+//   floor 4   15.5 rooms   52.5 kills          446s   7.4 min
+//   floor 5   15.5 rooms   47.5 kills + boss   589s   9.8 min
+//                                             -----  --------
+//                                             1890s  31.5 min
 //
 // A player who skips the optional rooms lands near 25; one who opens every
 // door and reads every relic lands near 40. If a playtest says otherwise the
