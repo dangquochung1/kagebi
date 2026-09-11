@@ -22,6 +22,12 @@ from PIL import Image, ImageDraw, ImageFont
 # glyphs afterwards, so making this generous costs nothing.
 EXTRA_TOP = 4
 
+# Left margin in the scratch canvas. A grave accent leans left and overhangs the
+# pen position, so drawing at x=0 clipped it clean off: `ì` came out 1px wide
+# with no accent at all, while `í` (which leans right) was fine. Anything drawn
+# here is measured relative to MARGIN_X, so the margin never reaches the atlas.
+MARGIN_X = 4
+
 # Characters the game needs. The Latin-1 accented letters come along for free
 # and cost nothing meaningful in atlas space.
 ASCII = "".join(chr(c) for c in range(0x20, 0x7F))
@@ -93,9 +99,9 @@ class Rasterizer:
     def render(self, ch):
         """Return (1-bit-ish 'L' image, advance width)."""
         adv = int(round(self.font.getlength(ch)))
-        width = max(adv, 1) + 8          # slack for marks that overhang the advance
+        width = max(adv, 1) + MARGIN_X * 2
         img = Image.new("L", (width, self.height), 0)
-        ImageDraw.Draw(img).text((0, EXTRA_TOP), ch, font=self.font, fill=255)
+        ImageDraw.Draw(img).text((MARGIN_X, EXTRA_TOP), ch, font=self.font, fill=255)
         # The font is on-grid at this size, but threshold anyway so a stray
         # antialiased pixel can never leak into the atlas.
         return img.point(lambda v: 255 if v >= 128 else 0), adv
@@ -202,7 +208,11 @@ def build(font_path, out_dir, size, preview):
             cells.append((cp, None, 0, 0, 0, 0, adv))
         else:
             x0, y0, x1, y1 = box
-            cells.append((cp, img.crop(box), x1 - x0, y1 - y0, x0, y0, adv))
+            if x0 == 0 or x1 == img.width:
+                raise SystemExit(
+                    "glyph U+%04X touches the scratch canvas edge and is being "
+                    "clipped; raise MARGIN_X" % cp)
+            cells.append((cp, img.crop(box), x1 - x0, y1 - y0, x0 - MARGIN_X, y0, adv))
 
     # Derive the real line metrics from the finished glyphs. EXTRA_TOP is
     # deliberately generous during composition; whatever headroom went unused

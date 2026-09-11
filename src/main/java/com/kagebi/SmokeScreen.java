@@ -64,7 +64,9 @@ public class SmokeScreen extends ScreenAdapter {
         // almost no contrast against it.
         panel.setBackground(skin.getDrawable(Assets.Ui.PANEL_2));
         panel.top();
-        panel.pad(8, 9, 7, 8);
+        // No pad() call: Table takes its padding from the background drawable,
+        // and the atlas now carries a `pad` for every nine-patch. Calling pad()
+        // here would replace that rather than add to it.
 
         panel.add(new Label("KAGEBI — Ngọn Lửa Thiêng", skin, "title"))
              .colspan(3).padBottom(4).row();
@@ -77,10 +79,10 @@ public class SmokeScreen extends ScreenAdapter {
         group.setMinCheckCount(1);
         group.setMaxCheckCount(1);
         for (String name : new String[] {"Âm thanh", "Điều khiển", "Hiển thị"}) {
+            // No forced height and no pad: the art is 12px tall while a line of
+            // text needs 14, and Vietnamese tone marks on a capital sit higher
+            // still. Both come from the nine-patch's split and pad now.
             TextButton tab = new TextButton(name, skin, "tab");
-            // No forced height here either: the tab art is 16x12 but a line of
-            // text needs 14, and clamping to the art's height clipped it.
-            tab.getLabelCell().pad(0, 3, 1, 3);
             group.add(tab);
             tabs.add(tab).padRight(1);
         }

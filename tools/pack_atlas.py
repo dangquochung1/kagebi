@@ -60,6 +60,31 @@ SPLITS = {
     "ui/white":             (1, 1, 1, 1),
 }
 
+# Content insets, as (left, right, top, bottom). libGDX applies these via
+# NinePatch.setPadding, and Button/Table read them to inset their label, so
+# declaring the breathing room here gives it to every widget everywhere rather
+# than needing a pad() call at each call site.
+#
+# Without these the label sits directly against the frame and Vietnamese
+# diacritics collide with the top border -- the tone mark on a capital sits two
+# rows above the cap height, which is taller than Latin text ever gets.
+PADS = {
+    "ui/panel":            (8, 8, 7, 7),
+    "ui/panel_2":          (8, 8, 7, 7),
+    "ui/panel_3":          (8, 8, 7, 7),
+    "ui/bg":               (4, 4, 3, 3),
+    "ui/bg_2":             (4, 4, 3, 3),
+    "ui/button_up":        (5, 5, 3, 2),
+    "ui/button_over":      (5, 5, 3, 2),
+    "ui/button_down":      (5, 5, 4, 1),
+    "ui/button_disabled":  (5, 5, 3, 2),
+    "ui/tab":              (5, 6, 4, 2),
+    "ui/tab_over":         (5, 6, 4, 2),
+    "ui/tab_selected":     (5, 6, 4, 2),
+    "ui/tab_disabled":     (5, 6, 4, 2),
+    "ui/cell":             (3, 2, 3, 2),
+}
+
 # Short, stable names for the widget art, so the skin JSON does not have to
 # know the asset pack's folder layout. An alias is a second region entry
 # pointing at the same rectangle -- it costs no pixels.
@@ -312,6 +337,9 @@ def pack(name, spec, verbose):
         lines.append("  bounds: %d, %d, %d, %d" % (x, y, w, h))
         if region in SPLITS:
             lines.append("  split: %d, %d, %d, %d" % SPLITS[region])
+            # libGDX only honours `pad` on a region that also has `split`.
+            if region in PADS:
+                lines.append("  pad: %d, %d, %d, %d" % PADS[region])
         # Always -1: any region with a real index makes libGDX sort the whole
         # region list by index, silently reordering atlas.getRegions().
         lines.append("  index: -1")

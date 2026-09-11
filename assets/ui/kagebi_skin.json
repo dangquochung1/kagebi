@@ -18,7 +18,9 @@
     "cream":        { "hex": "eecf9bff" },
     "text":         { "hex": "131b1bff" },
     "text_inverse": { "hex": "ffe6c4ff" },
-    "text_dim":     { "hex": "9b513cff" },
+    "text_soft":    { "hex": "46503cff" },
+    "text_on_dark": { "hex": "e8cfa9ff" },
+    "text_faded":   { "hex": "ab8a6eff" },
     "danger":       { "hex": "d94a3aff" },
     "scrim":        { "hex": "0c0a10c0" },
     "track":        { "hex": "00000060" },
@@ -40,7 +42,7 @@
   "com.badlogic.gdx.scenes.scene2d.ui.Label$LabelStyle": {
     "default": { "font": "default", "fontColor": "text" },
     "inverse": { "font": "default", "fontColor": "text_inverse" },
-    "dim":     { "font": "default", "fontColor": "text_dim" },
+    "dim":     { "font": "default", "fontColor": "text_soft" },
     "danger":  { "font": "default", "fontColor": "danger" },
     "title":   { "font": "default", "fontColor": "ink" },
     "boxed":   { "parent": "inverse", "background": "ui/bg" }
@@ -56,7 +58,7 @@
       "fontColor": "text",
       "overFontColor": "ink",
       "downFontColor": "ink",
-      "disabledFontColor": "text_dim"
+      "disabledFontColor": "text_faded"
     },
     "toggle": {
       "parent": "default",
@@ -73,10 +75,10 @@
       "down": "ui/tab_selected",
       "disabled": "ui/tab_disabled",
       "font": "default",
-      "fontColor": "text_dim",
-      "overFontColor": "ink",
+      "fontColor": "text_on_dark",
+      "overFontColor": "text_inverse",
       "checkedFontColor": "ink",
-      "disabledFontColor": "text_dim"
+      "disabledFontColor": "text_faded"
     },
     "bind": {
       "parent": "default",
@@ -137,7 +139,7 @@
       "checkboxOffDisabled": "ui/check_off_disabled",
       "font": "default",
       "fontColor": "text",
-      "disabledFontColor": "text_dim"
+      "disabledFontColor": "text_faded"
     },
     "radio": {
       "parent": "default",
