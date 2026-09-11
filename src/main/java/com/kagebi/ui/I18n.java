@@ -52,17 +52,34 @@ public final class I18n {
         return language;
     }
 
+    /**
+     * Interface strings and content strings live in separate files.
+     *
+     * <p>Screen labels and the names of four hundred enemies, relics and items
+     * are written by different people at different times, and keeping them
+     * apart means neither has to open the other's file. Content is loaded
+     * second, so a key defined in both resolves to the content one.
+     */
+    private static final String[] FILES = {"%s.json", "content.%s.json"};
+
     public void load(Language lang) {
         this.language = lang;
         strings.clear();
-        FileHandle file = Gdx.files.internal(Assets.I18N_DIR + lang.code + ".json");
-        JsonValue root = new JsonReader().parse(file);
-        for (JsonValue entry = root.child; entry != null; entry = entry.next) {
-            // The font carries precomposed Vietnamese letters, not combining
-            // marks, so a decomposed string would render its accents as missing
-            // glyphs. Normalising on load means a translator's editor settings
-            // can never cause that.
-            strings.put(entry.name, Normalizer.normalize(entry.asString(), Normalizer.Form.NFC));
+        for (String pattern : FILES) {
+            FileHandle file = Gdx.files.internal(
+                Assets.I18N_DIR + String.format(pattern, lang.code));
+            if (!file.exists()) {
+                continue;       // content may not be written yet
+            }
+            JsonValue root = new JsonReader().parse(file);
+            for (JsonValue entry = root.child; entry != null; entry = entry.next) {
+                // The font carries precomposed Vietnamese letters, not combining
+                // marks, so a decomposed string would render its accents as
+                // missing glyphs. Normalising on load means a translator's
+                // editor settings can never cause that.
+                strings.put(entry.name,
+                    Normalizer.normalize(entry.asString(), Normalizer.Form.NFC));
+            }
         }
     }
 

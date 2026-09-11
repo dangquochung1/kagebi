@@ -31,14 +31,27 @@ class ContentContractTest {
 
     // ---- i18n ------------------------------------------------------------
 
+    /**
+     * Interface strings and content strings are separate files, so that the
+     * person naming the screens and the person naming four hundred items never
+     * have to open the same file. Both are checked here as one set: from a
+     * player's point of view a missing key is a missing key.
+     */
     private static Map<String, String> readStrings(String lang) {
-        File file = new File("assets/i18n/" + lang + ".json");
-        assertTrue(file.isFile(), "missing translation file: " + file);
-        JsonValue root = new JsonReader().parse(new FileHandle(file));
         Map<String, String> out = new HashMap<>();
-        for (JsonValue e = root.child; e != null; e = e.next) {
-            out.put(e.name, e.asString());
+        boolean any = false;
+        for (String pattern : new String[] {"%s.json", "content.%s.json"}) {
+            File file = new File("assets/i18n/" + String.format(pattern, lang));
+            if (!file.isFile()) {
+                continue;
+            }
+            any = true;
+            JsonValue root = new JsonReader().parse(new FileHandle(file));
+            for (JsonValue e = root.child; e != null; e = e.next) {
+                out.put(e.name, e.asString());
+            }
         }
+        assertTrue(any, "no translation file for " + lang);
         return out;
     }
 
