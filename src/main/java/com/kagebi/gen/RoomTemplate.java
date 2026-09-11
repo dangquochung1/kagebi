@@ -29,6 +29,22 @@ public final class RoomTemplate {
     public static final int PIXEL_WIDTH = WIDTH * 16;
     public static final int PIXEL_HEIGHT = HEIGHT * 16;
 
+    /**
+     * Tiles of opening in the middle of every wall. The screen needs these to
+     * know which tiles to cover when it seals a door that leads nowhere;
+     * {@code RoomCatalogTest} holds them to what tools/make_maps.py actually
+     * generated, so the two cannot quietly disagree.
+     */
+    public static final int DOOR_SPAN = 3;
+    /** First tile column of the top and bottom openings: columns 8, 9, 10. */
+    public static final int DOOR_X = (WIDTH - DOOR_SPAN) / 2;
+    /**
+     * First tile row of the left and right openings: rows 4, 5, 6. The same
+     * counted from the top or the bottom, because 11 rows leave 4 either side,
+     * so nobody has to ask which way up this is.
+     */
+    public static final int DOOR_Y = (HEIGHT - DOOR_SPAN) / 2;
+
     public final String id;
     /** Which floors may use it: the biome name from {@code FloorDef.biome}. */
     public final String biome;
