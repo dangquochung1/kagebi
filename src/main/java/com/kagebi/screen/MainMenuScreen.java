@@ -1,7 +1,13 @@
 package com.kagebi.screen;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.maps.tiled.TiledMap;
+import com.badlogic.gdx.maps.tiled.TmxMapLoader;
+import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
@@ -15,17 +21,32 @@ import com.kagebi.gfx.PixelViewport;
 import com.kagebi.ui.I18n;
 
 /**
- * The title screen.
+ * The title screen, over a live Tiled map of the village.
  *
- * <p>Everything lives in one 320x180 {@link PixelViewport} shared with the
- * world, so the font is always drawn at scale 1 and nine-patches are never
- * rescaled. The language button rebuilds the whole layout rather than setting
- * each label, because widths change when the text does.
+ * <p>The backdrop is the real map renderer rather than a painted image, which
+ * means this screen also proves the whole Tiled pipeline - relative tileset
+ * paths, layer order, the 16px grid - before any of it is load-bearing for
+ * gameplay.
  */
 public class MainMenuScreen extends GameScreen {
 
+    /** How fast the fog drifts across, in virtual pixels per second. */
+    private static final float FOG_SPEED = 4f;
+
+    /**
+     * fog.png is 41% pure opaque white, so it lightens whatever it covers. A
+     * little reads as haze; at 0.14 it bleached the whole village.
+     */
+    private static final float FOG_ALPHA = 0.05f;
+
     private final Kagebi game;
     private Stage stage;
+
+    private TiledMap map;
+    private OrthogonalTiledMapRenderer mapRenderer;
+    private OrthographicCamera mapCamera;
+    private Texture fog;
+    private float fogScroll;
 
     public MainMenuScreen(Kagebi game) {
         this.game = game;
@@ -38,13 +59,34 @@ public class MainMenuScreen extends GameScreen {
 
     @Override
     public void show() {
-        if (stage == null) {
-            stage = new Stage(
-                new PixelViewport(Cfg.VIRT_W, Cfg.VIRT_H, new OrthographicCamera()),
-                game.batch());
-            rebuild();
-            game.audio().playMusic(Assets.MUSIC_INTRO);
+        if (stage != null) {
+            return;
         }
+        map = new TmxMapLoader().load(Assets.MAPS_DIR + "village.tmx");
+        mapRenderer = new OrthogonalTiledMapRenderer(map, game.batch());
+
+        mapCamera = new OrthographicCamera();
+        mapCamera.setToOrtho(false, Cfg.VIRT_W, Cfg.VIRT_H);
+        // Whole pixels only: half a pixel of camera offset makes every edge in
+        // the scene shimmer once it is magnified.
+        // Framed on the houses rather than the middle of the map: the middle is
+        // the deliberately-empty clearing, which on its own is just grass.
+        // Whole pixels only - half a pixel of offset makes every edge shimmer
+        // once the scene is magnified.
+        mapCamera.position.set(240, 196, 0);
+        mapCamera.update();
+
+        fog = new Texture(Gdx.files.internal(Assets.FOG));
+        fog.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+        // Wrap is a property of the texture, not of a region, which is exactly
+        // why this file is kept out of the atlas.
+        fog.setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
+
+        stage = new Stage(
+            new PixelViewport(Cfg.VIRT_W, Cfg.VIRT_H, new OrthographicCamera()),
+            game.batch());
+        rebuild();
+        game.audio().playMusic(Assets.MUSIC_INTRO);
     }
 
     private void rebuild() {
@@ -59,16 +101,15 @@ public class MainMenuScreen extends GameScreen {
         panel.top();
 
         panel.add(new Label("KAGEBI", game.skin(), "title")).padBottom(1).row();
-        panel.add(new Label(t.get("game.title"), game.skin(), "dim")).padBottom(6).row();
+        panel.add(new Label(t.get("game.title"), game.skin(), "dim")).padBottom(5).row();
 
         addMenuButton(panel, t.get("menu.continue"), true);
         addMenuButton(panel, t.get("menu.newgame"), false);
         addMenuButton(panel, t.get("menu.settings"), false);
-        addMenuButton(panel, t.get("menu.credits"), false);
         addMenuButton(panel, t.get("menu.quit"), false);
 
-        // Switching language here rather than burying it in settings makes it
-        // reachable before the player can read the settings label.
+        // Reachable before the player can read the settings label, which is the
+        // point of putting it here rather than inside settings.
         TextButton language = new TextButton(t.language().label, game.skin());
         language.addListener(new ChangeListener() {
             @Override
@@ -80,20 +121,47 @@ public class MainMenuScreen extends GameScreen {
                 rebuild();
             }
         });
-        panel.add(language).padTop(6).row();
+        panel.add(language).padTop(5).row();
 
-        root.add(panel).width(180);
+        root.add(panel).width(150);
         stage.addActor(root);
     }
 
     private void addMenuButton(Table panel, String text, boolean disabled) {
         TextButton button = new TextButton(text, game.skin());
         button.setDisabled(disabled);
-        panel.add(button).width(120).padBottom(2).row();
+        panel.add(button).width(104).padBottom(2).row();
+    }
+
+    @Override
+    public void update(float delta) {
+        fogScroll += delta * FOG_SPEED;
     }
 
     @Override
     public void render(float delta) {
+        mapRenderer.setView(mapCamera);
+        mapRenderer.render();
+
+        SpriteBatch batch = game.batch();
+        batch.setProjectionMatrix(mapCamera.combined);
+        batch.begin();
+        float left = mapCamera.position.x - Cfg.VIRT_W / 2f;
+        float bottom = mapCamera.position.y - Cfg.VIRT_H / 2f;
+
+        batch.setColor(1f, 1f, 1f, FOG_ALPHA);
+        float u = fogScroll / fog.getWidth();
+        batch.draw(fog, left, bottom, Cfg.VIRT_W, Cfg.VIRT_H, u, 1f, u + 1f, 0f);
+
+        // Darken the backdrop so the panel reads as foreground. A menu drawn
+        // straight onto a busy, fully-lit scene is hard to look at, and this is
+        // cheaper and more controllable than dimming the art itself.
+        batch.setColor(0.09f, 0.07f, 0.13f, 0.30f);
+        batch.draw(game.skin().getRegion(Assets.Ui.WHITE), left, bottom,
+                   Cfg.VIRT_W, Cfg.VIRT_H);
+        batch.setColor(1f, 1f, 1f, 1f);
+        batch.end();
+
         stage.act(delta);
         stage.draw();
     }
@@ -107,6 +175,15 @@ public class MainMenuScreen extends GameScreen {
     public void dispose() {
         if (stage != null) {
             stage.dispose();
+        }
+        if (mapRenderer != null) {
+            mapRenderer.dispose();
+        }
+        if (map != null) {
+            map.dispose();
+        }
+        if (fog != null) {
+            fog.dispose();
         }
     }
 }
