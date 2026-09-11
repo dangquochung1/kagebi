@@ -48,6 +48,19 @@
     "boxed":   { "parent": "inverse", "background": "ui/bg" }
   },
 
+  "com.badlogic.gdx.scenes.scene2d.ui.Button$ButtonStyle": {
+    "default": {
+      "up": "ui/button_up",
+      "over": "ui/button_over",
+      "down": "ui/button_down",
+      "disabled": "ui/button_disabled"
+    },
+    "bind": {
+      "parent": "default",
+      "checked": "ui/button_down"
+    }
+  },
+
   "com.badlogic.gdx.scenes.scene2d.ui.TextButton$TextButtonStyle": {
     "default": {
       "up": "ui/button_up",

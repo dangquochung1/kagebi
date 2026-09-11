@@ -34,10 +34,13 @@ public class MainMenuScreen extends GameScreen {
     private static final float FOG_SPEED = 4f;
 
     /**
-     * fog.png is 41% pure opaque white, so it lightens whatever it covers. A
-     * little reads as haze; at 0.14 it bleached the whole village.
+     * fog.png is 41% pure opaque white, so it lightens whatever it covers. Kept
+     * this low because the village is meant to read as bright and fresh; there
+     * is deliberately no darkening scrim over the scene either. The panel is
+     * fully opaque, so it never needed one to be legible - dimming the backdrop
+     * only drained the colour out of the art.
      */
-    private static final float FOG_ALPHA = 0.05f;
+    private static final float FOG_ALPHA = 0.04f;
 
     private final Kagebi game;
     private Stage stage;
@@ -60,6 +63,7 @@ public class MainMenuScreen extends GameScreen {
     @Override
     public void show() {
         if (stage != null) {
+            rebuild();      // language may have changed while this was covered
             return;
         }
         map = new TmxMapLoader().load(Assets.MAPS_DIR + "village.tmx");
@@ -103,10 +107,11 @@ public class MainMenuScreen extends GameScreen {
         panel.add(new Label("KAGEBI", game.skin(), "title")).padBottom(1).row();
         panel.add(new Label(t.get("game.title"), game.skin(), "dim")).padBottom(5).row();
 
-        addMenuButton(panel, t.get("menu.continue"), true);
-        addMenuButton(panel, t.get("menu.newgame"), false);
-        addMenuButton(panel, t.get("menu.settings"), false);
-        addMenuButton(panel, t.get("menu.quit"), false);
+        addMenuButton(panel, t.get("menu.continue"), true, null);
+        addMenuButton(panel, t.get("menu.newgame"), false, null);
+        addMenuButton(panel, t.get("menu.settings"), false,
+            () -> stack().push(new SettingsScreen(game)));
+        addMenuButton(panel, t.get("menu.quit"), false, Gdx.app::exit);
 
         // Reachable before the player can read the settings label, which is the
         // point of putting it here rather than inside settings.
@@ -127,9 +132,18 @@ public class MainMenuScreen extends GameScreen {
         stage.addActor(root);
     }
 
-    private void addMenuButton(Table panel, String text, boolean disabled) {
+    private void addMenuButton(Table panel, String text, boolean disabled,
+                               Runnable action) {
         TextButton button = new TextButton(text, game.skin());
         button.setDisabled(disabled);
+        if (action != null) {
+            button.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    action.run();
+                }
+            });
+        }
         panel.add(button).width(104).padBottom(2).row();
     }
 
@@ -153,12 +167,6 @@ public class MainMenuScreen extends GameScreen {
         float u = fogScroll / fog.getWidth();
         batch.draw(fog, left, bottom, Cfg.VIRT_W, Cfg.VIRT_H, u, 1f, u + 1f, 0f);
 
-        // Darken the backdrop so the panel reads as foreground. A menu drawn
-        // straight onto a busy, fully-lit scene is hard to look at, and this is
-        // cheaper and more controllable than dimming the art itself.
-        batch.setColor(0.09f, 0.07f, 0.13f, 0.30f);
-        batch.draw(game.skin().getRegion(Assets.Ui.WHITE), left, bottom,
-                   Cfg.VIRT_W, Cfg.VIRT_H);
         batch.setColor(1f, 1f, 1f, 1f);
         batch.end();
 

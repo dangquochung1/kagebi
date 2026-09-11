@@ -17,6 +17,7 @@ import com.kagebi.input.InputMap;
 import com.kagebi.input.InputService;
 import com.kagebi.screen.MainMenuScreen;
 import com.kagebi.screen.ScreenStack;
+import com.kagebi.screen.SettingsScreen;
 import com.kagebi.screen.StyleSheetScreen;
 import com.kagebi.settings.Settings;
 import com.kagebi.ui.I18n;
@@ -113,9 +114,14 @@ public class Kagebi extends ApplicationAdapter {
             + Gdx.graphics.getBackBufferHeight());
 
         screens = new ScreenStack();
-        screens.push("style".equals(boot.screen)
-            ? new StyleSheetScreen(this, boot.page)
-            : new MainMenuScreen(this));
+        if ("style".equals(boot.screen)) {
+            screens.push(new StyleSheetScreen(this, boot.page));
+        } else {
+            screens.push(new MainMenuScreen(this));
+            if ("settings".equals(boot.screen)) {
+                screens.push(new SettingsScreen(this, boot.page - 1));
+            }
+        }
     }
 
     @Override
