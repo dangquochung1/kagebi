@@ -159,14 +159,11 @@ class RoomCatalogTest {
         }
     }
 
-    @Test
-    void decorIsLeftEmptyForAHumanToFill() {
-        for (Map.Entry<String, Tmx> e : files.entrySet()) {
-            int[] decor = e.getValue().layers.get(TiledRooms.DECOR);
-            assertTrue(Arrays.stream(decor).allMatch(g -> g == 0),
-                e.getKey() + ": the generator wrote into decor");
-        }
-    }
+    // Deliberately no "decor is empty" test. The generator never writes decor,
+    // but decor is where a human finishes a room in Tiled, so an emptiness
+    // test would fail the build on exactly the work the layer exists for.
+    // What must hold whoever drew them - every decor tile resolves to a real
+    // tileset - is covered below, flip bits and hand-added tilesets included.
 
     @Test
     void everyTileIdBelongsToATileset() {

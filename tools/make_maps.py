@@ -5,13 +5,20 @@ Maps are generated rather than drawn by hand so that changing a rule - the path
 width, how dense the trees are - is an edit in one place instead of twenty
 edits in an editor. The cost is that generated layouts look mechanical, so every
 map gets an empty `decor` layer: open the .tmx in Tiled and scatter detail into
-it by hand, and nothing here will overwrite it.
+it by hand, and nothing here will overwrite it. That promise is kept by
+carry_decor(), which lifts the decor layer out of each file before rewriting
+it; every other layer, and the spawns, belong to this script.
 
-Tile coordinates below were read off the tilesets directly (see
-tools/preview/*_grid.png), because the packs ship no metadata saying which tile
-is a tree.
+Tile coordinates below were read off the tilesets directly, because the packs
+ship no metadata saying which tile is a tree. tools/preview_tiles.py draws the
+labelled grids they were read from.
+
+Every room is flood-filled before it is written (check_room): all four doors
+open, and every floor tile reachable from every door. A room that seals a door
+still looks open in a preview, so this is not left to the eye.
 
 Usage:  python tools/make_maps.py
+        python tools/preview_map.py assets/maps/rooms/ruins review/ruins.png --spawns
 """
 import os
 import random
@@ -87,8 +94,99 @@ class Layer:
         return True
 
 
+# Tiled keeps horizontal, vertical, diagonal and hex-rotation flips in the top
+# four bits of a gid; a hand-placed decor tile may well carry one.
+FLIP_BITS = 0xF0000000
+
+
+class ForeignTileset:
+    """A tileset a human added in Tiled, written back as it was found."""
+
+    def __init__(self, node, firstgid, count):
+        self.node = node
+        self.firstgid = firstgid
+        self.count = count
+
+
+def _tileset_key(tmx_dir, source):
+    return os.path.normcase(os.path.normpath(os.path.join(tmx_dir, source)))
+
+
+def carry_decor(path, tilesets, layers, tiles_rel):
+    """Copy the decor layer out of the file about to be overwritten.
+
+    `decor` is where a human finishes a generated map by hand, so a regenerate
+    that wipes it destroys exactly the work the layer exists for - and before
+    this function existed, that is what every run did: a tile planted in
+    rooms/ruins/normal_01.tmx was gone after one run of this script.
+
+    Tiles are matched by image and local index rather than by raw gid, because
+    firstgids are this script's to renumber: add a tileset to a room and every
+    gid after it shifts. A tileset the human added in Tiled for their decor is
+    appended after the generated ones. Anything that cannot be carried across
+    exactly stops the run instead of dropping the work silently.
+
+    Returns the extra tilesets that must be written for the carried tiles.
+    """
+    decor = next((l for l in layers if l.name == "decor"), None)
+    if decor is None or not os.path.exists(path):
+        return []
+    root = ET.parse(path).getroot()
+    old = next((l for l in root.findall("layer") if l.get("name") == "decor"), None)
+    if old is None:
+        return []
+    data = old.find("data")
+    if data.get("encoding") != "csv" or data.get("compression"):
+        raise SystemExit("%s: decor is not plain CSV, so it cannot be carried "
+                         "over; re-save it in Tiled with Tile Layer Format: CSV"
+                         % path)
+    gids = [int(v) for v in data.text.replace("\n", "").split(",") if v.strip()]
+    if not any(gids):
+        return []
+    if (int(old.get("width")), int(old.get("height"))) != (decor.width, decor.height):
+        raise SystemExit("%s: hand-drawn decor is %sx%s but the map is now %dx%d; "
+                         "move it by hand before regenerating"
+                         % (path, old.get("width"), old.get("height"),
+                            decor.width, decor.height))
+
+    tmx_dir = os.path.dirname(os.path.abspath(path))
+    old_sets = []
+    for ts in root.findall("tileset"):
+        if ts.get("source"):
+            # An external .tsx: its tile count lives in that file, not here.
+            tsx = ET.parse(os.path.join(tmx_dir, ts.get("source"))).getroot()
+            count, key = int(tsx.get("tilecount")), _tileset_key(tmx_dir, ts.get("source"))
+        else:
+            count = int(ts.get("tilecount"))
+            key = _tileset_key(tmx_dir, ts.find("image").get("source"))
+        old_sets.append((int(ts.get("firstgid")), count, key, ts))
+
+    first = {_tileset_key(tmx_dir, tiles_rel + ts.filename): ts.firstgid
+             for ts in tilesets}
+    next_gid = max(ts.firstgid + ts.count for ts in tilesets)
+    extra = []
+    for i, raw in enumerate(gids):
+        if raw == 0:
+            continue
+        flags, gid = raw & FLIP_BITS, raw & ~FLIP_BITS & 0xFFFFFFFF
+        owner = next((s for s in old_sets if s[0] <= gid < s[0] + s[1]), None)
+        if owner is None:
+            raise SystemExit("%s: decor tile %d belongs to no tileset in the file"
+                             % (path, gid))
+        old_first, count, key, node = owner
+        if key not in first:
+            first[key] = next_gid
+            extra.append(ForeignTileset(node, next_gid, count))
+            next_gid += count
+        decor.data[i] = flags | (first[key] + gid - old_first)
+    print("    kept %d hand-placed decor tiles in %s"
+          % (sum(1 for g in gids if g), os.path.relpath(path, ROOT)))
+    return extra
+
+
 def write_tmx(path, width, height, tilesets, layers,
               tiles_rel="../gfx/tiles/overworld/", objects=None):
+    extra = carry_decor(path, tilesets, layers, tiles_rel)
     m = ET.Element("map", {
         "version": "1.10", "tiledversion": "1.10.2",
         "orientation": "orthogonal", "renderorder": "right-down",
@@ -108,6 +206,9 @@ def write_tmx(path, width, height, tilesets, layers,
             "source": tiles_rel + ts.filename,
             "width": str(ts.width), "height": str(ts.height),
         })
+    for ts in extra:
+        ts.node.set("firstgid", str(ts.firstgid))
+        m.append(ts.node)
     for i, layer in enumerate(layers, start=1):
         node = ET.SubElement(m, "layer", {
             "id": str(i), "name": layer.name,
@@ -358,16 +459,14 @@ DEPTHS_BONES = [(4, 6), (7, 7), (8, 6)]
 # --------------------------------------------------------------------------
 #
 # Every layout returns (blocks, singles):
-#   blocks  - list of (x, y, w, h) rectangles, each with min(w, h) == 2
+#   blocks  - list of (x, y, w, h) rectangles, both sides even
 #   singles - list of (x, y) one-tile props
 #
-# The 2-thick rule is not a style choice. The ruins frame has no fill tile -
-# its middle is transparent - so a 3x3 block would be drawn as a ring with a
-# hole in it that is solid but looks walkable. Keeping every rectangle two
-# tiles thick in one direction means every cell of it is a corner or an edge,
-# which is exactly what the frame provides.
-
-INNER = (1, 1, ROOM_W - 2, ROOM_H - 2)      # x 1..18, y 1..9
+# Even on both sides is not a style choice: every free-standing obstacle in the
+# ruins set that fills its own footprint is 2x2 (see ruins_pieces), so a block
+# is tiled out of those, and an odd side would need a piece that does not
+# exist. The depths set draws blocks as a brick face over a cap and has no
+# such limit, but one set of layouts serves both packs.
 
 
 def _open(rng):
@@ -711,19 +810,6 @@ def perimeter(layer, frame):
             continue
         layer.put(0, y, frame("left"))
         layer.put(ROOM_W - 1, y, frame("right"))
-
-
-def block(layer, x, y, w, h, frame):
-    """A free-standing rectangle drawn from the frame's corners and edges."""
-    for dy in range(h):
-        for dx in range(w):
-            if dy == 0:
-                piece = "tl" if dx == 0 else "tr" if dx == w - 1 else "top"
-            elif dy == h - 1:
-                piece = "bl" if dx == 0 else "br" if dx == w - 1 else "bottom"
-            else:
-                piece = "left" if dx == 0 else "right" if dx == w - 1 else "top"
-            layer.put(x + dx, y + dy, frame(piece))
 
 
 # --------------------------------------------------------------------------

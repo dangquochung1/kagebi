@@ -56,7 +56,7 @@ public final class FloorGenerator {
      * Whole-floor retries before accepting a floor short of its side rooms.
      * See {@link #plan} for why a retry is ever needed. The worst seed seen
      * across 25,000 - five floors of 8 to 16 rooms, 5,000 seeds each - took
-     * four attempts, so fifty is headroom, not a tuning knob. The last attempt
+     * five attempts, so fifty is headroom, not a tuning knob. The last attempt
      * is still built and checked, so a floor that never fits fails loudly in
      * {@link #check} rather than looping.
      */
@@ -69,7 +69,7 @@ public final class FloorGenerator {
     }
 
     public FloorLayout generate(FloorDef floor, long seed) {
-        Random rng = new Random(mix(seed));
+        Random rng = new Random(streamFor(seed, floor.number));
 
         // The room count is rolled once: it is the designer's number, and
         // re-rolling it on a retry would quietly bias floors towards the small
@@ -130,7 +130,8 @@ public final class FloorGenerator {
     }
 
     /**
-     * Scrambles a seed before it reaches {@code java.util.Random}.
+     * The seed {@code java.util.Random} actually gets, for a caller's seed on
+     * one floor. Two separate problems are fixed here.
      *
      * <p>Random's first output barely moves between nearby seeds: seed and
      * seed+1 differ by about 2^34.5 in its 48-bit state, so the top bits that
@@ -142,10 +143,22 @@ public final class FloorGenerator {
      * seeded as run seed plus floor number, would have had the same flat
      * spread in play.
      *
-     * <p>This is the SplitMix64 finalizer. It is a bijection, so two seeds
-     * still never share a floor, and {@link FloorLayout#seed} keeps the
-     * caller's seed rather than this one.
+     * <p>{@link #mix} scrambles that away. It is a bijection, so on any one
+     * floor two seeds still never share a layout, and {@link FloorLayout#seed}
+     * keeps the caller's seed rather than this one.
      */
+    static long streamFor(long seed, int floorNumber) {
+        // The floor number is folded in so that one run seed can be handed to
+        // every floor. Without it, the same seed on two floors is the same
+        // random stream, and whenever the first draw lands on the same room
+        // count the whole floor repeats: measured over 1,000 shared seeds,
+        // floors 4 and 5 - both depths - came out as the identical floor,
+        // same rooms in the same places, 150 times. Adding the golden-ratio
+        // constant per floor is how SplitMix64 itself steps between streams.
+        return mix(seed + 0x9E3779B97F4A7C15L * floorNumber);
+    }
+
+    /** The SplitMix64 finalizer; see {@link #streamFor}. */
     static long mix(long z) {
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
         z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
@@ -304,11 +317,11 @@ public final class FloorGenerator {
      * <p>Taking a spot kills every other spot beside it, because those would
      * then touch two rooms. Picking uniformly at random spends that budget
      * carelessly: measured over 5,000 seeds, a 10-13 room floor asking for
-     * five side rooms needed a whole-floor retry on 10.4% of seeds and nine
+     * five side rooms needed a whole-floor retry on 9.7% of seeds and six
      * attempts on its worst one. Preferring the spots with the fewest spot
      * neighbours is the greedy answer to that packing problem, and still
      * leaves a random choice among the ties; with it, the same floor retries
-     * on 5.9% of seeds and never more than four times. What is left is
+     * on 5.3% of seeds and never more than five times. What is left is
      * arithmetic rather than waste - a ten-room floor minus five side rooms
      * and the boss leaves four plain rooms to hang five side rooms on.
      */

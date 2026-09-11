@@ -238,6 +238,25 @@ class FloorGeneratorTest {
     }
 
     @Test
+    void oneRunSeedGivesEachFloorItsOwnLayout() {
+        // A caller may well hand the run's seed to every floor. Two floors
+        // alike in every number but the floor number are the harshest case:
+        // without the floor folded into the stream they are the same floor on
+        // every seed. Measured before FloorGenerator.streamFor did that, the
+        // real floors 4 and 5 - both depths - repeated on 150 seeds in 1000.
+        FloorDef a = floor(4, "depths", 11, 14, 2, 1, "b");
+        FloorDef b = floor(5, "depths", 11, 14, 2, 1, "b");
+        FloorGenerator gen = new FloorGenerator(catalog);
+        int same = 0;
+        for (long seed = 0; seed < SEEDS; seed++) {
+            if (shape(gen.generate(a, seed)).equals(shape(gen.generate(b, seed)))) {
+                same++;
+            }
+        }
+        assertTrue(same <= SEEDS / 100, same + " of " + SEEDS + " shared seeds repeated the floor");
+    }
+
+    @Test
     void roomCountsSpreadAcrossTheWholeRange() {
         // The regression test for FloorGenerator.mix. Without it, seeds 0-999
         // gave an 8-11 room floor only 10 or 11 rooms and never 8 or 9, so
