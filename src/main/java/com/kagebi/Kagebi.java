@@ -17,6 +17,7 @@ import com.kagebi.input.InputMap;
 import com.kagebi.input.InputService;
 import com.kagebi.screen.MainMenuScreen;
 import com.kagebi.screen.ScreenStack;
+import com.kagebi.screen.StyleSheetScreen;
 import com.kagebi.settings.Settings;
 import com.kagebi.ui.I18n;
 
@@ -33,22 +34,28 @@ public class Kagebi extends ApplicationAdapter {
     private InputService input;
     private ScreenStack screens;
 
-    /** Frames to render before saving a screenshot and quitting; -1 to disable. */
-    private final int screenshotAfterFrames;
-    private final String screenshotPath;
+    /**
+     * Launch options. Art direction is the one thing no test can check, so the
+     * game has to be able to open a given state and show its work.
+     */
+    public static final class Boot {
+        public String screen = "menu";
+        public int page = 1;
+        public String language;
+        /** Frames to render before saving a screenshot and quitting; -1 to disable. */
+        public int screenshotAfterFrames = -1;
+        public String screenshotPath;
+    }
+
+    private final Boot boot;
     private int framesRendered;
 
     public Kagebi() {
-        this(-1, null);
+        this(new Boot());
     }
 
-    /**
-     * Screenshot mode. Art direction is the one thing no test can check, so the
-     * game has to be able to show its work to a build step or a reviewer.
-     */
-    public Kagebi(int screenshotAfterFrames, String screenshotPath) {
-        this.screenshotAfterFrames = screenshotAfterFrames;
-        this.screenshotPath = screenshotPath;
+    public Kagebi(Boot boot) {
+        this.boot = boot;
     }
 
     public SpriteBatch batch() {
@@ -83,6 +90,9 @@ public class Kagebi extends ApplicationAdapter {
     public void create() {
         batch = new SpriteBatch();
         settings = new Settings();
+        if (boot.language != null) {
+            settings.setLanguage(I18n.Language.fromCode(boot.language));
+        }
         i18n = new I18n(settings.language());
         audio = new AudioService(settings);
         inputMap = new InputMap();
@@ -103,7 +113,9 @@ public class Kagebi extends ApplicationAdapter {
             + Gdx.graphics.getBackBufferHeight());
 
         screens = new ScreenStack();
-        screens.push(new MainMenuScreen(this));
+        screens.push("style".equals(boot.screen)
+            ? new StyleSheetScreen(this, boot.page)
+            : new MainMenuScreen(this));
     }
 
     @Override
@@ -113,8 +125,8 @@ public class Kagebi extends ApplicationAdapter {
         audio.update(delta);
         screens.render(delta);
 
-        if (screenshotAfterFrames >= 0 && ++framesRendered >= screenshotAfterFrames) {
-            saveScreenshot(screenshotPath);
+        if (boot.screenshotAfterFrames >= 0 && ++framesRendered >= boot.screenshotAfterFrames) {
+            saveScreenshot(boot.screenshotPath);
             Gdx.app.exit();
         }
     }

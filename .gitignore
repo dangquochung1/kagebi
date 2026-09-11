@@ -36,3 +36,6 @@ desktop.ini
 
 # Regenerable dev previews
 tools/preview/
+
+# Regenerable review screenshots
+review/
