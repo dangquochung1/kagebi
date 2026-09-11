@@ -10,14 +10,11 @@ assets/gfx/
 assets/audio/
 assets/atlas/
 
-# Build output
-build/
-*/build/
-.gradle/
+# Build output (Maven)
+target/
 out/
 *.class
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
 
 # Scratch
 tools/__pycache__/

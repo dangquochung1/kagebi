@@ -11,7 +11,8 @@ public final class DesktopLauncher {
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("KAGEBI");
         config.setWindowedMode(Cfg.VIRT_W * 4, Cfg.VIRT_H * 4);   // 1280x720
-        config.setWindowSizeLimits(Cfg.VIRT_W, Cfg.VIRT_H, -1, -1);
+        // Never below 2x: at 1x a 12px UI row is 12 screen pixels and unclickable.
+        config.setWindowSizeLimits(Cfg.VIRT_W * 2, Cfg.VIRT_H * 2, -1, -1);
         config.useVsync(true);
         config.setForegroundFPS(60);
 

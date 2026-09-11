@@ -242,7 +242,7 @@ def build(font_path, out_dir, size, preview):
                  'stretchH=100 smooth=0 aa=1 padding=0,0,0,0 spacing=1,1\n'
                  % (stem, size))
         fh.write('common lineHeight=%d base=%d scaleW=%d scaleH=%d pages=1 packed=0\n'
-                 % (rast.height + 1, rast.baseline, side, side))
+                 % (line_height, base_line, side, side))
         fh.write('page id=0 file="%s"\n' % png_name)
         fh.write('chars count=%d\n' % len(records))
         for cp, x, y, w, h, xo, yo, adv in records:
