@@ -43,11 +43,11 @@ places, and `ContentValidatorTest` will tell you if you forget.
 | `glass_cannon` | **one number, both directions**: damage dealt and damage taken are both multiplied by it | every hit, both ways |
 | `room_clear_heal` | hit points | when a room's last enemy dies |
 
-### Item effects (11)
+### Item effects (10)
 
 Used by `ItemDef.effect`. Pickup and inventory code interprets these.
 
-`heal`, `heal_pct`, `cure_poison`, `max_hp_add`, `gold`, `key`,
+`heal`, `cure_poison`, `max_hp_add`, `gold`, `key`,
 `speed_buff`, `damage_buff`, `shield_buff`, `drop_aggro`, `reveal_map`.
 
 `speed_buff`, `damage_buff` and `shield_buff` all last 600 steps (10s) so the
@@ -77,7 +77,7 @@ Also enforced by `ContentValidator`, from `ContentValidator.BRAINS`.
 | `chaser` | walks straight at the player; damage is contact | larva, axolot, skeleton1 |
 | `hopper` | idles, then hops a fixed distance toward the player | slime |
 | `wanderer` | random walk until `aggroRange`, then `chaser` | mouse |
-| `flyer` | ignores walls and pits, approaches on a sine | bluebat, spirit, wraith |
+| `flyer` | ignores walls and pits, approaches on a sine. If `attackDamage > 0` it also fires from `attackRange` | bluebat, spirit (fires `spiritbolt`), wraith |
 | `shooter` | holds at `attackRange`, fires, retreats if closed on | octopus, zealot |
 | `charger` | telegraphs for `windupSteps`, then rushes in a straight line | kappared, reptile, skeleton2, bonelord |
 | `ambusher` | still and harmless until the player is inside `aggroRange`, then lunges | mollusc, vampire |
@@ -204,6 +204,10 @@ happens. In the order I would add them.
 - **`RunSummary.gold` banks in full.** Nothing is taxed on death. The cheapest
   village upgrade is 150 so that a first run, which ends on floor 2 with around
   240 banked, buys exactly one thing and has change.
+- **Biomes are `ruins`, `ruins_green`, `ruins_orange`, `depths`** - the folder
+  names procgen writes under `assets/maps/rooms/`. Floors 1/2/3 take one ruins
+  colourway each and 4/5 share `depths`. `ContentValidator.BIOMES` holds the
+  four names; a fifth biome folder needs adding there too.
 - **Floor 3 and floor 5 are the only floors with a boss.** `FloorDef.boss` is
   null on 1, 2 and 4, and `hasBoss()` already answers that.
 - **`assets/data/icons.json` is a name-to-index map, not a def.** It is loaded
