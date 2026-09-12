@@ -1,0 +1,177 @@
+{
+    "activeFile": "assets/maps/village.tmx",
+    "expandedProjectPaths": [
+        "assets/maps/rooms",
+        "assets/maps",
+        "assets/maps/rooms/ruins_orange",
+        "assets/maps/rooms/ruins_green",
+        "assets/maps/rooms/depths"
+    ],
+    "fileStates": {
+        "assets/maps/rooms/depths/normal_01.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 2,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/depths/normal_01.tmx#dungeon": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/depths/normal_03.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/depths/normal_03.tmx#dungeon": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/depths/normal_07.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/depths/normal_07.tmx#dungeon": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/depths/secret_01.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/depths/secret_01.tmx#dungeon": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/depths/start_01.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/depths/start_01.tmx#dungeon": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/boss_01.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/ruins_green/boss_01.tmx#elements": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/boss_01.tmx#floor": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/boss_01.tmx#wall": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/exit_02.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/ruins_green/exit_02.tmx#elements": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/exit_02.tmx#floor": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/exit_02.tmx#wall": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/normal_05.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/ruins_green/normal_05.tmx#elements": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/normal_05.tmx#floor": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_green/normal_05.tmx#wall": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_orange/treasure_02.tmx": {
+            "scale": 1.85546875,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 160.0673684210526,
+                "y": 88.1178947368421
+            }
+        },
+        "assets/maps/rooms/ruins_orange/treasure_02.tmx#elements": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_orange/treasure_02.tmx#floor": {
+            "scaleInDock": 1
+        },
+        "assets/maps/rooms/ruins_orange/treasure_02.tmx#wall": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx": {
+            "scale": 1.2369791666666665,
+            "selectedLayer": 1,
+            "viewCenter": {
+                "x": 240.10105263157897,
+                "y": 144.30315789473687
+            }
+        },
+        "assets/maps/village.tmx#floor": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#house": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#nature": {
+            "scaleInDock": 1
+        }
+    },
+    "openFiles": [
+        "assets/maps/rooms/depths/normal_01.tmx",
+        "assets/maps/rooms/depths/normal_03.tmx",
+        "assets/maps/rooms/depths/normal_07.tmx",
+        "assets/maps/rooms/depths/secret_01.tmx",
+        "assets/maps/village.tmx",
+        "assets/maps/rooms/ruins_orange/treasure_02.tmx",
+        "assets/maps/rooms/ruins_green/boss_01.tmx",
+        "assets/maps/rooms/ruins_green/exit_02.tmx",
+        "assets/maps/rooms/ruins_green/normal_05.tmx",
+        "assets/maps/rooms/depths/start_01.tmx"
+    ],
+    "project": "kagebi.tiled-project",
+    "recentFiles": [
+        "assets/maps/rooms/depths/normal_01.tmx",
+        "assets/maps/rooms/depths/normal_03.tmx",
+        "assets/maps/rooms/depths/normal_07.tmx",
+        "assets/maps/rooms/depths/secret_01.tmx",
+        "assets/maps/rooms/depths/start_01.tmx",
+        "assets/maps/rooms/ruins_green/normal_05.tmx",
+        "assets/maps/rooms/ruins_green/exit_02.tmx",
+        "assets/maps/rooms/ruins_green/boss_01.tmx",
+        "assets/maps/rooms/ruins_orange/treasure_02.tmx",
+        "assets/maps/village.tmx"
+    ]
+}
