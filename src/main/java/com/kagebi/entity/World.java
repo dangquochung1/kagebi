@@ -1,6 +1,7 @@
 package com.kagebi.entity;
 
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.utils.Disposable;
 import com.kagebi.Dir;
 import com.kagebi.gen.CollisionGrid;
@@ -22,6 +23,18 @@ import com.kagebi.input.InputService;
  * already uses.
  */
 public interface World extends Disposable {
+
+    /**
+     * Hands over atlases the screen already holds, so the world stops loading
+     * its own copies - about 20MB of texture for art that is on the GPU twice.
+     *
+     * <p>On the interface rather than on the implementation because it is part
+     * of this seam: the screen owns the atlases, and this is how it says so.
+     * Doing nothing is a correct implementation - the effect is memory, not
+     * behaviour - so a test double need not care.
+     */
+    default void useSharedAtlases(TextureAtlas ui, TextureAtlas fx) {
+    }
 
     /**
      * Advances one fixed step. Called from the accumulator loop, never from

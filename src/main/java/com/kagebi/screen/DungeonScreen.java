@@ -160,6 +160,20 @@ public class DungeonScreen extends SimScreen {
         return this;
     }
 
+    private boolean fightOnShow;
+
+    /**
+     * Opens in the first room that has enemies in it, for
+     * {@code --screen fight}. Without it the only dungeon anyone can screenshot
+     * is the start room, which is empty by design - so the game's central view,
+     * a room with something in it trying to kill you, could not be looked at at
+     * all.
+     */
+    DungeonScreen inFight() {
+        fightOnShow = true;
+        return this;
+    }
+
     @Override
     public InputProcessor inputProcessor() {
         return game.input();
@@ -187,12 +201,23 @@ public class DungeonScreen extends SimScreen {
         }
         templates = RoomCatalog.load();
         world = new EntityWorld(Preload.actors(), game.content(), run, game.settings());
+        // Without this the world loads its own copies of both pages: ~20MB of
+        // texture for art this screen is already holding.
+        world.useSharedAtlases(game.skin().getAtlas(), Preload.fx());
         startFloor(Math.max(1, run.floor));
         if (mapOnShow) {
             hud.toggleMap();
         }
         if (exitOnShow && run.layout != null) {
             enter(run.layout.exit(), null);
+        }
+        if (fightOnShow && run.layout != null) {
+            for (Room candidate : run.layout.rooms()) {
+                if (candidate.kind == RoomKind.NORMAL) {
+                    enter(candidate, null);
+                    break;
+                }
+            }
         }
         if (slideOnShow && run.room != null) {
             for (Dir d : Dir.ALL) {

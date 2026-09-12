@@ -187,6 +187,9 @@ public class HubScreen extends SimScreen {
         }
 
         world = new EntityWorld(Preload.actors(), game.content(), run, game.settings());
+        // Without this the world loads its own copies of both pages: ~20MB of
+        // texture for art this screen is already holding.
+        world.useSharedAtlases(game.skin().getAtlas(), Preload.fx());
         world.enterRoom(villageRoom(), grid, null);
         if (talkOnShow >= 0 && talkOnShow < villagers.size) {
             talk(villagers.get(talkOnShow));

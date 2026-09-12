@@ -15,6 +15,7 @@ import com.kagebi.assets.Assets;
 import com.kagebi.audio.AudioService;
 import com.kagebi.data.ContentLoader;
 import com.kagebi.data.ContentRegistry;
+import com.kagebi.data.ShopCatalog;
 import com.kagebi.input.InputMap;
 import com.kagebi.input.InputService;
 import com.kagebi.run.RunState;
@@ -39,6 +40,7 @@ public class Kagebi extends ApplicationAdapter {
     private InputService input;
     private ScreenStack screens;
     private ContentRegistry content;
+    private ShopCatalog shop;
     private SaveManager saves;
     private Profile profile;
     /** The run in progress, or null outside one. Set by the screens. */
@@ -100,6 +102,14 @@ public class Kagebi extends ApplicationAdapter {
         return content;
     }
 
+    /**
+     * The village shop. Deliberately not inside {@link ContentRegistry}, which
+     * holds only what a run is made of; upgrades and unlocks outlive runs.
+     */
+    public ShopCatalog shop() {
+        return shop;
+    }
+
     public Profile profile() {
         return profile;
     }
@@ -143,6 +153,7 @@ public class Kagebi extends ApplicationAdapter {
             + Gdx.graphics.getBackBufferHeight());
 
         content = ContentLoader.load();
+        shop = ShopCatalog.load();
         saves = new SaveManager();
         profile = saves.load();
 

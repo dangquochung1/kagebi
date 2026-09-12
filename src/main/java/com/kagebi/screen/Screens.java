@@ -27,6 +27,7 @@ import com.kagebi.run.RunState;
  *   talk      --page 1-3   the village, mid-conversation with that villager
  *   dungeon   --page 1-5   the start room of that floor
  *   map       --page 1-5   the same, with the floor map expanded
+ *   fight     --page 1-5   the first room of that floor that has enemies in it
  *   slide                  halfway through the first room transition
  *   exit      --page 1-5   standing on that floor's way down
  *   pause                  the pause menu over floor 1
@@ -79,6 +80,9 @@ public final class Screens {
             case "exit":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game).atExit()};
+            case "fight":
+                startRun(game, page);
+                return new GameScreen[] {new DungeonScreen(game).inFight()};
             case "slide":
                 startRun(game, 1);
                 return new GameScreen[] {new DungeonScreen(game).sliding()};

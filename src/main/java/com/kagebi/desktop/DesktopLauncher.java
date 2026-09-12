@@ -19,6 +19,7 @@ import com.kagebi.Kagebi.Boot;
  *   --lang vi|en          force a language
  *   --scale N             window at N x 320x180      (default 4)
  *   --screenshot PATH     render a few frames, save a PNG, exit
+ *   --frames N            how many frames first; use it to let fades finish
  * </pre>
  */
 public final class DesktopLauncher {
@@ -53,7 +54,19 @@ public final class DesktopLauncher {
                 case "--screenshot" -> {
                     if (hasValue) {
                         boot.screenshotPath = args[++i];
-                        boot.screenshotAfterFrames = 12;
+                        if (boot.screenshotAfterFrames < 0) {
+                            boot.screenshotAfterFrames = 12;
+                        }
+                    }
+                }
+                // Anything that fades - a floor title card, a room transition,
+                // a hit flash - looks like a permanent part of the screen in a
+                // shot taken while it is still up. Being able to say when the
+                // shot is taken is the difference between reviewing the game
+                // and reviewing frame twelve of it.
+                case "--frames" -> {
+                    if (hasValue) {
+                        boot.screenshotAfterFrames = Integer.parseInt(args[++i]);
                     }
                 }
                 default -> { }

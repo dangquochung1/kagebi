@@ -1,5 +1,6 @@
 package com.kagebi.screen;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -93,16 +94,14 @@ abstract class RunEndScreen extends SimScreen {
         summary = run.summary();
         banked = run.gold;
 
+        // What a death is worth, and how far the village dims, are balance
+        // decisions with a test behind them; keeping them out of this screen is
+        // what stops the two drifting apart.
         Profile profile = game.profile();
-        profile.gold += banked;
-        profile.runs++;
-        profile.deepestFloor = Math.max(profile.deepestFloor, summary.deepestFloor);
-        if (victory) {
-            profile.wins++;
-        } else {
-            profile.villageDarkness++;
+        game.shop().bank(profile, summary);
+        if (!game.saves().save(profile)) {
+            Gdx.app.error("save", "profile not written; the previous save stands");
         }
-        game.saves().save(profile);
 
         // The next run starts from the village with the same ninja and weapon,
         // at full health. What the dead run was carrying stays with it.
