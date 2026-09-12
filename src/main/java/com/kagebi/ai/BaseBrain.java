@@ -63,6 +63,15 @@ public abstract class BaseBrain implements AiBrain {
 
     @Override
     public final void think(Enemy self, AiContext ctx) {
+        // First, not last: every transient case below returns early, so a
+        // check after the switch would never see the states it exists for.
+        if (self.stateSteps() >= WEDGE_LIMIT && self.state() != AiState.IDLE
+                && self.state() != AiState.CHASE && self.state() != AiState.DEAD) {
+            self.attack().cancel();
+            self.halt();
+            self.setState(AiState.IDLE);
+            return;
+        }
         switch (self.state()) {
             case DEAD:
                 return;
@@ -110,10 +119,6 @@ public abstract class BaseBrain implements AiBrain {
             default:
                 idle(self, ctx);
                 break;
-        }
-        if (self.state() != AiState.IDLE && self.state() != AiState.CHASE
-                && self.stateSteps() > WEDGE_LIMIT) {
-            self.setState(AiState.IDLE);
         }
     }
 

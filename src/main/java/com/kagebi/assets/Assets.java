@@ -144,6 +144,24 @@ public final class Assets {
             "idle", "walk", "attack", "roll", "hit", "dead", "pickup",
         };
 
+        /**
+         * The animation names in {@link #PLAYER_ANIMS}, by role. A nested class
+         * rather than String fields here, because AssetsContractTest reads every
+         * String field of Actor as a complete region name.
+         */
+        public static final class PlayerAnim {
+            public static final String IDLE = "idle";
+            public static final String WALK = "walk";
+            public static final String ATTACK = "attack";
+            public static final String ROLL = "roll";
+            public static final String HIT = "hit";
+            /** 32x64: one column of two frames, not a directional sheet. */
+            public static final String DEAD = "dead";
+            public static final String PICKUP = "pickup";
+
+            private PlayerAnim() {}
+        }
+
         /** e.g. {@code player(CHARACTERS[0], "walk")} -> player/ninjagreen/walk */
         public static String player(String characterId, String animation) {
             return "player/" + characterId + "/" + animation;

@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
 import com.kagebi.ai.AiBrain;
+import com.kagebi.ai.AiContext;
 import com.kagebi.ai.AiState;
 import com.kagebi.combat.AttackState;
 import com.kagebi.combat.Faction;
@@ -99,8 +100,17 @@ public class Enemy extends Entity {
         // The body is smaller than the cell on purpose: a 16px sprite with a
         // 16px box cannot pass a 16px gap, and every corridor in the game is
         // exactly that wide.
-        this.bodyW = def.boss ? def.cell * 0.7f : 12f;
-        this.bodyH = def.boss ? def.cell * 0.6f : 12f;
+        this.bodyW = 12f;
+        this.bodyH = 12f;
+        if (def.boss) {
+            // A boss is sized from its measured figure, not its cell: tengured's
+            // 82px cell holds a 53x33 figure, and a body cut from the cell would
+            // be hit by swings that visibly passed over its head.
+            float fw = sprites != null ? sprites.figureW : def.cell * 0.65f;
+            float fh = sprites != null ? sprites.figureH : def.cell * 0.5f;
+            this.bodyW = Math.max(12f, fw * 0.75f);
+            this.bodyH = Math.max(12f, fh * 0.6f);
+        }
     }
 
     public AiBrain brain() {
@@ -152,6 +162,15 @@ public class Enemy extends Entity {
 
     @Override
     public void step(EntityWorld world) {
+        simulate(world);
+    }
+
+    /**
+     * One step against any context. The world passes itself; an AI test
+     * passes a thirty-line fake, which is the whole reason this is split out
+     * of {@link #step}.
+     */
+    public void simulate(AiContext ctx) {
         stepTimers();
         if (cooldown > 0) {
             cooldown--;
@@ -169,8 +188,8 @@ public class Enemy extends Entity {
             return;
         }
 
-        applyShove(world.collision());
-        brain.think(this, world);
+        applyShove(ctx.collision());
+        brain.think(this, ctx);
         stateSteps++;
     }
 
@@ -271,13 +290,6 @@ public class Enemy extends Entity {
     }
 
     // ---- rendering -------------------------------------------------------
-
-    @Override
-    protected int spriteFootOffset() {
-        // The depths strips stand their 20px figures two pixels off the bottom
-        // of a 32px cell; the 16px monsters fill theirs to the edge.
-        return sprites != null && sprites.cell >= 32 && !def.boss ? -2 : 0;
-    }
 
     @Override
     protected boolean castsShadow() {

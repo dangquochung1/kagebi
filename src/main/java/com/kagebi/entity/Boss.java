@@ -2,6 +2,7 @@ package com.kagebi.entity;
 
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.kagebi.ai.AiBrain;
+import com.kagebi.ai.AiContext;
 import com.kagebi.ai.AiState;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.gfx.Anim;
@@ -53,6 +54,16 @@ public final class Boss extends Enemy {
     }
 
     /**
+     * Untouchable for the whole transformation, from the step it begins.
+     * Granting i-frames step by step instead leaves the first step open, and
+     * a fast weapon lands a free hit on exactly the frame the fight pauses.
+     */
+    @Override
+    public boolean invulnerable() {
+        return transforming || super.invulnerable();
+    }
+
+    /**
      * Health fraction at which the next phase begins.
      *
      * <p>Equal slices: a two-phase boss turns at half, a three-phase one at two
@@ -67,13 +78,12 @@ public final class Boss extends Enemy {
     }
 
     @Override
-    public void step(EntityWorld world) {
+    public void simulate(AiContext ctx) {
         if (transforming) {
             stepTimers();
-            // Untouchable and motionless. Letting the player keep hitting
-            // through a transformation makes it a free damage window, which is
-            // the opposite of the beat it is supposed to be.
-            iframes.grant(2);
+            // Motionless and, through invulnerable(), untouchable. Letting the
+            // player keep hitting through a transformation makes it a free
+            // damage window, the opposite of the beat it is supposed to be.
             flashSteps = transformSteps % 8 < 4 ? 2 : 0;
             transformSteps--;
             if (transformSteps <= 0) {
@@ -87,7 +97,7 @@ public final class Boss extends Enemy {
             beginTransformation();
             return;
         }
-        super.step(world);
+        super.simulate(ctx);
     }
 
     private void beginTransformation() {

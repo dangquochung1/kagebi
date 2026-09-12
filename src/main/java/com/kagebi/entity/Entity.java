@@ -161,17 +161,24 @@ public abstract class Entity implements Updatable, Damageable {
         return moved;
     }
 
-    /** Applies the current knockback velocity for one step. */
+    /**
+     * Applies the current knockback velocity for one step, then decays it.
+     *
+     * <p>Move first, decay second. The other order silently drops the first
+     * and strongest step of every shove - a 70 px/s hit then travels 6.4px
+     * rather than 7.6, and every knockback number in the game is a sixth
+     * weaker than whoever tuned it believes. {@code PlayerTest} pins this.
+     */
     protected void applyShove(CollisionGrid grid) {
         if (shove.active()) {
             moveBy(grid, shove.vx() * Cfg.STEP, shove.vy() * Cfg.STEP);
+            shove.step();
         }
     }
 
     /** Counters every entity runs down, whatever else it is doing. */
     protected void stepTimers() {
         iframes.step();
-        shove.step();
         if (flashSteps > 0) {
             flashSteps--;
         }
@@ -184,12 +191,12 @@ public abstract class Entity implements Updatable, Damageable {
     public abstract TextureRegion frame();
 
     /**
-     * Pixels between the bottom of the body box and the bottom of the sprite.
-     * Negative for the player, whose 32px cell holds a character standing a
-     * couple of pixels off the bottom edge.
+     * Pixels between the bottom of the body box and the bottom of the frame:
+     * minus the empty rows under the figure's feet, so the feet land on the
+     * shadow. Measured per sheet shape in {@link ActorSprites}.
      */
     protected int spriteFootOffset() {
-        return 0;
+        return sprites == null ? 0 : -sprites.footInset;
     }
 
     protected boolean castsShadow() {
@@ -202,8 +209,12 @@ public abstract class Entity implements Updatable, Damageable {
             return;
         }
         TextureRegion s = sprites.shadow;
-        batch.draw(s, Math.round(x - s.getRegionWidth() / 2f),
-            Math.round(footY() - s.getRegionHeight() / 2f + 1f));
+        // The 12x7 shadow suits a 16px body. Under a 40px frog it reads as a
+        // coin on the floor, so it widens to the body and keeps its proportions.
+        float w = Math.max(s.getRegionWidth(), bodyW * 0.9f);
+        float h = s.getRegionHeight() * w / s.getRegionWidth();
+        batch.draw(s, Math.round(x - w / 2f), Math.round(footY() - h / 2f + 1f),
+            Math.round(w), Math.round(h));
     }
 
     /** Single-facing art is mirrored for LEFT; directional sheets have a real left column. */
@@ -216,9 +227,10 @@ public abstract class Entity implements Updatable, Damageable {
         if (f == null) {
             return;
         }
-        int drawX = Math.round(x - f.getRegionWidth() / 2f);
-        int drawY = Math.round(footY() + spriteFootOffset());
         boolean flip = flipX();
+        int shift = sprites == null ? 0 : (flip ? -sprites.shiftX : sprites.shiftX);
+        int drawX = Math.round(x - f.getRegionWidth() / 2f) + shift;
+        int drawY = Math.round(footY() + spriteFootOffset());
 
         // Blinking while invulnerable is the only cue the player has that the
         // i-frames they paid a roll for are still running. Dropping frames

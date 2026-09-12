@@ -35,13 +35,24 @@ public final class Damage {
      */
     public static final float MAX_RESIST = 0.9f;
 
+    /**
+     * Nudge applied before rounding.
+     *
+     * <p>Multipliers are typed in decimal in the JSON and are not exact in
+     * binary: 1.15f is 1.14999998, so a 10-damage katana with a +15% relic
+     * comes out at 11.4999998 and rounds to 11 where the designer wrote 11.5
+     * and meant 12. A thousandth of a point is far below any real difference
+     * between two damage values and is enough to put those halves back.
+     */
+    private static final float ROUNDING_NUDGE = 0.001f;
+
     /** Weapon number scaled by the attacker's multipliers and its crit roll. */
     public static int outgoing(int base, float damageMult, boolean crit, float critMult) {
         float raw = base * damageMult;
         if (crit) {
             raw *= critMult;
         }
-        return Math.max(MIN, Math.round(raw));
+        return Math.max(MIN, Math.round(raw + ROUNDING_NUDGE));
     }
 
     /**
@@ -54,7 +65,7 @@ public final class Damage {
     public static int incoming(int amount, int armour, float resist) {
         float after = amount - armour;
         after *= 1f - clampResist(resist);
-        return Math.max(MIN, Math.round(after));
+        return Math.max(MIN, Math.round(after + ROUNDING_NUDGE));
     }
 
     /** The whole formula end to end, for tests and for anything with both halves. */

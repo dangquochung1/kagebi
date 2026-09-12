@@ -646,13 +646,21 @@ public final class EntityWorld implements World, AiContext {
         return e;
     }
 
+    /**
+     * The current floor's def, or null.
+     *
+     * <p>Caught rather than searched for: {@code ContentRegistry} has no
+     * {@code hasFloor}, and {@code allFloors()} stops at the first missing
+     * number - so a floors.json that defines floor 5 but not yet floor 4 would
+     * make the floor-5 boss silently vanish. Once per room entry, so the cost of
+     * the exception is nothing.
+     */
     private FloorDef floorDef() {
-        for (FloorDef f : content.allFloors()) {
-            if (f.number == run.floor) {
-                return f;
-            }
+        try {
+            return content.floor(run.floor);
+        } catch (IllegalArgumentException missing) {
+            return null;
         }
-        return null;
     }
 
     /** A weighted pick from the floor's pool, over the ids that actually resolve. */

@@ -1,7 +1,13 @@
 package com.kagebi.entity;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.TextureData;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.glutils.FileTextureData;
 import com.kagebi.Dir;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.def.EnemyDef;
@@ -43,6 +49,29 @@ public final class ActorSprites {
     public static final int PLAYER_CELL = 32;
     public static final int MONSTER_CELL = 16;
 
+    /*
+     * Transparent rows below the feet, measured on the source sheets. The ninja
+     * is a 15x15 figure in the middle of a 32px cell with 8 empty rows beneath
+     * it - all six are recolours of one sheet, so one number serves. The depths
+     * skeletons and vampire leave 3. The 16px monsters fill their cells to within
+     * a pixel. Bosses vary too much for a constant (giantfrog2 leaves 7 of 40,
+     * tengured 24 of 82) and are measured at load; see measureFigure.
+     */
+    private static final int PLAYER_FOOT = 8;
+    private static final int PLAYER_FIGURE = 15;
+    private static final int DEPTHS_FOOT = 3;
+    /*
+     * The depths figures do not stand in the middle of their 32px cells: the
+     * feet average x = 12.9 across the idle, movement and attack strips of all
+     * three actors, against a cell centre of 15.5. Drawn centred, a skeleton
+     * stands three pixels beside its own shadow - on the other side when flipped.
+     */
+    private static final int DEPTHS_SHIFT = 3;
+    private static final int MONSTER_FOOT = 1;
+
+    /** Boss figures, measured once per region per session. */
+    private static final Map<String, int[]> FIGURES = new HashMap<>();
+
     public final int cell;
     /**
      * Drawn one way only, so facing left means flipping. The directional sheets
@@ -61,10 +90,23 @@ public final class ActorSprites {
     public final TextureRegion[] dead;
     public final TextureRegion shadow;
 
+    /** Empty rows between the bottom of a frame and the figure's feet. */
+    public int footInset;
+    /**
+     * Pixels to move the frame right so the figure's feet, not the cell,
+     * are centred on the entity. Mirrored when the frame is flipped.
+     */
+    public int shiftX;
+    /** The opaque figure inside a frame, for sizing a boss's body and shadow. */
+    public int figureW;
+    public int figureH;
+
     private ActorSprites(int cell, boolean singleFacing, Anim idle, Anim walk, Anim attack,
                          Anim hurt, Anim roll, Anim death, TextureRegion[] dead,
                          TextureRegion shadow) {
         this.cell = cell;
+        this.figureW = cell;
+        this.figureH = cell;
         this.singleFacing = singleFacing;
         this.idle = idle;
         this.walk = walk;
@@ -82,16 +124,29 @@ public final class ActorSprites {
             return null;
         }
         return new ActorSprites(PLAYER_CELL, false,
-            Anim.directional(atlas, Assets.Actor.player(characterId, "idle"), PLAYER_CELL, 12, true),
-            Anim.directional(atlas, Assets.Actor.player(characterId, "walk"), PLAYER_CELL, 6, true),
+            ninja(atlas, characterId, Assets.Actor.PlayerAnim.IDLE, 12, true),
+            ninja(atlas, characterId, Assets.Actor.PlayerAnim.WALK, 6, true),
             // One step per frame: a swing lasts as long as its weapon says, so
             // frameOf() stretches the art over it rather than the art guessing.
-            Anim.directional(atlas, Assets.Actor.player(characterId, "attack"), PLAYER_CELL, 1, false),
-            Anim.directional(atlas, Assets.Actor.player(characterId, "hit"), PLAYER_CELL, 1, false),
-            Anim.directional(atlas, Assets.Actor.player(characterId, "roll"), PLAYER_CELL, 1, false),
+            ninja(atlas, characterId, Assets.Actor.PlayerAnim.ATTACK, 1, false),
+            ninja(atlas, characterId, Assets.Actor.PlayerAnim.HIT, 1, false),
+            ninja(atlas, characterId, Assets.Actor.PlayerAnim.ROLL, 1, false),
             null,
-            column(atlas, Assets.Actor.player(characterId, "dead"), PLAYER_CELL),
-            atlas.findRegion(Assets.Actor.SHADOW));
+            column(atlas, Assets.Actor.player(characterId, Assets.Actor.PlayerAnim.DEAD), PLAYER_CELL),
+            atlas.findRegion(Assets.Actor.SHADOW)).figure(PLAYER_FOOT, PLAYER_FIGURE, PLAYER_FIGURE);
+    }
+
+    private ActorSprites figure(int foot, int w, int h) {
+        footInset = foot;
+        figureW = w;
+        figureH = h;
+        return this;
+    }
+
+    private static Anim ninja(TextureAtlas atlas, String characterId, String animation,
+                              int stepsPerFrame, boolean looping) {
+        return Anim.directional(atlas, Assets.Actor.player(characterId, animation),
+            PLAYER_CELL, stepsPerFrame, looping);
     }
 
     /**
@@ -122,11 +177,12 @@ public final class ActorSprites {
             return new ActorSprites(cell, false,
                 Anim.directional(atlas, def.sprite, cell, 14, true),
                 Anim.directional(atlas, def.sprite, cell, 6, true),
-                null, null, null, null, null, shadow);
+                null, null, null, null, null, shadow).figure(MONSTER_FOOT, cell, cell);
         }
         if (h == cell) {
             Anim strip = Anim.strip(atlas, def.sprite, 8, true);
-            return new ActorSprites(cell, true, strip, strip, null, null, null, null, null, shadow);
+            return new ActorSprites(cell, true, strip, strip, null, null, null, null, null, shadow)
+                .figure(0, cell, cell);
         }
         return null;
     }
@@ -144,9 +200,63 @@ public final class ActorSprites {
         Anim walk = firstStrip(atlas, id, Assets.Actor.BOSS_MOVE, 6, true);
         Anim attack = firstStrip(atlas, id, Assets.Actor.BOSS_ATTACK, 1, false);
         Anim hurt = firstStrip(atlas, id, Assets.Actor.BOSS_HURT, 1, false);
-        int cell = atlas.findRegion(Assets.Actor.boss(id, idleName)).getRegionHeight();
-        return new ActorSprites(cell, false, idle, walk != null ? walk : idle, attack, hurt,
-            null, null, null, atlas.findRegion(Assets.Actor.SHADOW));
+        String idleRegion = Assets.Actor.boss(id, idleName);
+        int cell = atlas.findRegion(idleRegion).getRegionHeight();
+        ActorSprites out = new ActorSprites(cell, false, idle, walk != null ? walk : idle,
+            attack, hurt, null, null, null, atlas.findRegion(Assets.Actor.SHADOW));
+        int[] fig = measureFigure(atlas.findRegion(idleRegion), cell);
+        if (fig != null) {
+            out.figure(fig[0], fig[1], fig[2]);
+        }
+        return out;
+    }
+
+    /**
+     * The opaque figure in a strip's first frame: {foot inset, width, height}.
+     *
+     * <p>Read from the atlas page itself, the same way a texture reloads after
+     * a lost context, so no path is written down here. Decoding the page costs
+     * tens of milliseconds, which is why only bosses are measured - one per
+     * floor - and why the answer is kept for the session. Null if the page
+     * cannot be re-read, in which case the cell stands in for the figure.
+     */
+    private static int[] measureFigure(TextureRegion region, int cell) {
+        TextureData data = region.getTexture().getTextureData();
+        if (!(data instanceof FileTextureData)) {
+            return null;
+        }
+        String key = ((FileTextureData) data).getFileHandle().path() + "@"
+            + region.getRegionX() + "," + region.getRegionY();
+        int[] cached = FIGURES.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        Pixmap page = new Pixmap(((FileTextureData) data).getFileHandle());
+        try {
+            int left = cell;
+            int right = -1;
+            int top = cell;
+            int bottom = -1;
+            for (int py = 0; py < cell; py++) {
+                for (int px = 0; px < cell; px++) {
+                    int rgba = page.getPixel(region.getRegionX() + px, region.getRegionY() + py);
+                    if ((rgba & 0xFF) > 20) {
+                        left = Math.min(left, px);
+                        right = Math.max(right, px);
+                        top = Math.min(top, py);
+                        bottom = Math.max(bottom, py);
+                    }
+                }
+            }
+            if (right < 0) {
+                return null;
+            }
+            int[] fig = {cell - 1 - bottom, right - left + 1, bottom - top + 1};
+            FIGURES.put(key, fig);
+            return fig;
+        } finally {
+            page.dispose();
+        }
     }
 
     /** The transformation strip, which only the two-phase bosses ship. */
@@ -171,7 +281,13 @@ public final class ActorSprites {
             // The room counts the kill on the step hp reaches zero, not when
             // this finishes, so a long death never holds a door shut.
             strip(atlas, Assets.Actor.depthsDeath(idleRegion), 4, false),
-            null, atlas.findRegion(Assets.Actor.SHADOW));
+            null, atlas.findRegion(Assets.Actor.SHADOW)).figure(DEPTHS_FOOT, 15, 16)
+            .shifted(DEPTHS_SHIFT);
+    }
+
+    private ActorSprites shifted(int dx) {
+        shiftX = dx;
+        return this;
     }
 
     /**

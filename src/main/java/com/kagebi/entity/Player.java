@@ -350,13 +350,6 @@ public final class Player extends Entity {
     // ---- rendering -------------------------------------------------------
 
     @Override
-    protected int spriteFootOffset() {
-        // The 32x32 cell holds the ninja standing two pixels off its bottom
-        // edge, so the sprite sits two pixels low for the feet to meet the shadow.
-        return -2;
-    }
-
-    @Override
     protected boolean castsShadow() {
         return alive();
     }
