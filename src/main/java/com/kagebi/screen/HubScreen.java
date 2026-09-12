@@ -122,6 +122,9 @@ public class HubScreen extends SimScreen {
     /** A villager to be already talking to on arrival, or -1. */
     private int talkOnShow = -1;
 
+    /** Set while the herbalist is speaking; her last page opens her stall. */
+    private boolean openShopAfterTalk;
+
     public HubScreen(Kagebi game) {
         super(game.input());
         this.game = game;
@@ -268,9 +271,17 @@ public class HubScreen extends SimScreen {
         if (dialog.open()) {
             dialog.step();
             if (input().justPressed(GameAction.INTERACT) || input().justPressed(GameAction.ATTACK)) {
-                dialog.advance();
+                // The herbalist's conversation ends by opening her stall. She
+                // is the only villager who sells anything, so the shop is
+                // reached by talking to her rather than by a second key: one
+                // fewer thing on screen, and the dialogue is the sign.
+                if (dialog.advance() && openShopAfterTalk) {
+                    openShopAfterTalk = false;
+                    stack().push(new ShopScreen(game));
+                }
             } else if (input().justPressed(GameAction.PAUSE)) {
                 dialog.close();
+                openShopAfterTalk = false;
             }
             return;         // the player stands still while spoken to
         }
@@ -316,7 +327,13 @@ public class HubScreen extends SimScreen {
         // enough; the wash over the scene is saying the rest.
         String first = v.id.equals(Assets.Npc.ELDER) && game.profile().villageDarkness > 0
             ? t.get(prefix + "dim") : t.get(prefix + "1");
-        dialog.show(t.get(prefix + "name"), v.face, first, t.get(prefix + "2"));
+        // The herbalist with an empty customer says so and opens nothing. A
+        // shop screen where every price is out of reach is a worse answer than
+        // a sentence, and she is the one who can give the sentence.
+        boolean broke = v.id.equals(Assets.Npc.HERBALIST) && game.profile().gold <= 0;
+        openShopAfterTalk = v.id.equals(Assets.Npc.HERBALIST) && !broke;
+        dialog.show(t.get(prefix + "name"), v.face, first,
+                    t.get(prefix + (broke ? "broke" : "2")));
         game.audio().playSfx(Assets.SFX_ACCEPT);
     }
 

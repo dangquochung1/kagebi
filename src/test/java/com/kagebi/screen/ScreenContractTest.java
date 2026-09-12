@@ -130,7 +130,9 @@ class ScreenContractTest {
         List<String> keys = new ArrayList<>();
         for (String k : new String[] {
             "menu.newgame", "menu.credits", "menu.settings", "menu.quit", "menu.continue",
-            "select.title", "select.weapon", "select.start", "select.locked_hint",
+            "select.title", "select.weapon", "select.start",
+            "shop.title", "shop.tab.upgrades", "shop.tab.unlocks", "shop.buy",
+            "shop.max", "shop.owned", "shop.poor", "shop.bought",
             "prompt.talk", "prompt.descend", "prompt.escape",
             // Advertised by World.promptKey(); the screens only look them up.
             "prompt.open_chest", "prompt.shop",
@@ -146,8 +148,13 @@ class ScreenContractTest {
             keys.add("floor." + floor);
         }
         for (String id : Assets.Actor.CHARACTERS) {
+            // One name and one perk line each, and each in one file. There used
+            // to be two of both: "char.<id>.passive" beside "character.<id>.desc"
+            // and "char.<id>.name" beside "character.<id>.name", so the select
+            // screen and the shop called the same ninja by different names and
+            // promised different perks. See CharacterSelectScreen.drawDetails.
             keys.add("char." + id + ".name");
-            keys.add("char." + id + ".passive");
+            keys.add("character." + id + ".desc");
         }
         for (String id : Assets.Npc.VILLAGERS) {
             keys.add("npc." + id + ".name");
@@ -155,6 +162,7 @@ class ScreenContractTest {
             keys.add("npc." + id + ".2");
         }
         keys.add("npc." + Assets.Npc.ELDER + ".dim");
+        keys.add("npc." + Assets.Npc.HERBALIST + ".broke");
         for (String id : CharacterSelectScreen.FALLBACK_WEAPONS) {
             keys.add("select.weapon." + id);
         }

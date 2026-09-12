@@ -5,6 +5,7 @@ import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.gen.RoomKind;
 import com.kagebi.run.RunState;
+import com.kagebi.save.Profile;
 
 /**
  * Builds the screen a {@code --screen} launch flag asks for.
@@ -26,6 +27,8 @@ import com.kagebi.run.RunState;
  *   select    --page 1-6   character select, with that ninja highlighted
  *   hub       --page N     the village, dimmed by N-1 failed descents
  *   talk      --page 1-3   the village, mid-conversation with that villager
+ *   store     --page 1-4   the herbalist's stall, over a profile N runs deep
+ *   unlocks   --page 1-4   the same, on its second tab
  *   dungeon   --page 1-5   the start room of that floor
  *   map       --page 1-5   the same, with the floor map expanded
  *   fight     --page 1-5   the first room of that floor that has enemies in it
@@ -83,6 +86,13 @@ public final class Screens {
                 return new GameScreen[] {new HubScreen(game)};
             case "talk":
                 return new GameScreen[] {new HubScreen(game).talkingTo(page - 1)};
+            case "store":
+                stockProfile(game, page);
+                return new GameScreen[] {new HubScreen(game), new ShopScreen(game)};
+            case "unlocks":
+                stockProfile(game, page);
+                return new GameScreen[] {new HubScreen(game),
+                                         new ShopScreen(game).onUnlocks()};
             case "dungeon":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game)};
@@ -143,6 +153,36 @@ public final class Screens {
         run.floor = Math.max(1, floor);
         game.setRun(run);
         return run;
+    }
+
+    /**
+     * A profile {@code runs} deep, for looking at the shop.
+     *
+     * <p>The screen has four states worth photographing - affordable, too dear,
+     * requirement unmet, already owned - and an untouched profile shows only the
+     * middle two. The numbers are the ones {@code BalanceTest} models: a death
+     * on floor 3 banks about 635, one on floor 4 about 1,250.
+     *
+     * <p><b>A profile that has been played is left exactly as it is.</b> This
+     * writes into the live profile, and the shop saves on every purchase - so
+     * without this guard, opening the shop with a debug flag and buying
+     * anything would write invented gold over a real player's bank.
+     */
+    private static void stockProfile(Kagebi game, int runs) {
+        Profile p = game.profile();
+        if (p.runs > 0 || p.gold > 0) {
+            return;
+        }
+        p.runs = Math.max(1, runs);
+        p.deepestFloor = Math.min(5, 2 + p.runs);
+        p.gold = 635 * p.runs;
+        if (p.runs >= 2) {
+            p.unlockedWeapons.add("axe");
+            p.upgrades.put("vigor", 1);
+        }
+        if (p.runs >= 3) {
+            p.upgrades.put("flamekeeper", 2);
+        }
     }
 
     private static void sampleRun(Kagebi game, int deepest) {
