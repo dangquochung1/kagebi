@@ -81,6 +81,9 @@
   "char.ninjafire.name": "Hoả Tâm",
   "char.ninjawater.name": "Thuỷ Nguyệt",
 
+  "trader.title": "Kẻ buôn dưới hầm",
+  "trader.empty": "Hôm nay hết hàng",
+  "trader.sold": "Đã bán",
   "shop.title": "Hàng bà lang",
   "shop.tab.upgrades": "Nâng cấp",
   "shop.tab.unlocks": "Mở khoá",

@@ -28,9 +28,25 @@ public final class ItemDef {
     /** How many the player may carry: 1 for a key, more for potions. */
     public final int stackSize;
 
+    /**
+     * What the dungeon's shopkeeper charges, or 0 for something never sold.
+     *
+     * <p>Zero rather than -1 because "not for sale" is the common case: gold
+     * itself, the hearts enemies drop, and anything a chest hands over are all
+     * pickups rather than goods. {@link #forSale} is the question every caller
+     * actually asks.
+     */
+    public final int price;
+
     public ItemDef(String id, String nameKey, String descKey, String sprite,
                    int icon, Kind kind, String effect, float magnitude,
                    int stackSize) {
+        this(id, nameKey, descKey, sprite, icon, kind, effect, magnitude, stackSize, 0);
+    }
+
+    public ItemDef(String id, String nameKey, String descKey, String sprite,
+                   int icon, Kind kind, String effect, float magnitude,
+                   int stackSize, int price) {
         this.id = id;
         this.nameKey = nameKey;
         this.descKey = descKey;
@@ -40,6 +56,12 @@ public final class ItemDef {
         this.effect = effect;
         this.magnitude = magnitude;
         this.stackSize = stackSize;
+        this.price = price;
+    }
+
+    /** Whether the dungeon shopkeeper may stock it. */
+    public boolean forSale() {
+        return price > 0;
     }
 
     @Override

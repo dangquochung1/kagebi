@@ -865,8 +865,19 @@ public final class EntityWorld implements World, AiContext {
         return descendRequested;
     }
 
+    /**
+     * Whether the player just asked the shopkeeper to trade, clearing the ask.
+     *
+     * <p>Consuming rather than merely reporting, unlike {@link
+     * #descendRequested}: descending ends the room, so a flag left raised there
+     * can never be seen twice. A shop can be closed and the player can walk on,
+     * and a flag left raised would reopen it on the next interaction anywhere
+     * in the room - including on a chest.
+     */
     public boolean shopRequested() {
-        return shopRequested;
+        boolean asked = shopRequested;
+        shopRequested = false;
+        return asked;
     }
 
     public int hostilesAlive() {

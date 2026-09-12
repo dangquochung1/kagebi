@@ -36,6 +36,7 @@ import com.kagebi.save.Profile;
  *   throw     --page 1-5   the same with a kunai in the off hand, throwing
  *   treasure  --page 1-5   the first treasure room, for looking at a chest
  *   shop      --page 1-5   the first shop room, for looking at the shopkeeper
+ *   trade     --page 1-5   the same, mid-purchase, with gold to spend
  *   slide                  halfway through the first room transition
  *   exit      --page 1-5   standing on that floor's way down
  *   pause                  the pause menu over floor 1
@@ -125,6 +126,14 @@ public final class Screens {
             case "shop":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.SHOP)};
+            case "trade": {
+                // With a purse. The shelf is drawn against what can be paid for
+                // and an empty one shows three prices in red and nothing else.
+                RunState run = startRun(game, page);
+                run.gold = 120 * Math.max(1, page);
+                return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.SHOP),
+                                         new TraderScreen(game)};
+            }
             case "slide":
                 startRun(game, 1);
                 return new GameScreen[] {new DungeonScreen(game).sliding()};

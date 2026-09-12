@@ -471,6 +471,12 @@ public class DungeonScreen extends SimScreen {
                 descend();
             } else if (world.promptKey() != null) {
                 world.interact();
+                // The shopkeeper's answer. Until this line the world raised the
+                // flag and nothing ever looked at it, so the "Trade" prompt over
+                // his head was a promise the game could not keep.
+                if (world instanceof EntityWorld && ((EntityWorld) world).shopRequested()) {
+                    stack().push(new TraderScreen(game));
+                }
             }
         }
     }

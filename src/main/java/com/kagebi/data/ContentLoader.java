@@ -181,7 +181,8 @@ public final class ContentLoader {
         ItemDef d = new ItemDef(
             id, f.string("nameKey"), f.string("descKey"), f.stringOr("sprite", null),
             f.icon("icon", data.icons), f.enumeration("kind", ItemDef.Kind.class),
-            f.string("effect"), f.number("magnitude"), f.integer("stackSize"));
+            f.string("effect"), f.number("magnitude"), f.integer("stackSize"),
+            f.integerOr("price", 0));
         f.done();
         return d;
     }

@@ -81,6 +81,9 @@
   "char.ninjafire.name": "Ember Heart",
   "char.ninjawater.name": "Water Moon",
 
+  "trader.title": "The Dungeon Trader",
+  "trader.empty": "Nothing left today",
+  "trader.sold": "Sold",
   "shop.title": "The Herbalist's Stall",
   "shop.tab.upgrades": "Upgrades",
   "shop.tab.unlocks": "Unlocks",
