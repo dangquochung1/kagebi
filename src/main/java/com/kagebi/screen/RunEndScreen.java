@@ -1,0 +1,174 @@
+package com.kagebi.screen;
+
+import com.badlogic.gdx.InputMultiplexer;
+import com.badlogic.gdx.InputProcessor;
+import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.utils.ScreenUtils;
+import com.kagebi.Cfg;
+import com.kagebi.Kagebi;
+import com.kagebi.assets.Assets;
+import com.kagebi.gfx.PixelViewport;
+import com.kagebi.run.RunState;
+import com.kagebi.run.RunSummary;
+import com.kagebi.save.Profile;
+import com.kagebi.ui.I18n;
+
+/**
+ * What victory and game over have in common: the numbers, the bank, the way
+ * home.
+ *
+ * <p>The two screens differ in a title, a colour and two pieces of music, and
+ * agree on everything that matters - in particular on <em>when the gold is
+ * banked</em>. That happens once, on first show, and not on the button press:
+ * a player who closes the window on this screen has still finished the run,
+ * and should still have the gold.
+ *
+ * <p>The sting plays first and the music only once it has finished. Starting
+ * both at once buries a two-second jingle under a crossfade, and the jingle is
+ * the part that tells the player what just happened.
+ */
+abstract class RunEndScreen extends SimScreen {
+
+    /** Both stings are exactly 2.0 s - see {@code Assets.JINGLE_SUCCESS}. */
+    private static final int STING_STEPS = 120;
+
+    protected final Kagebi game;
+    private final boolean victory;
+
+    private Stage stage;
+    private InputMultiplexer inputs;
+    private MenuColumn menu;
+
+    private RunSummary summary;
+    private int banked;
+    private boolean musicStarted;
+
+    RunEndScreen(Kagebi game, boolean victory) {
+        super(game.input());
+        this.game = game;
+        this.victory = victory;
+    }
+
+    protected abstract String sting();
+
+    protected abstract String music();
+
+    /** The skin label style for the title. */
+    protected abstract String titleStyle();
+
+    @Override
+    public InputProcessor inputProcessor() {
+        return inputs;
+    }
+
+    @Override
+    public void show() {
+        game.input().clear();
+        if (stage != null) {
+            return;
+        }
+        bank();
+        stage = new Stage(new PixelViewport(Cfg.VIRT_W, Cfg.VIRT_H, new OrthographicCamera()),
+                          game.batch());
+        inputs = new InputMultiplexer(game.input(), stage);
+        build();
+        game.audio().stopMusic();
+        game.audio().playSfx(sting(), 0f);
+    }
+
+    /**
+     * Freezes the run into a summary and moves what survives death into the
+     * profile. A failed descent dims the village one step; see HubScreen.
+     */
+    private void bank() {
+        RunState run = game.run();
+        if (run == null) {
+            run = Screens.freshRun(Assets.Actor.DEFAULT_CHARACTER,
+                                   "katana", Screens.DEFAULT_MAX_HP);
+        }
+        run.victory = victory;
+        summary = run.summary();
+        banked = run.gold;
+
+        Profile profile = game.profile();
+        profile.gold += banked;
+        profile.runs++;
+        profile.deepestFloor = Math.max(profile.deepestFloor, summary.deepestFloor);
+        if (victory) {
+            profile.wins++;
+        } else {
+            profile.villageDarkness++;
+        }
+        game.saves().save(profile);
+
+        // The next run starts from the village with the same ninja and weapon,
+        // at full health. What the dead run was carrying stays with it.
+        game.setRun(Screens.freshRun(run.characterId, run.weaponId, Screens.DEFAULT_MAX_HP));
+    }
+
+    private void build() {
+        stage.clear();
+        I18n t = game.i18n();
+
+        Table root = new Table();
+        root.setFillParent(true);
+
+        Table panel = new Table();
+        panel.setBackground(game.skin().getDrawable(Assets.Ui.PANEL_2));
+        panel.defaults().padLeft(2).padRight(2);
+
+        panel.add(new Label(t.get(victory ? "game.victory" : "game.gameover"),
+                            game.skin(), titleStyle())).colspan(2).padBottom(6).row();
+
+        stat(panel, t.get("game.stats.floor"), String.valueOf(summary.deepestFloor));
+        stat(panel, t.get("game.stats.kills"), String.valueOf(summary.kills));
+        stat(panel, t.get("game.stats.gold"), String.valueOf(summary.gold));
+        stat(panel, t.get("game.stats.time"), summary.time());
+
+        panel.add(new Label(t.format("end.banked", banked), game.skin(), "dim"))
+             .colspan(2).padTop(6).padBottom(5).row();
+
+        menu = new MenuColumn(game.skin(), game.audio());
+        menu.add(t.get("end.to_village"), () -> stack().set(new HubScreen(game)));
+        panel.add(menu.table(112)).colspan(2).row();
+
+        root.add(panel).width(200);
+        stage.addActor(root);
+    }
+
+    private void stat(Table panel, String label, String value) {
+        panel.add(new Label(label, game.skin(), "dim")).left().expandX().padBottom(1);
+        panel.add(new Label(value, game.skin())).right().padBottom(1).row();
+    }
+
+    @Override
+    protected void step() {
+        if (!musicStarted && steps() >= STING_STEPS) {
+            musicStarted = true;
+            game.audio().playMusic(music());
+        }
+        menu.step(input());
+    }
+
+    @Override
+    public void render(float delta) {
+        ScreenUtils.clear(0.05f, 0.04f, 0.07f, 1f);
+        stage.act(delta);
+        stage.draw();
+    }
+
+    @Override
+    public void resize(int width, int height) {
+        stage.getViewport().update(width, height, true);
+    }
+
+    @Override
+    public void dispose() {
+        if (stage != null) {
+            stage.dispose();
+        }
+    }
+}
