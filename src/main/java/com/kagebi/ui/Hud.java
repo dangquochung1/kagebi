@@ -92,16 +92,39 @@ public final class Hud {
         batch.setColor(Color.WHITE);
     }
 
+    /**
+     * Hit points behind one quarter of a heart.
+     *
+     * <p>Not one, which is what this drew at first. The content is balanced
+     * around a hundred starting hit points - twenty-two enemies and five floors
+     * were tuned against that number - and at one point a quarter that is
+     * twenty-five hearts across a three-hundred-and-twenty pixel screen. Five
+     * hit points a quarter makes the starting bar exactly five hearts, and a
+     * fully upgraded one nine.
+     */
+    public static final int HP_PER_QUARTER = 5;
+    /** Hit points in a whole heart. */
+    public static final int HP_PER_HEART = HP_PER_QUARTER * Assets.Ui.HEART_STEPS;
+
     /** Hearts drawn for a maximum: a part-heart of capacity still gets a heart. */
     public static int heartCount(int maxHp) {
-        int per = Assets.Ui.HEART_STEPS;
-        return (maxHp + per - 1) / per;
+        return Math.max(1, (maxHp + HP_PER_HEART - 1) / HP_PER_HEART);
     }
 
-    /** Quarters filled in heart {@code index} (0 = leftmost), which is its frame. */
+    /**
+     * Quarters filled in heart {@code index} (0 = leftmost), which is its frame.
+     *
+     * <p>Rounded up, so any hit points at all in a heart show as at least a
+     * quarter. A player on their last point of health seeing an empty bar would
+     * reasonably conclude they were already dead.
+     */
     public static int quarters(int hp, int index) {
-        int per = Assets.Ui.HEART_STEPS;
-        return Math.max(0, Math.min(per, hp - index * per));
+        int inThisHeart = hp - index * HP_PER_HEART;
+        if (inThisHeart <= 0) {
+            return 0;
+        }
+        int filled = (inThisHeart + HP_PER_QUARTER - 1) / HP_PER_QUARTER;
+        return Math.min(Assets.Ui.HEART_STEPS, filled);
     }
 
     private void drawHearts(SpriteBatch batch, RunState run, int screenH) {

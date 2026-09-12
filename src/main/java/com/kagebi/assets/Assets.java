@@ -100,6 +100,38 @@ public final class Assets {
         return MUSIC_DIR + (name.endsWith(".ogg") ? name : name + ".ogg");
     }
 
+    /**
+     * Combat sounds. Chosen by ear from the pack's eleven groups, not by name:
+     * the files are called hit1 through hit9 and say nothing about what they
+     * sound like.
+     *
+     * <p>Hit-stop already tells the player a blow landed; this is the other
+     * half of it, and the two together are most of what makes a hit feel like
+     * a hit rather than a number changing.
+     */
+    public static final class Sfx {
+        private static final String S = SFX_DIR;
+
+        public static final String SWING = S + "whoosh_and_slash/slash.wav";
+        /** For a hammer or an axe: slower, heavier, and it should sound it. */
+        public static final String SWING_HEAVY = S + "whoosh_and_slash/sword2.wav";
+        public static final String THROW = S + "whoosh_and_slash/whoosh.wav";
+
+        public static final String HIT = S + "hit_and_impact/hit1.wav";
+        /** The player being hit, deliberately a duller and lower sound. */
+        public static final String HURT = S + "hit_and_impact/hit5.wav";
+        public static final String DEATH = S + "hit_and_impact/hit8.wav";
+
+        public static final String COIN = S + "bonus/coin.wav";
+        public static final String PICKUP = S + "bonus/bonus.wav";
+        public static final String HEAL = S + "bonus/bonus2.wav";
+        public static final String KEY_GET = S + "bonus/bonus3.wav";
+        /** A boss noticing the player, or changing phase. */
+        public static final String ALERT = S + "alert/alert.wav";
+
+        private Sfx() {}
+    }
+
     /** Region names in {@link #ATLAS_UI}. */
     public static final class Ui {
         public static final String PANEL = "ui/panel";

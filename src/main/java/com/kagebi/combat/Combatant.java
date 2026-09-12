@@ -29,6 +29,14 @@ public interface Combatant {
     int armour();
 
     /**
+     * What this one's relics do to a hit it takes: below 1 shrugs damage off,
+     * above 1 takes more. Default 1, so nothing that has no relics has to care.
+     */
+    default float damageTakenMult() {
+        return 1f;
+    }
+
+    /**
      * Takes a hit that has already passed the faction, overlap and
      * invulnerability checks.
      *

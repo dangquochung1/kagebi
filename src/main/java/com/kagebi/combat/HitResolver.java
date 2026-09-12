@@ -17,10 +17,26 @@ public final class HitResolver {
      */
     public static int resolve(Hitbox box, Iterable<? extends Combatant> targets,
                               AttackState swing) {
+        return resolve(box, targets, swing, null);
+    }
+
+    /**
+     * As above, additionally collecting who was hit.
+     *
+     * <p>A count is enough for hit-stop and for lifesteal, but not for anything
+     * that marks the target - poison, a slow, a chain - and those have to know
+     * which enemy, not how many. Passing a list in rather than returning one
+     * keeps the common case free of garbage in a loop that runs every step.
+     */
+    public static int resolve(Hitbox box, Iterable<? extends Combatant> targets,
+                              AttackState swing, java.util.List<Combatant> hitOut) {
         int hits = 0;
         for (Combatant t : targets) {
             if (hit(box, t, swing)) {
                 hits++;
+                if (hitOut != null) {
+                    hitOut.add(t);
+                }
             }
         }
         return hits;
@@ -48,7 +64,8 @@ public final class HitResolver {
         if (target.invulnerable()) {
             return false;
         }
-        int amount = Damage.incoming(box.damage, target.armour(), 0f);
+        int amount = Damage.incoming(box.damage, target.armour(), 0f,
+            target.damageTakenMult());
         target.takeHit(amount, box.originX, box.originY, box.knockback);
         return true;
     }

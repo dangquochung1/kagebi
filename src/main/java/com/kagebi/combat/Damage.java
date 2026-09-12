@@ -63,8 +63,25 @@ public final class Damage {
      * reverse order collapses the two stats into the same thing.
      */
     public static int incoming(int amount, int armour, float resist) {
+        return incoming(amount, armour, resist, 1f);
+    }
+
+    /**
+     * As above, then scaled by whatever the defender's relics do to a hit.
+     *
+     * <p>A separate number from {@code resist} rather than a negative one,
+     * because resistance is clamped to nought at the bottom: a relic that makes
+     * the player take <em>more</em> damage - and one of them does, in exchange
+     * for dealing more - cannot be expressed as resistance without quietly
+     * losing its whole downside.
+     *
+     * <p>Applied after armour, so armour keeps the role the split above gives
+     * it: worth most against a flurry of small hits.
+     */
+    public static int incoming(int amount, int armour, float resist, float takenMult) {
         float after = amount - armour;
         after *= 1f - clampResist(resist);
+        after *= takenMult;
         return Math.max(MIN, Math.round(after + ROUNDING_NUDGE));
     }
 

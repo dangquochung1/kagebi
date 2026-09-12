@@ -70,7 +70,10 @@ public final class Pickup extends Entity {
         float dy = player.y - y;
         float dist = (float) Math.sqrt(dx * dx + dy * dy);
         if (dist <= COLLECT) {
-            collect(world.run(), player);
+            // The world collects rather than this, because what a coin is worth
+            // and what a potion does are relic and content questions, and a
+            // pickup has no business knowing either.
+            world.collect(this);
             removed = true;
             return;
         }
@@ -80,25 +83,6 @@ public final class Pickup extends Entity {
             float pull = MAGNET_SPEED * (1f - dist / MAGNET) + 25f;
             x += dx / dist * pull * Cfg.STEP;
             y += dy / dist * pull * Cfg.STEP;
-        }
-    }
-
-    private void collect(RunState run, Player player) {
-        switch (kind) {
-            case GOLD:
-                run.gold += amount;
-                break;
-            case HEART:
-                player.heal(amount);
-                break;
-            case KEY:
-                run.keys += amount;
-                break;
-            default:
-                if (itemId != null) {
-                    run.addItem(itemId, amount);
-                }
-                break;
         }
     }
 

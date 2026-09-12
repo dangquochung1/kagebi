@@ -34,6 +34,15 @@ public interface AiBrain {
      * you" - and that promise only holds if contact damage respects the state
      * machine rather than being a permanent aura around every body.
      */
+    /**
+     * Makes this one lose track of the player for a while, as a smoke bomb
+     * does. Default does nothing, because a brain that never chases has nothing
+     * to forget.
+     */
+    default void forget(Enemy self, int steps) {
+        self.distract(steps);
+    }
+
     default boolean harmfulOnContact(Enemy self) {
         return true;
     }

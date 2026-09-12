@@ -190,6 +190,12 @@ public class HubScreen extends SimScreen {
         // Without this the world loads its own copies of both pages: ~20MB of
         // texture for art this screen is already holding.
         world.useSharedAtlases(game.skin().getAtlas(), Preload.fx());
+        if (world instanceof EntityWorld) {
+            // Upgrades bought in the village count for as much as relics found
+            // in the dungeon, and both are resolved in one place.
+            ((EntityWorld) world).useVillage(game.shop(), game.profile());
+            ((EntityWorld) world).useAudio(game.audio());
+        }
         world.enterRoom(villageRoom(), grid, null);
         if (talkOnShow >= 0 && talkOnShow < villagers.size) {
             talk(villagers.get(talkOnShow));

@@ -13,10 +13,18 @@ import com.kagebi.ai.AiBrain;
 import com.kagebi.ai.AiBrains;
 import com.kagebi.ai.AiContext;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.def.LootTableDef;
+import com.kagebi.data.def.RelicDef;
+import com.kagebi.data.def.ItemDef;
+import com.kagebi.loot.LootRoller;
+import com.kagebi.save.Profile;
+import com.kagebi.data.ShopCatalog;
+import com.kagebi.audio.AudioService;
 import com.kagebi.combat.AttackState;
 import com.kagebi.combat.Faction;
 import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
+import com.kagebi.combat.Modifiers;
 import com.kagebi.data.ContentRegistry;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.FloorDef;
@@ -90,6 +98,14 @@ public final class EntityWorld implements World, AiContext {
     /** How close the player must be to a chest, shop or stairs to be offered it. */
     public static final float INTERACT_RANGE = 20f;
 
+    /** Sideways nudge per extra projectile, as a fraction of forward speed. */
+    public static final float FAN_SPREAD = 0.16f;
+
+    /** How far a chained hit will reach for its second target, in pixels. */
+    public static final float CHAIN_RANGE = 72f;
+    /** What the arc carries. A full second hit would make the relic the build. */
+    public static final float CHAIN_DAMAGE = 0.5f;
+
     /** Player projectiles, px/s. Fast enough to feel thrown rather than lobbed. */
     public static final float THROW_SPEED = 220f;
     /** Enemy projectile knockback: a nudge, since dodging it was the real test. */
@@ -121,7 +137,21 @@ public final class EntityWorld implements World, AiContext {
     private Room room;
     private Random rng = new Random(0L);
 
+    /**
+     * The run's maximum health before any relic touched it, so that recomputing
+     * after a second pickup adds the second relic rather than the first twice.
+     */
+    private final int baseMaxHp;
+
+    private ShopCatalog shop;
+    private Profile profile;
+    private AudioService audio;
+
+    /** Guards the once-per-run grants, which useVillage would otherwise repeat. */
+    private boolean startingKitGiven;
+
     private int hitstop;
+    private int burnTick;
     private float shake;
     private boolean descendRequested;
     private boolean shopRequested;
@@ -163,10 +193,56 @@ public final class EntityWorld implements World, AiContext {
         this.content = content != null ? content : new ContentRegistry();
         this.run = run;
         this.settings = settings;
+        this.baseMaxHp = run.maxHp;
         this.player = new Player(run, resolveWeapon(run.weaponId),
             ActorSprites.player(actors, run.characterId), new Random(run.seed ^ 0x5DEECE66DL));
+        refreshMods();
         if (actors != null) {
             loadOwnAtlases();
+        }
+    }
+
+    /**
+     * Hands over the village, so bought upgrades and the character's perk count
+     * for as much as the relics picked up during the run. Separate from the
+     * constructor because a test wants a player with relics and no village, and
+     * because the screens do not all have one.
+     */
+    public void useVillage(ShopCatalog shop, Profile profile) {
+        this.shop = shop;
+        this.profile = profile;
+        refreshMods();
+        if (!startingKitGiven) {
+            startingKitGiven = true;
+            run.keys += player.mods().startKeysAdd();
+        }
+    }
+
+    /** The one funnel for sound. Null leaves the world silent, as in tests. */
+    public void useAudio(AudioService audio) {
+        this.audio = audio;
+    }
+
+    /**
+     * Recomputes what the player's relics, upgrades and perk add up to. Called
+     * whenever the set changes - which is to say when a relic is picked up -
+     * rather than every step, because nothing else can change it.
+     */
+    public void refreshMods() {
+        player.setMods(Loadout.of(run, content, shop, profile));
+        int bonus = player.mods().maxHpAdd();
+        if (bonus > 0 && run.maxHp < baseMaxHp + bonus) {
+            int added = baseMaxHp + bonus - run.maxHp;
+            run.maxHp += added;
+            // Extra maximum health that does not also heal is a relic the
+            // player cannot feel picking up.
+            run.hp = Math.min(run.maxHp, run.hp + added);
+        }
+    }
+
+    private void sfx(String path) {
+        if (audio != null) {
+            audio.playSfx(path);
         }
     }
 
@@ -236,6 +312,7 @@ public final class EntityWorld implements World, AiContext {
             enemies.get(i).step(this);
         }
         applyContactDamage();
+        stepBurnAura();
         for (int i = 0; i < projectiles.size; i++) {
             projectiles.get(i).step(this);
         }
@@ -253,10 +330,35 @@ public final class EntityWorld implements World, AiContext {
         if (run.hp < hpBefore) {
             hitstop = Math.max(hitstop, HITSTOP_HURT);
             shake = Math.max(shake, SHAKE_HURT);
+            sfx(Assets.Sfx.HURT);
+        }
+        if (run.hp <= 0) {
+            revive();
         }
         if (room != null && !room.cleared && hostilesAlive() == 0) {
             room.cleared = true;
+            int heal = player.mods().roomClearHeal();
+            if (heal > 0) {
+                player.heal(heal);
+                sfx(Assets.Sfx.HEAL);
+            }
         }
+    }
+
+    /**
+     * Spends a revive, if the player has one. Checked every step rather than at
+     * the screen's death handling so that the run never actually ends: a revive
+     * that fires after the game-over screen has appeared is not a revive.
+     */
+    private void revive() {
+        Modifiers mods = player.mods();
+        if (!mods.spendRevive()) {
+            return;
+        }
+        run.hp = Math.max(1, Math.round(run.maxHp * mods.reviveFraction()));
+        player.reviveAt(run.hp);
+        shake = Math.max(shake, SHAKE_HURT);
+        sfx(Assets.Sfx.ALERT);
     }
 
     @Override
@@ -372,13 +474,7 @@ public final class EntityWorld implements World, AiContext {
         }
         switch (m.kind) {
             case CHEST:
-                m.used = true;
-                // Gold only for now: rolling the room's loot table is the loot
-                // package's job, and it hooks in here. See notes/b.md.
-                int coins = 3 + rng.nextInt(4);
-                for (int i = 0; i < coins; i++) {
-                    dropGold(m.x, m.y, 1 + rng.nextInt(3));
-                }
+                openChest(m);
                 break;
             case EXIT:
                 descendRequested = true;
@@ -389,6 +485,78 @@ public final class EntityWorld implements World, AiContext {
             default:
                 break;
         }
+    }
+
+    /**
+     * Which loot table a chest rolls, by the room it stands in. A locked room
+     * costs a key to enter, so its chest has to be worth the key.
+     */
+    private String chestTable() {
+        if (room == null) {
+            return "chest_common";
+        }
+        switch (room.kind) {
+            case LOCKED: return "chest_locked";
+            case TREASURE:
+            case SECRET: return "chest_treasure";
+            case BOSS: return "chest_boss";
+            default: return "chest_common";
+        }
+    }
+
+    private void openChest(Marker m) {
+        m.used = true;
+        sfx(Assets.Sfx.PICKUP);
+        for (int i = 0, coins = 3 + rng.nextInt(4); i < coins; i++) {
+            dropGold(m.x, m.y, 1 + rng.nextInt(3));
+        }
+        dropLoot(chestTable(), m.x, m.y);
+        // A treasure room exists to hand out a relic. Its table drops potions
+        // and keys, which are useful but are not a build - so the relic comes
+        // from here, and only from the rooms whose whole purpose is to give one.
+        if (room != null && (room.kind == RoomKind.TREASURE
+                || room.kind == RoomKind.LOCKED || room.kind == RoomKind.SECRET)) {
+            grantRelic();
+        }
+    }
+
+    /**
+     * Gives a relic the run does not already hold.
+     *
+     * <p>Weighted by rarity rather than uniformly, because twenty-four relics
+     * drawn flat means an epic is as common as a common and the rarities in the
+     * content stop meaning anything. RelicDef carries no weight of its own -
+     * the content agent listed it as a field it wished it had - so the weights
+     * live here until it does.
+     */
+    public String grantRelic() {
+        Array<RelicDef> pool = new Array<>();
+        Array<Integer> weights = new Array<>();
+        int total = 0;
+        for (RelicDef r : content.allRelics()) {
+            if (run.hasRelic(r.id)) {
+                continue;
+            }
+            int w = r.rarity == RelicDef.Rarity.EPIC ? 10
+                : r.rarity == RelicDef.Rarity.RARE ? 30 : 60;
+            pool.add(r);
+            weights.add(w);
+            total += w;
+        }
+        if (total <= 0) {
+            return null;
+        }
+        int pick = rng.nextInt(total);
+        for (int i = 0; i < pool.size; i++) {
+            pick -= weights.get(i);
+            if (pick < 0) {
+                run.relics.add(pool.get(i).id);
+                refreshMods();
+                sfx(Assets.Sfx.HEAL);
+                return pool.get(i).id;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -525,12 +693,27 @@ public final class EntityWorld implements World, AiContext {
         return n;
     }
 
-    /** The player threw their weapon. */
+    /**
+     * The player threw their weapon.
+     *
+     * <p>The bandolier relic adds projectiles, fanned rather than stacked: extra
+     * shots on the same line would land on the same target and read as one
+     * shot doing more damage, which is what a damage relic is for.
+     */
     void throwFrom(Player p, int damage) {
         WeaponDef w = p.weapon();
         int life = Math.max(1, Math.round(w.reach / THROW_SPEED / Cfg.STEP));
-        projectiles.add(new Projectile(Faction.PLAYER, p.x, p.y, p.facing.dx, p.facing.dy,
-            THROW_SPEED, damage, w.knockback, life, null, kunaiRegion));
+        int extra = Math.max(0, p.mods().throwExtra());
+        sfx(Assets.Sfx.THROW);
+        for (int i = 0; i <= extra; i++) {
+            // 0, then +/-1, +/-2 ... spread of about nine degrees a step.
+            int rank = (i + 1) / 2;
+            float spread = (i % 2 == 0 ? rank : -rank) * FAN_SPREAD;
+            float dx = p.facing.dx - p.facing.dy * spread;
+            float dy = p.facing.dy + p.facing.dx * spread;
+            projectiles.add(new Projectile(Faction.PLAYER, p.x, p.y, dx, dy,
+                THROW_SPEED, damage, w.knockback, life, null, kunaiRegion));
+        }
     }
 
     /**
@@ -696,6 +879,112 @@ public final class EntityWorld implements World, AiContext {
             ? Math.max(0, floor.enemyWeights[i]) : 1;
     }
 
+    /**
+     * Called by the player when a swing connects, once per step rather than
+     * once per target: a wide hammer that catches three enemies should not heal
+     * for three swings' worth.
+     */
+    public void onPlayerHitLanded(Player p, int damagePerTarget, int targets) {
+        sfx(Assets.Sfx.HIT);
+        float steal = p.mods().lifesteal();
+        if (steal > 0f) {
+            int healed = Math.round(damagePerTarget * targets * steal);
+            if (healed > 0) {
+                p.heal(healed);
+            }
+        }
+    }
+
+    /**
+     * The relics that mark what they hit: poison, a slow, a chain.
+     *
+     * <p>Separate from {@link #onPlayerHitLanded} because these need to know
+     * <em>which</em> enemy rather than how many, and a chain has to pick a
+     * second target that was not one of the first.
+     */
+    public void applyOnHit(Player p, java.util.List<com.kagebi.combat.Combatant> struck,
+                           int damage) {
+        Modifiers mods = p.mods();
+        float slow = mods.slowOnHit();
+        int poison = mods.poisonOnHit();
+        float chain = mods.chainLightning();
+        if (slow <= 0f && poison <= 0 && chain <= 0f) {
+            return;
+        }
+        for (com.kagebi.combat.Combatant c : struck) {
+            if (!(c instanceof Enemy)) {
+                continue;
+            }
+            Enemy e = (Enemy) c;
+            e.slow(slow, Modifiers.SLOW_STEPS);
+            e.poison(poison, Modifiers.POISON_STEPS);
+        }
+        if (chain > 0f && rng.nextFloat() < chain) {
+            chainTo(struck, damage);
+        }
+    }
+
+    /** Arcs a hit to the nearest enemy that was not already caught by the swing. */
+    private void chainTo(java.util.List<com.kagebi.combat.Combatant> struck, int damage) {
+        Enemy best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (Enemy e : enemies) {
+            if (!e.alive() || struck.contains(e)) {
+                continue;
+            }
+            float dx = e.x - player.x;
+            float dy = e.y - player.y;
+            float d = dx * dx + dy * dy;
+            if (d < bestDist) {
+                bestDist = d;
+                best = e;
+            }
+        }
+        if (best == null || bestDist > CHAIN_RANGE * CHAIN_RANGE) {
+            return;
+        }
+        // Straight to takeHit rather than through a hitbox: the arc has no
+        // geometry, and building one would only be a way of asking the resolver
+        // a question this has already answered.
+        best.takeHit(Math.max(1, Math.round(damage * CHAIN_DAMAGE)),
+            player.x, player.y, 20f);
+        sfx(Assets.Sfx.HIT);
+    }
+
+    /**
+     * Burns whatever is standing close. Ticks once a second rather than every
+     * step, so an aura of 4 is four damage a second and not two hundred and
+     * forty.
+     */
+    private void stepBurnAura() {
+        int burn = player.mods().burnAura();
+        if (burn <= 0 || !player.alive()) {
+            burnTick = 0;
+            return;
+        }
+        if (++burnTick < Modifiers.TICK_STEPS) {
+            return;
+        }
+        burnTick = 0;
+        for (Enemy e : enemies) {
+            if (!e.alive()) {
+                continue;
+            }
+            float dx = e.x - player.x;
+            float dy = e.y - player.y;
+            if (dx * dx + dy * dy <= Modifiers.BURN_RANGE * Modifiers.BURN_RANGE) {
+                e.takeHit(burn, player.x, player.y, 0f);
+            }
+        }
+    }
+
+    /** A swing started. Heavier weapons get the heavier sound. */
+    public void onSwingBegun(WeaponDef weapon) {
+        sfx(weapon != null && weapon.thrown() ? Assets.Sfx.THROW
+            : weapon != null && weapon.rootSteps > 0 ? Assets.Sfx.SWING_HEAVY
+            : Assets.Sfx.SWING);
+    }
+
     private void applyContactDamage() {
         if (!player.alive()) {
             return;
@@ -719,15 +1008,19 @@ public final class EntityWorld implements World, AiContext {
             e.deathCounted = true;
             run.kills++;
             shake = Math.max(shake, SHAKE_KILL);
+            sfx(Assets.Sfx.DEATH);
             e.brain().onDeath(e, this);
+            int healOnKill = player.mods().healOnKill();
+            if (healOnKill > 0) {
+                player.heal(healOnKill);
+            }
             // A splitter's children drop nothing, or splitting would double the
             // gold a mushroom is worth, and the room would pay for its own trap.
-            if (e.generation == 0 && e.def.goldMax > 0) {
-                int gold = e.def.goldMin + (e.def.goldMax > e.def.goldMin
-                    ? rng.nextInt(e.def.goldMax - e.def.goldMin + 1) : 0);
-                if (gold > 0) {
-                    dropGold(e.x, e.y, gold);
+            if (e.generation == 0) {
+                if (e.def.goldMax > 0) {
+                    dropGold(e.x, e.y, LootRoller.gold(e.def, rng.nextLong()));
                 }
+                dropLoot(e.def.lootTable, e.x, e.y);
             }
         }
     }
@@ -747,6 +1040,143 @@ public final class EntityWorld implements World, AiContext {
         Pickup p = new Pickup(kind, amount, itemId, x, y, region);
         pickups.add(p);
         return p;
+    }
+
+    /**
+     * Rolls a loot table and puts what comes out on the floor.
+     *
+     * <p>One pickup per {@code Drop}, because a three-roll chest can legally
+     * return the same item twice and a player who sees one potion appear for a
+     * chest that gave them two has been robbed as far as they can tell.
+     */
+    public void dropLoot(String tableId, float x, float y) {
+        if (tableId == null || !content.hasLootTable(tableId)) {
+            return;
+        }
+        LootTableDef table = content.lootTable(tableId);
+        for (LootRoller.Drop drop : LootRoller.roll(table, rng.nextLong(),
+                player.mods().luckAdd())) {
+            if (!content.hasItem(drop.itemId)) {
+                continue;
+            }
+            ItemDef item = content.item(drop.itemId);
+            Pickup.Kind kind;
+            switch (item.kind) {
+                case GOLD: kind = Pickup.Kind.GOLD; break;
+                case KEY: kind = Pickup.Kind.KEY; break;
+                case INSTANT: kind = Pickup.Kind.HEART; break;
+                default: kind = Pickup.Kind.ITEM; break;
+            }
+            float jx = (rng.nextFloat() - 0.5f) * 14f;
+            float jy = (rng.nextFloat() - 0.5f) * 8f;
+            dropPickup(kind, drop.count, item.id, x + jx, y + jy);
+        }
+    }
+
+    /**
+     * Takes a pickup off the floor. Gold is multiplied here rather than where it
+     * was dropped, so a relic picked up after the coin still pays.
+     */
+    public void collect(Pickup p) {
+        switch (p.kind) {
+            case GOLD:
+                run.gold += Math.max(1, Math.round(p.amount * player.mods().goldMult()));
+                sfx(Assets.Sfx.COIN);
+                break;
+            case KEY:
+                run.keys += p.amount;
+                sfx(Assets.Sfx.KEY_GET);
+                break;
+            case HEART:
+                if (p.itemId != null && content.hasItem(p.itemId)) {
+                    applyItem(content.item(p.itemId));
+                } else {
+                    player.heal(p.amount);
+                }
+                sfx(Assets.Sfx.HEAL);
+                break;
+            default:
+                if (p.itemId == null) {
+                    break;
+                }
+                if (content.hasRelic(p.itemId)) {
+                    if (!run.hasRelic(p.itemId)) {
+                        run.relics.add(p.itemId);
+                        refreshMods();
+                    }
+                } else {
+                    run.addItem(p.itemId, p.amount);
+                }
+                sfx(Assets.Sfx.PICKUP);
+                break;
+        }
+    }
+
+    /**
+     * Uses a consumable from the inventory. Public because the inventory screen
+     * is what decides when, and this is what decides what happens.
+     *
+     * @return false when the player has none of it
+     */
+    public boolean useItem(String itemId) {
+        if (itemId == null || !content.hasItem(itemId) || !run.spendItem(itemId)) {
+            return false;
+        }
+        applyItem(content.item(itemId));
+        return true;
+    }
+
+    /**
+     * What an item's effect actually does. The names are the content's, and
+     * ContentValidator rejects any it does not recognise, so an unknown one
+     * here means this list and that one have drifted - worth a log rather than
+     * a silent shrug.
+     */
+    private void applyItem(ItemDef item) {
+        int magnitude = Math.round(item.magnitude);
+        switch (item.effect) {
+            case "heal":
+                player.heal(magnitude);
+                break;
+            case "max_hp_add":
+                run.maxHp += magnitude;
+                player.heal(magnitude);
+                break;
+            case "gold":
+                run.gold += Math.max(1, Math.round(magnitude * player.mods().goldMult()));
+                break;
+            case "key":
+                run.keys += magnitude;
+                break;
+            case "cure_poison":
+                player.clearPoison();
+                break;
+            case "speed_buff":
+                player.buffSpeed(item.magnitude, Modifiers.BUFF_STEPS);
+                break;
+            case "damage_buff":
+                player.buffDamage(item.magnitude, Modifiers.BUFF_STEPS);
+                break;
+            case "shield_buff":
+                player.addShield(magnitude);
+                break;
+            case "drop_aggro":
+                for (Enemy e : enemies) {
+                    e.brain().forget(e, magnitude);
+                }
+                break;
+            case "reveal_map":
+                if (run.layout != null) {
+                    for (Room r : run.layout.rooms()) {
+                        r.visited = true;
+                    }
+                }
+                break;
+            default:
+                log("item '" + item.id + "' has effect '" + item.effect
+                    + "', which nothing here implements");
+                break;
+        }
     }
 
     private void dropGold(float x, float y, int amount) {

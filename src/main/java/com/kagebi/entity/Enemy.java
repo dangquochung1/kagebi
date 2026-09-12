@@ -8,6 +8,7 @@ import com.kagebi.ai.AiContext;
 import com.kagebi.ai.AiState;
 import com.kagebi.combat.AttackState;
 import com.kagebi.combat.Faction;
+import com.kagebi.combat.Modifiers;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.gen.CollisionGrid;
 
@@ -87,6 +88,16 @@ public class Enemy extends Entity {
     /** Boss phases scale these; 1 for everything else. */
     public float speedMult = 1f;
     public float damageMult = 1f;
+
+    // Statuses the player's relics and items apply. All three are "longest
+    // wins" rather than additive: a second application refreshes the timer
+    // instead of stacking, which is what stops a fast weapon from making an
+    // enemy permanently frozen and permanently dying.
+    private int slowSteps;
+    private int poisonSteps;
+    private int poisonPerTick;
+    private int poisonTick;
+    private int distractSteps;
 
     /** Set by the world once this death has been counted into the run. */
     public boolean deathCounted;
@@ -172,6 +183,7 @@ public class Enemy extends Entity {
      */
     public void simulate(AiContext ctx) {
         stepTimers();
+        stepStatus();
         if (cooldown > 0) {
             cooldown--;
         }
@@ -189,8 +201,68 @@ public class Enemy extends Entity {
         }
 
         applyShove(ctx.collision());
+        if (distractSteps > 0) {
+            // Skipped here rather than inside each brain, so a smoke bomb works
+            // on all fourteen of them and on the fifteenth nobody has written.
+            state = AiState.IDLE;
+            stateSteps++;
+            return;
+        }
         brain.think(this, ctx);
         stateSteps++;
+    }
+
+    /** Slows this one by a fraction of its speed, for a while. */
+    public void slow(float fraction, int steps) {
+        if (fraction <= 0f || steps <= 0) {
+            return;
+        }
+        speedMult = Math.min(speedMult, Math.max(0.1f, 1f - fraction));
+        slowSteps = Math.max(slowSteps, steps);
+    }
+
+    public void poison(int perTick, int steps) {
+        if (perTick <= 0 || steps <= 0) {
+            return;
+        }
+        poisonPerTick = Math.max(poisonPerTick, perTick);
+        poisonSteps = Math.max(poisonSteps, steps);
+    }
+
+    public void distract(int steps) {
+        distractSteps = Math.max(distractSteps, steps);
+    }
+
+    public boolean distracted() {
+        return distractSteps > 0;
+    }
+
+    /**
+     * Damage over time bypasses i-frames on purpose. Poison that can be dodged
+     * by being hit again is not poison, and at sixty ticks apart it cannot
+     * stack into anything unfair.
+     */
+    private void stepStatus() {
+        if (slowSteps > 0 && --slowSteps == 0) {
+            speedMult = 1f;
+        }
+        if (distractSteps > 0) {
+            distractSteps--;
+        }
+        if (poisonSteps > 0) {
+            poisonSteps--;
+            if (++poisonTick >= Modifiers.TICK_STEPS) {
+                poisonTick = 0;
+                hp = Math.max(0, hp - poisonPerTick);
+                flashSteps = Math.max(flashSteps, 3);
+                if (hp <= 0) {
+                    setState(AiState.DEAD);
+                }
+            }
+            if (poisonSteps == 0) {
+                poisonPerTick = 0;
+            }
+        }
     }
 
     /** How long the corpse stays: the art's death strip when it has one. */

@@ -8,6 +8,7 @@ import com.kagebi.combat.Damage;
 import com.kagebi.combat.Faction;
 import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
+import com.kagebi.combat.Modifiers;
 import com.kagebi.data.def.WeaponDef;
 import com.kagebi.gen.CollisionGrid;
 import com.kagebi.run.RunState;
@@ -84,11 +85,38 @@ public final class Player extends Entity {
     private WeaponDef weapon;
 
     /** Recomputed from the run's relics on entering a room; see EntityWorld. */
+    /**
+     * Base crit before relics. Five percent is low enough that a crit reads as
+     * luck rather than as the normal case, which is what makes the relics that
+     * raise it worth taking.
+     */
+    public static final float BASE_CRIT_CHANCE = 0.05f;
+    public static final float BASE_CRIT_MULT = 2f;
+
+    /**
+     * Timed buffs from items, and anything else that wants to nudge a number
+     * for a while. Relics do not live here - they come from {@link #mods}, so
+     * that picking one up takes effect on the next step without anyone having
+     * to remember to recompute.
+     */
     public float damageMult = 1f;
-    public float critChance = 0.05f;
-    public float critMult = 2f;
+    public float critChance = BASE_CRIT_CHANCE;
+    public float critMult = BASE_CRIT_MULT;
     public float speedMult = 1f;
     public int armour;
+
+    /** Relics, village upgrades and the character's perk, already combined. */
+    private Modifiers mods = new Modifiers();
+    /** A flat pool absorbed before hit points, from a shield potion. */
+    private int shield;
+
+    // Timed buffs from potions. One duration for all of them, so the player
+    // learns it once; see Modifiers.BUFF_STEPS.
+    private int speedBuffSteps;
+    private int damageBuffSteps;
+    private int poisonSteps;
+    private int poisonPerTick;
+    private int poisonTick;
 
     private boolean rolling;
     private int rollElapsed;
@@ -154,6 +182,27 @@ public final class Player extends Entity {
         return Faction.PLAYER;
     }
 
+    public Modifiers mods() {
+        return mods;
+    }
+
+    public void setMods(Modifiers mods) {
+        this.mods = mods == null ? new Modifiers() : mods;
+    }
+
+    public int shield() {
+        return shield;
+    }
+
+    public void addShield(int amount) {
+        shield = Math.max(shield, amount);
+    }
+
+    @Override
+    public float damageTakenMult() {
+        return mods.incomingMult();
+    }
+
     @Override
     public int armour() {
         return armour;
@@ -180,6 +229,7 @@ public final class Player extends Entity {
     public void step(EntityWorld world) {
         hitsLandedThisStep = 0;
         stepTimers();
+        stepBuffs();
         hp = run.hp;
         maxHp = run.maxHp;
 
@@ -205,7 +255,7 @@ public final class Player extends Entity {
         if (canRoll(intent)) {
             beginRoll(intent);
         } else if (canAttack(intent)) {
-            beginSwing(intent);
+            beginSwing(intent, world);
         }
 
         if (rolling) {
@@ -218,7 +268,7 @@ public final class Player extends Entity {
                 resolveSwing(world);
             }
             if (!swing.rooted() && hurtSteps == 0) {
-                walk(world.collision(), intent, SPEED * speedMult * ATTACK_MOVE_SCALE, false);
+                walk(world.collision(), intent, speed() * ATTACK_MOVE_SCALE, false);
             } else {
                 moving = false;
             }
@@ -227,7 +277,7 @@ public final class Player extends Entity {
         }
 
         if (hurtSteps == 0) {
-            walk(world.collision(), intent, SPEED * speedMult, true);
+            walk(world.collision(), intent, speed(), true);
         } else {
             moving = false;
         }
@@ -263,7 +313,7 @@ public final class Player extends Entity {
 
     private void advanceRoll(CollisionGrid grid) {
         if (rollElapsed == ROLL_IFRAME_FROM) {
-            iframes.grant(ROLL_IFRAME_TO - ROLL_IFRAME_FROM);
+            iframes.grant(ROLL_IFRAME_TO - ROLL_IFRAME_FROM + mods.rollInvulnAdd());
         }
         moveBy(grid, rollDirX * ROLL_SPEED * Cfg.STEP, rollDirY * ROLL_SPEED * Cfg.STEP);
         rollElapsed++;
@@ -273,14 +323,27 @@ public final class Player extends Entity {
         }
     }
 
-    private void beginSwing(Intent intent) {
+    /** Reused every swing rather than allocated: this runs sixty times a second. */
+    private final java.util.List<com.kagebi.combat.Combatant> struck =
+        new java.util.ArrayList<>();
+
+    private void beginSwing(Intent intent, EntityWorld world) {
         intent.consumeAttack();
         if (intent.moving()) {
             facing = Dir.of(intent.moveX, intent.moveY);
         }
-        boolean crit = Damage.rollCrit(rng, critChance);
-        swingDamage = Damage.outgoing(weapon.damage, damageMult, crit, critMult);
-        swing.begin(weapon.windupSteps, weapon.activeSteps, weapon.recoverSteps,
+        boolean crit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
+        swingDamage = Damage.outgoing(weapon.damage,
+            damageMult * mods.outgoingMult(hpFraction()),
+            crit, critMult * mods.critDamageMult());
+        // Attack speed shortens the parts the player waits through. The active
+        // window is left alone: shrinking it would make a faster weapon harder
+        // to land, which is the opposite of what the relic promises.
+        float haste = Math.max(0.25f, mods.attackSpeedMult());
+        world.onSwingBegun(weapon);
+        swing.begin(Math.max(1, Math.round(weapon.windupSteps / haste)),
+            weapon.activeSteps,
+            Math.max(1, Math.round(weapon.recoverSteps / haste)),
             weapon.rootSteps);
     }
 
@@ -293,9 +356,15 @@ public final class Player extends Entity {
             }
             return;
         }
-        Hitbox box = Hitbox.swing(x, y, facing, weapon.reach, weapon.width,
-            swingDamage, weapon.knockback, Faction.PLAYER);
-        hitsLandedThisStep += HitResolver.resolve(box, world.hostiles(), swing);
+        Hitbox box = Hitbox.swing(x, y, facing, weapon.reach + mods.reachAdd(),
+            weapon.width, swingDamage, weapon.knockback, Faction.PLAYER);
+        struck.clear();
+        int landed = HitResolver.resolve(box, world.hostiles(), swing, struck);
+        hitsLandedThisStep += landed;
+        if (landed > 0) {
+            world.onPlayerHitLanded(this, swingDamage, landed);
+            world.applyOnHit(this, struck, swingDamage);
+        }
     }
 
     private void walk(CollisionGrid grid, Intent intent, float speed, boolean turn) {
@@ -313,9 +382,17 @@ public final class Player extends Entity {
 
     @Override
     public void takeHit(int damage, float fromX, float fromY, float knockback) {
+        // A shield potion is a pool in front of the hit points, not a heal, so
+        // it survives a run at full health - which is when the player has one
+        // spare to drink.
+        if (shield > 0) {
+            int absorbed = Math.min(shield, damage);
+            shield -= absorbed;
+            damage -= absorbed;
+        }
         run.hp = Math.max(0, run.hp - damage);
         hp = run.hp;
-        iframes.grant(HURT_IFRAMES);
+        iframes.grant(HURT_IFRAMES + mods.invulnStepsAdd());
         flashSteps = 8;
         hurtSteps = HURT_STUN;
         shove.apply(fromX, fromY, x, y, knockback, 0f, facing.opposite());
@@ -324,6 +401,78 @@ public final class Player extends Entity {
         // reason not to trade.
         swing.cancel();
         rolling = false;
+    }
+
+    public void buffSpeed(float mult, int steps) {
+        speedMult = Math.max(speedMult, mult);
+        speedBuffSteps = Math.max(speedBuffSteps, steps);
+    }
+
+    public void buffDamage(float mult, int steps) {
+        damageMult = Math.max(damageMult, mult);
+        damageBuffSteps = Math.max(damageBuffSteps, steps);
+    }
+
+    public void poison(int perTick, int steps) {
+        poisonPerTick = Math.max(poisonPerTick, perTick);
+        poisonSteps = Math.max(poisonSteps, steps);
+    }
+
+    public void clearPoison() {
+        poisonSteps = 0;
+        poisonPerTick = 0;
+        poisonTick = 0;
+    }
+
+    public boolean poisoned() {
+        return poisonSteps > 0;
+    }
+
+    /** Runs the timed buffs and any poison down. Called once per step. */
+    private void stepBuffs() {
+        if (speedBuffSteps > 0 && --speedBuffSteps == 0) {
+            speedMult = 1f;
+        }
+        if (damageBuffSteps > 0 && --damageBuffSteps == 0) {
+            damageMult = 1f;
+        }
+        if (poisonSteps > 0) {
+            poisonSteps--;
+            if (++poisonTick >= Modifiers.TICK_STEPS) {
+                poisonTick = 0;
+                // Straight to hit points: poison that i-frames block would be
+                // cured by being hit, which is the wrong lesson entirely.
+                run.hp = Math.max(0, run.hp - poisonPerTick);
+                hp = run.hp;
+                flashSteps = Math.max(flashSteps, 4);
+            }
+            if (poisonSteps == 0) {
+                poisonPerTick = 0;
+            }
+        }
+    }
+
+    /**
+     * Comes back from the dead with a long grace window, so the hit that would
+     * have killed the player again is not the very next one.
+     */
+    public void reviveAt(int hitPoints) {
+        run.hp = hitPoints;
+        hp = hitPoints;
+        iframes.grant(HURT_IFRAMES * 2);
+        flashSteps = 30;
+        swing.cancel();
+        rolling = false;
+    }
+
+    /** Walk speed with buffs and relics folded in. */
+    public float speed() {
+        return SPEED * speedMult * mods.moveSpeedMult();
+    }
+
+    /** Hit points as a fraction of the maximum, for the relics that key off it. */
+    public float hpFraction() {
+        return run.maxHp <= 0 ? 0f : (float) run.hp / run.maxHp;
     }
 
     /** Heals, clamped to the run maximum. Used by pickups and by shrines. */

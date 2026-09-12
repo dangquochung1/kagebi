@@ -131,19 +131,45 @@ class DungeonLayoutTest {
 
     @Test
     void heartsFillInQuartersLeftToRight() {
-        assertEquals(3, Hud.heartCount(12));
-        assertEquals(4, Hud.heartCount(13), "a part-heart of capacity still gets drawn");
-        int[] at5 = {Hud.quarters(5, 0), Hud.quarters(5, 1), Hud.quarters(5, 2)};
-        assertEquals(4, at5[0]);
-        assertEquals(1, at5[1]);
-        assertEquals(0, at5[2]);
+        int heart = Hud.HP_PER_HEART;
+        assertEquals(3, Hud.heartCount(heart * 3));
+        assertEquals(4, Hud.heartCount(heart * 3 + 1),
+            "a part-heart of capacity still gets drawn");
+
+        // One and a quarter hearts of health: the first heart full, a quarter
+        // into the second, nothing in the third.
+        int hp = heart + Hud.HP_PER_QUARTER;
+        assertEquals(4, Hud.quarters(hp, 0));
+        assertEquals(1, Hud.quarters(hp, 1));
+        assertEquals(0, Hud.quarters(hp, 2));
+
         assertEquals(0, Hud.quarters(-3, 0), "overkill never indexes below the empty frame");
-        assertEquals(4, Hud.quarters(99, 0), "overheal never indexes past the full frame");
+        assertEquals(4, Hud.quarters(heart * 9, 0),
+            "overheal never indexes past the full frame");
     }
 
-    /** Every starting run draws whole hearts only; see Screens.DEFAULT_MAX_HP. */
+    /**
+     * A single hit point still shows something. An empty bar on a player who is
+     * alive reads as a bug at best and as already dead at worst, and with five
+     * hit points to the quarter there is now a range where that could happen.
+     */
     @Test
-    void theStartingHealthIsWholeHearts() {
-        assertEquals(0, Screens.DEFAULT_MAX_HP % com.kagebi.assets.Assets.Ui.HEART_STEPS);
+    void oneHitPointStillDrawsAQuarter() {
+        assertEquals(1, Hud.quarters(1, 0));
+        assertEquals(1, Hud.quarters(Hud.HP_PER_QUARTER, 0));
+        assertEquals(2, Hud.quarters(Hud.HP_PER_QUARTER + 1, 0));
+    }
+
+    /**
+     * The starting bar is whole hearts, and is the number the content was
+     * balanced against rather than the number the art made convenient. These
+     * two disagreed by a factor of eight until the game was first played.
+     */
+    @Test
+    void theStartingHealthIsWholeHeartsAtTheBalancedNumber() {
+        assertEquals(0, Screens.DEFAULT_MAX_HP % Hud.HP_PER_HEART,
+            "a starting run should not open on a part-drawn heart");
+        assertEquals(100, Screens.DEFAULT_MAX_HP,
+            "BalanceTest models every floor from a hundred starting hit points");
     }
 }

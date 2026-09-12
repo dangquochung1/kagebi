@@ -27,6 +27,11 @@ class PurityTest {
     private static final String[] PURE = {
         "src/main/java/com/kagebi/loot",
         "src/main/java/com/kagebi/save/migration",
+        // combat was always meant to be on this list - the plan says so - and
+        // was not. It is the package where purity pays for itself most: damage,
+        // i-frames, knockback and the relic arithmetic are the numbers that
+        // most need testing and would otherwise need a GL context to reach.
+        "src/main/java/com/kagebi/combat",
     };
 
     private static final String[] FORBIDDEN = {
@@ -50,7 +55,7 @@ class PurityTest {
                 }
             }
         }
-        assertTrue(files >= 4, "found only " + files + " source files - has a package moved?");
+        assertTrue(files >= 10, "found only " + files + " source files - has a package moved?");
         assertTrue(offences.isEmpty(), offences.toString());
     }
 

@@ -204,6 +204,12 @@ public class DungeonScreen extends SimScreen {
         // Without this the world loads its own copies of both pages: ~20MB of
         // texture for art this screen is already holding.
         world.useSharedAtlases(game.skin().getAtlas(), Preload.fx());
+        if (world instanceof EntityWorld) {
+            // Upgrades bought in the village count for as much as relics found
+            // in the dungeon, and both are resolved in one place.
+            ((EntityWorld) world).useVillage(game.shop(), game.profile());
+            ((EntityWorld) world).useAudio(game.audio());
+        }
         startFloor(Math.max(1, run.floor));
         if (mapOnShow) {
             hud.toggleMap();

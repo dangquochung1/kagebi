@@ -43,11 +43,18 @@ import com.kagebi.run.RunState;
 public final class Screens {
 
     /**
-     * What a run starts with until {@code data/} carries character defs. A
-     * multiple of four because the heart art is drawn in quarters: three full
-     * hearts, and never a half-drawn one at the end of the row.
+     * What a run starts with until {@code data/} carries character defs.
+     *
+     * <p>A hundred because that is the number the content was balanced against:
+     * {@code BalanceTest} models every floor from it, and the enemy damage,
+     * floor pacing and shop prices were all tuned around it. This screen first
+     * shipped with twelve - three hearts of the quarter-heart art - and the two
+     * halves never met until the game was played: a floor-five enemy hitting for
+     * sixteen killed a full-health player outright, and an idle player died on
+     * floor one in two seconds. The art question is the HUD's, and
+     * {@code Hud.HP_PER_QUARTER} answers it without moving this.
      */
-    public static final int DEFAULT_MAX_HP = 12;
+    public static final int DEFAULT_MAX_HP = 100;
 
     /**
      * @param name the {@code --screen} value

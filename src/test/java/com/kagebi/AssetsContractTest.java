@@ -119,7 +119,11 @@ class AssetsContractTest {
     @Test
     void everyPathConstantPointsAtSomethingReal() {
         List<String> missing = new ArrayList<>();
-        for (String path : constants(Assets.class)) {
+        List<String> paths = new ArrayList<>(constants(Assets.class));
+        // Sounds are nested rather than top level, and a missing one is silent
+        // in the worst way: the hit still lands, it just stops making a noise.
+        paths.addAll(constants(Assets.Sfx.class));
+        for (String path : paths) {
             if (!path.startsWith("assets/")) {
                 continue;
             }
