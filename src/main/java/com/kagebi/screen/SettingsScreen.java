@@ -24,6 +24,7 @@ import com.kagebi.assets.Assets;
 import com.kagebi.gfx.PixelViewport;
 import com.kagebi.input.GameAction;
 import com.kagebi.input.InputMap;
+import com.kagebi.settings.Difficulty;
 import com.kagebi.ui.I18n;
 import com.kagebi.ui.KeyPrompts;
 import com.kagebi.ui.TabBar;
@@ -273,6 +274,28 @@ public class SettingsScreen extends GameScreen {
             }
         });
         page.add(shake).left().padBottom(3).row();
+
+        // Difficulty cycles rather than offering three buttons: at 320 pixels
+        // three labelled choices plus their own label is the whole row, and the
+        // language control beneath it already taught the player that a button
+        // showing a value changes to the next one.
+        Table hard = new Table();
+        hard.add(new Label(t.get("settings.difficulty"), game.skin())).left().padRight(4);
+        TextButton level = new TextButton(t.get(game.settings().difficulty().i18nKey),
+                                          game.skin());
+        level.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                Difficulty[] all = Difficulty.values();
+                Difficulty next =
+                    all[(game.settings().difficulty().ordinal() + 1) % all.length];
+                game.settings().setDifficulty(next);
+                // Takes effect on the next run, not this one: see RunState.
+                level.setText(game.i18n().get(next.i18nKey));
+            }
+        });
+        hard.add(level);
+        page.add(hard).left().padBottom(3).row();
 
         Table lang = new Table();
         lang.add(new Label(t.get("settings.language"), game.skin())).left().padRight(4);

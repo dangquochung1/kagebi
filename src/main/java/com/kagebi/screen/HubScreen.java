@@ -168,7 +168,7 @@ public class HubScreen extends SimScreen {
         if (run == null) {
             // Reached with --screen hub, or after an end screen that has
             // already cleared the run. The village still needs someone in it.
-            run = Screens.freshRun(Assets.Actor.DEFAULT_CHARACTER, "katana",
+            run = Screens.freshRun(game, Assets.Actor.DEFAULT_CHARACTER, "katana",
                                    Screens.DEFAULT_MAX_HP);
             game.setRun(run);
         }

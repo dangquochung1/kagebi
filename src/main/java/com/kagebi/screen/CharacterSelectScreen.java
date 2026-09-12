@@ -207,7 +207,7 @@ public class CharacterSelectScreen extends SimScreen {
             return;
         }
         game.audio().playSfx(Assets.SFX_ACCEPT);
-        RunState run = Screens.freshRun(Assets.Actor.CHARACTERS[character],
+        RunState run = Screens.freshRun(game, Assets.Actor.CHARACTERS[character],
                                         weapons.get(weapon), Screens.DEFAULT_MAX_HP);
         run.throwWeaponId = throwables.get(throwable);
         game.setRun(run);

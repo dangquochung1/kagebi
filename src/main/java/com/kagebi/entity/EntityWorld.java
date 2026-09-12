@@ -1110,11 +1110,28 @@ public final class EntityWorld implements World, AiContext {
             ? new Boss(def, brain, sprites,
                 ActorSprites.transformation(actors, Assets.Actor.bossIdOf(def.sprite)))
             : new Enemy(def, brain, sprites);
+        scaleHealth(e, def.boss);
         e.x = x;
         e.y = y;
         brain.onSpawn(e);
         enemies.add(e);
         return e;
+    }
+
+    /**
+     * Applies the run's difficulty to one enemy's health, at full health.
+     *
+     * <p>Here rather than in {@link Enemy}: the def is the content as authored
+     * and an enemy has no idea which run it belongs to. Bosses take a gentler
+     * factor - the final one is eighty-nine measured seconds of unbroken
+     * swinging already, and a fifth more of that is not harder, only longer.
+     */
+    private void scaleHealth(Enemy e, boolean boss) {
+        if (run == null) {
+            return;
+        }
+        e.maxHp = run.difficulty.scaleHp(e.maxHp, boss);
+        e.hp = e.maxHp;
     }
 
     /**

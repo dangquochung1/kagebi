@@ -135,6 +135,8 @@ public class Enemy extends Entity {
         this.sprites = sprites;
         this.maxHp = def.maxHp;
         this.hp = def.maxHp;
+        // Scaled by the world that spawns it, which is the only thing that
+        // knows the run's difficulty; see scaleHealth.
         // The body is smaller than the cell on purpose: a 16px sprite with a
         // 16px box cannot pass a 16px gap, and every corridor in the game is
         // exactly that wide.

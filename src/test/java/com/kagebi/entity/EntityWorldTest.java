@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 
 import com.kagebi.Dir;
 import com.kagebi.ai.AiState;
+import com.kagebi.combat.Faction;
+import com.kagebi.combat.HitResolver;
+import com.kagebi.combat.Hitbox;
 import com.kagebi.data.ContentRegistry;
 import com.kagebi.data.ShopCatalog;
 import com.kagebi.data.def.FloorDef;
@@ -18,6 +21,7 @@ import com.kagebi.gen.SpawnPoint;
 import com.kagebi.input.GameAction;
 import com.kagebi.run.RunState;
 import com.kagebi.save.Profile;
+import com.kagebi.settings.Difficulty;
 
 /**
  * A whole room, headless: what spawns, what survives bad content, what the run
@@ -439,6 +443,82 @@ class EntityWorldTest {
         EntityWorld dungeon = world(registry(), run);
         dungeon.useVillage(shop, profile);
         assertEquals(115, run.maxHp, "descending must not apply it a second time");
+    }
+
+    // ---- difficulty -------------------------------------------------------------
+
+    /**
+     * The same blow, three settings, three numbers - and in the right order.
+     *
+     * <p>Measured through {@code HitResolver}, which is the path every hit the
+     * player takes goes down, rather than by reading the multiplier back.
+     */
+    @Test
+    void oneBlowCostsDifferentAmountsAtTheThreeSettings() {
+        int[] lost = new int[Difficulty.values().length];
+        for (Difficulty d : Difficulty.values()) {
+            RunState run = TestDefs.run();
+            run.difficulty = d;
+            EntityWorld w = world(registry(), run);
+            Player p = w.player();
+            int before = run.hp;
+            Hitbox box = new Hitbox(p.x - 4, p.y - 4, 8f, 8f, 20, 0f, Faction.ENEMY,
+                                    p.x, p.y);
+            HitResolver.hit(box, p, null);
+            lost[d.ordinal()] = before - run.hp;
+        }
+        assertTrue(lost[Difficulty.HARD.ordinal()] > lost[Difficulty.NORMAL.ordinal()],
+            "hard should hurt more than normal");
+        assertTrue(lost[Difficulty.NORMAL.ordinal()] > lost[Difficulty.WEAK.ordinal()],
+            "normal should hurt more than the gentle setting");
+    }
+
+    /**
+     * Enemy health is scaled where the enemy is spawned, because that is the
+     * only place that knows which run it belongs to. The def itself must come
+     * through untouched, or the second room of the floor would scale twice.
+     */
+    @Test
+    void enemyHealthFollowsTheRunsDifficultyWithoutTouchingTheContent() {
+        ContentRegistry content = registry();
+        int authored = content.enemy("slime").maxHp;
+        for (Difficulty d : Difficulty.values()) {
+            RunState run = TestDefs.run();
+            run.difficulty = d;
+            EntityWorld w = world(content, run);
+            w.enterRoom(TestDefs.room(RoomKind.NORMAL,
+                TestDefs.at(ENEMY, 60, 60, "slime")), TestDefs.walled(), null);
+            Enemy e = w.hostiles().first();
+            assertEquals(d.scaleHp(authored, false), e.maxHp(), "max health at " + d);
+            assertEquals(e.maxHp(), e.hp(), "a scaled enemy should spawn at full health");
+            assertEquals(authored, content.enemy("slime").maxHp,
+                "the def itself must not be rewritten");
+        }
+    }
+
+    /**
+     * Poison is the one source of damage that never passes through
+     * HitResolver. A difficulty that halved every blow but not the poison
+     * would make a poison stack worth twice what a sword blow is.
+     */
+    @Test
+    void poisonIsScaledToo() {
+        int[] lost = new int[Difficulty.values().length];
+        for (Difficulty d : Difficulty.values()) {
+            RunState run = TestDefs.run();
+            run.difficulty = d;
+            EntityWorld w = world(registry(), run);
+            w.enterRoom(TestDefs.room(RoomKind.NORMAL), TestDefs.walled(), null);
+            w.player().poison(10, 600);
+            int before = run.hp;
+            ScriptedInput in = new ScriptedInput();
+            for (int t = 0; t < 120; t++) {
+                in.tick(w);
+            }
+            lost[d.ordinal()] = before - run.hp;
+        }
+        assertTrue(lost[Difficulty.HARD.ordinal()] > lost[Difficulty.WEAK.ordinal()],
+            "poison ignored the difficulty: " + java.util.Arrays.toString(lost));
     }
 
     // ---- replayability ----------------------------------------------------------

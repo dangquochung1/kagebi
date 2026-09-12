@@ -221,7 +221,7 @@ public class DungeonScreen extends SimScreen {
 
         run = game.run();
         if (run == null) {
-            run = Screens.freshRun(Assets.Actor.DEFAULT_CHARACTER, "katana",
+            run = Screens.freshRun(game, Assets.Actor.DEFAULT_CHARACTER, "katana",
                                    Screens.DEFAULT_MAX_HP);
             game.setRun(run);
         }

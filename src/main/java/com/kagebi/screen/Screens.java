@@ -157,7 +157,7 @@ public final class Screens {
     }
 
     private static RunState startRun(Kagebi game, int floor) {
-        RunState run = freshRun(Assets.Actor.DEFAULT_CHARACTER,
+        RunState run = freshRun(game, Assets.Actor.DEFAULT_CHARACTER,
                                 "katana", DEFAULT_MAX_HP);
         run.floor = Math.max(1, floor);
         game.setRun(run);
@@ -224,6 +224,22 @@ public final class Screens {
     public static RunState freshRun(String characterId, String weaponId, int maxHp) {
         long seed = fixedSeed != null ? fixedSeed : MathUtils.random.nextLong();
         return new RunState(seed, characterId, weaponId, maxHp);
+    }
+
+    /**
+     * As above, taking the difficulty from the settings.
+     *
+     * <p>This is the only place the setting is read, and it is read once. A run
+     * keeps the difficulty it started with, so the pause menu cannot be used to
+     * make one bad room easier and then put it back.
+     */
+    public static RunState freshRun(Kagebi game, String characterId, String weaponId,
+                                    int maxHp) {
+        RunState run = freshRun(characterId, weaponId, maxHp);
+        if (game.settings() != null) {
+            run.difficulty = game.settings().difficulty();
+        }
+        return run;
     }
 
     private Screens() {}

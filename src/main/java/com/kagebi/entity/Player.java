@@ -238,9 +238,22 @@ public final class Player extends Entity {
         shield = Math.max(shield, amount);
     }
 
+    /**
+     * Armour and relics, then the difficulty setting.
+     *
+     * <p>Multiplied on here rather than folded into {@link Modifiers}, which is
+     * documented as the sum of relics, upgrades and perks. Hiding a global
+     * option inside it would make {@code ModifiersTest} assert something untrue
+     * about what a relic is worth, and would hand the difficulty to anything
+     * that reads a modifier for any other reason.
+     *
+     * <p>{@code HitResolver} is the only caller that matters, so this one line
+     * covers every blow the player takes - except poison, which subtracts from
+     * the run directly and is scaled where it is applied.
+     */
     @Override
     public float damageTakenMult() {
-        return mods.incomingMult();
+        return mods.incomingMult() * run.difficulty.damageTaken;
     }
 
     @Override
@@ -518,7 +531,12 @@ public final class Player extends Entity {
                 poisonTick = 0;
                 // Straight to hit points: poison that i-frames block would be
                 // cured by being hit, which is the wrong lesson entirely.
-                run.hp = Math.max(0, run.hp - poisonPerTick);
+                // Scaled here because it is the one source of damage that
+                // never passes through HitResolver, and a difficulty that
+                // halved every blow but not the poison would leave a poison
+                // stack worth twice what a sword blow is.
+                int tick = Math.max(1, Math.round(poisonPerTick * run.difficulty.damageTaken));
+                run.hp = Math.max(0, run.hp - tick);
                 hp = run.hp;
                 flashSteps = Math.max(flashSteps, 4);
             }

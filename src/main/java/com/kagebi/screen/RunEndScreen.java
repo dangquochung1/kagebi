@@ -87,7 +87,7 @@ abstract class RunEndScreen extends SimScreen {
     private void bank() {
         RunState run = game.run();
         if (run == null) {
-            run = Screens.freshRun(Assets.Actor.DEFAULT_CHARACTER,
+            run = Screens.freshRun(game, Assets.Actor.DEFAULT_CHARACTER,
                                    "katana", Screens.DEFAULT_MAX_HP);
         }
         run.victory = victory;
@@ -105,7 +105,8 @@ abstract class RunEndScreen extends SimScreen {
 
         // The next run starts from the village with the same ninja and weapon,
         // at full health. What the dead run was carrying stays with it.
-        game.setRun(Screens.freshRun(run.characterId, run.weaponId, Screens.DEFAULT_MAX_HP));
+        game.setRun(Screens.freshRun(game, run.characterId, run.weaponId,
+                                     Screens.DEFAULT_MAX_HP));
     }
 
     private void build() {

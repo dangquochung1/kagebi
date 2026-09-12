@@ -30,6 +30,7 @@ public final class Settings {
     private boolean vsync = true;
     private boolean screenShake = true;
     private I18n.Language language = I18n.Language.VI;
+    private Difficulty difficulty = Difficulty.DEFAULT;
 
     public Settings() {
         prefs = Gdx.app.getPreferences(FILE);
@@ -40,6 +41,7 @@ public final class Settings {
         vsync = prefs.getBoolean("video.vsync", vsync);
         screenShake = prefs.getBoolean("game.screenShake", screenShake);
         language = I18n.Language.fromCode(prefs.getString("game.language", language.code));
+        difficulty = Difficulty.fromName(prefs.getString("game.difficulty", difficulty.name()));
         // Where Preferences actually lands is backend-specific and worth
         // knowing for real rather than trusting the documentation.
         Gdx.app.log("settings", "preferences file: " + FILE + " (backend-resolved)");
@@ -63,6 +65,7 @@ public final class Settings {
         prefs.putBoolean("video.vsync", vsync);
         prefs.putBoolean("game.screenShake", screenShake);
         prefs.putString("game.language", language.code);
+        prefs.putString("game.difficulty", difficulty.name());
         prefs.flush();
     }
 
@@ -88,6 +91,20 @@ public final class Settings {
 
     public boolean screenShake() {
         return screenShake;
+    }
+
+    public Difficulty difficulty() {
+        return difficulty;
+    }
+
+    /**
+     * Changes the setting. A run in progress is not rewritten: the choice is
+     * copied into the RunState when the run starts, so tabbing into settings
+     * mid-descent cannot make the floor you are standing on easier.
+     */
+    public void setDifficulty(Difficulty v) {
+        difficulty = v;
+        changed();
     }
 
     public I18n.Language language() {

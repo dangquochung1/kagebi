@@ -4,6 +4,7 @@ import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectIntMap;
 import com.kagebi.gen.FloorLayout;
 import com.kagebi.gen.Room;
+import com.kagebi.settings.Difficulty;
 
 /**
  * Everything true about the run in progress.
@@ -38,6 +39,16 @@ public final class RunState {
      * entirely - and the throw key did nothing at all.
      */
     public String throwWeaponId;
+
+    /**
+     * How hard this run is, fixed when it started.
+     *
+     * <p>A copy of the setting rather than a reading of it. The setting can be
+     * changed from the pause menu at any moment, and a run that read it live
+     * would let a player drop the difficulty for one bad room and put it back -
+     * which makes the choice meaningless and the death screen a lie.
+     */
+    public Difficulty difficulty = Difficulty.DEFAULT;
 
     /** 1 to 5 while in the dungeon; 0 in the village. */
     public int floor;
