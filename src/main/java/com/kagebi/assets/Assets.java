@@ -399,6 +399,14 @@ public final class Assets {
 
         public static final String[] VILLAGERS = {ELDER, MASTER, HERBALIST};
 
+        /**
+         * Whoever it is that keeps a stall five floors underground. A top hat
+         * and a coat, which at 16 pixels is the clearest "this one sells
+         * things" in the pack - and the only bright figure in a dark room, so
+         * the player looks at it without being told to.
+         */
+        public static final String MERCHANT = "noble";
+
         public static String idle(String npcId) {
             return "npc/" + npcId + "/anim/idle";
         }
@@ -463,6 +471,19 @@ public final class Assets {
         public static final String SIDE_TORCH = "props/depths/torch/side_torch";
         /** A hanging heraldic banner. Used to flag a room worth entering. */
         public static final String BANNER = "props/depths/flag/flag";
+
+        /**
+         * A treasure chest, and the same chest swinging open on gold.
+         *
+         * <p>Both are four-frame strips, and neither is a loop: {@code CHEST}
+         * runs closed to ajar and {@code CHEST_OPEN} runs closed to a lid full
+         * of gold. So the closed chest sits on frame 0 and the opened one plays
+         * {@code CHEST_OPEN} once and rests on its last frame. A chest that
+         * animated on the spot would be four frames of noise in a room the
+         * player is trying to read.
+         */
+        public static final String CHEST = "props/depths/chest/chest";
+        public static final String CHEST_OPEN = "props/depths/chest/chest_open";
 
         private Prop() {}
     }

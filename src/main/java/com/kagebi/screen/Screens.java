@@ -3,6 +3,7 @@ package com.kagebi.screen;
 import com.badlogic.gdx.math.MathUtils;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
+import com.kagebi.gen.RoomKind;
 import com.kagebi.run.RunState;
 
 /**
@@ -28,6 +29,8 @@ import com.kagebi.run.RunState;
  *   dungeon   --page 1-5   the start room of that floor
  *   map       --page 1-5   the same, with the floor map expanded
  *   fight     --page 1-5   the first room of that floor that has enemies in it
+ *   treasure  --page 1-5   the first treasure room, for looking at a chest
+ *   shop      --page 1-5   the first shop room, for looking at the shopkeeper
  *   slide                  halfway through the first room transition
  *   exit      --page 1-5   standing on that floor's way down
  *   pause                  the pause menu over floor 1
@@ -89,7 +92,13 @@ public final class Screens {
                 return new GameScreen[] {new DungeonScreen(game).atExit()};
             case "fight":
                 startRun(game, page);
-                return new GameScreen[] {new DungeonScreen(game).inFight()};
+                return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.NORMAL)};
+            case "treasure":
+                startRun(game, page);
+                return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.TREASURE)};
+            case "shop":
+                startRun(game, page);
+                return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.SHOP)};
             case "slide":
                 startRun(game, 1);
                 return new GameScreen[] {new DungeonScreen(game).sliding()};

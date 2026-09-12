@@ -160,17 +160,20 @@ public class DungeonScreen extends SimScreen {
         return this;
     }
 
-    private boolean fightOnShow;
+    private RoomKind openIn;
 
     /**
-     * Opens in the first room that has enemies in it, for
-     * {@code --screen fight}. Without it the only dungeon anyone can screenshot
-     * is the start room, which is empty by design - so the game's central view,
-     * a room with something in it trying to kill you, could not be looked at at
-     * all.
+     * Opens in the first room of a given kind, for {@code --screen fight},
+     * {@code --screen treasure} and {@code --screen shop}.
+     *
+     * <p>Without it the only dungeon anyone can screenshot is the start room,
+     * which is empty by design - so the game's central view, a room with
+     * something in it trying to kill you, could not be looked at at all. The
+     * same gap hid invisible chests for just as long: the rooms that have one
+     * were unreachable without playing to them.
      */
-    DungeonScreen inFight() {
-        fightOnShow = true;
+    DungeonScreen openIn(RoomKind kind) {
+        openIn = kind;
         return this;
     }
 
@@ -209,6 +212,9 @@ public class DungeonScreen extends SimScreen {
             // in the dungeon, and both are resolved in one place.
             ((EntityWorld) world).useVillage(game.shop(), game.profile());
             ((EntityWorld) world).useAudio(game.audio());
+            // The dungeon shopkeeper is a villager sprite, and this is the only
+            // screen that ever puts one underground.
+            ((EntityWorld) world).useNpcAtlas(Preload.npc());
         }
         startFloor(Math.max(1, run.floor));
         if (mapOnShow) {
@@ -217,9 +223,9 @@ public class DungeonScreen extends SimScreen {
         if (exitOnShow && run.layout != null) {
             enter(run.layout.exit(), null);
         }
-        if (fightOnShow && run.layout != null) {
+        if (openIn != null && run.layout != null) {
             for (Room candidate : run.layout.rooms()) {
-                if (candidate.kind == RoomKind.NORMAL) {
+                if (candidate.kind == openIn) {
                     enter(candidate, null);
                     break;
                 }

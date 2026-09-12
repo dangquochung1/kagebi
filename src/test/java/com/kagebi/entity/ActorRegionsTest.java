@@ -40,19 +40,67 @@ class ActorRegionsTest {
         return out;
     }
 
+    private static List<String> constantsOf(Class<?> type) throws IllegalAccessException {
+        List<String> out = new ArrayList<>();
+        for (Field f : type.getDeclaredFields()) {
+            if (Modifier.isStatic(f.getModifiers()) && f.getType() == String.class) {
+                out.add((String) f.get(null));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Both fx-atlas constant classes, not just {@link Assets.Fx}.
+     *
+     * <p>{@link Assets.Prop} was covered by nothing at all: {@code
+     * AssetsContractTest} reaches only {@code Ui} and {@code Actor}, and this
+     * test used to reach only {@code Fx}. A mistyped prop region is invisible
+     * in the worst way - the torch or the chest simply does not draw, which
+     * looks exactly like the bug where nothing drew them in the first place.
+     */
     @Test
     void everyFxRegionExists() throws IllegalAccessException {
         Map<String, int[]> fx = sizes("fx");
         List<String> missing = new ArrayList<>();
-        for (Field f : Assets.Fx.class.getDeclaredFields()) {
-            if (Modifier.isStatic(f.getModifiers()) && f.getType() == String.class) {
-                String region = (String) f.get(null);
-                if (!fx.containsKey(region)) {
-                    missing.add(region);
-                }
+        for (String region : constantsOf(Assets.Fx.class)) {
+            if (!fx.containsKey(region)) {
+                missing.add(region);
+            }
+        }
+        for (String region : constantsOf(Assets.Prop.class)) {
+            if (!fx.containsKey(region)) {
+                missing.add(region);
             }
         }
         assertTrue(missing.isEmpty(), "missing from fx.atlas: " + missing);
+    }
+
+    /** Every prop is a strip of square frames, which is what Anim.strip assumes. */
+    @Test
+    void everyPropIsAStripOfSquareFrames() throws IllegalAccessException {
+        Map<String, int[]> fx = sizes("fx");
+        List<String> odd = new ArrayList<>();
+        for (String region : constantsOf(Assets.Prop.class)) {
+            int[] size = fx.get(region);
+            if (size != null && (size[1] == 0 || size[0] % size[1] != 0)) {
+                odd.add(region + " is " + size[0] + "x" + size[1]);
+            }
+        }
+        assertTrue(odd.isEmpty(), "not a strip of squares: " + odd);
+    }
+
+    /**
+     * The dungeon shopkeeper has a sheet, and it is the shape Anim.directional
+     * slices. A villager sheet in the wrong place reads four frames as four
+     * facings and the merchant faces the wrong way forever.
+     */
+    @Test
+    void theDungeonMerchantHasADirectionalIdle() {
+        int[] idle = sizes("npc").get(Assets.Npc.idle(Assets.Npc.MERCHANT));
+        assertTrue(idle != null, "no idle sheet for " + Assets.Npc.MERCHANT);
+        assertEquals(0, idle[0] % 16, "4 columns of 16px: " + idle[0]);
+        assertEquals(4, idle[0] / 16, "one column per facing");
     }
 
     @Test

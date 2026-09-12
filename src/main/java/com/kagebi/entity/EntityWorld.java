@@ -98,6 +98,9 @@ public final class EntityWorld implements World, AiContext {
     /** How close the player must be to a chest, shop or stairs to be offered it. */
     public static final float INTERACT_RANGE = 20f;
 
+    /** Steps per frame of the chest lid. 8 makes the four frames read as one act. */
+    public static final int CHEST_STEPS = 8;
+
     /** Sideways nudge per extra projectile, as a fraction of forward speed. */
     public static final float FAN_SPREAD = 0.16f;
 
@@ -175,22 +178,88 @@ public final class EntityWorld implements World, AiContext {
     private Anim torchAnim;
     private Anim sideTorchAnim;
     private Anim bannerAnim;
+    private Anim chestAnim;
+    private Anim chestOpenAnim;
+    private TextureAtlas npcAtlas;
     private TextureRegion kunaiRegion;
     private TextureRegion goldRegion;
     private TextureRegion heartRegion;
     private TextureRegion keyRegion;
 
-    /** A chest, the stairs, or a shopkeeper: something the player walks up to. */
-    private static final class Marker {
+    /**
+     * A chest, the stairs, or a shopkeeper: something the player walks up to.
+     *
+     * <p>An {@link Entity} purely so it can be drawn in the depth sort. It was
+     * a bare struct for a long time and nothing ever drew it, which is how the
+     * game shipped with invisible chests that could still be opened - the
+     * prompt appeared, the loot dropped, and there was nothing on the floor to
+     * explain either. The room's tiles do not draw them either: the generator
+     * measured two chest tiles and never stamped one.
+     *
+     * <p>Being in the sort is the point rather than a detail. A chest stands in
+     * the middle of the floor and is walked around, so a player above it has to
+     * pass behind it; the wall torches in {@link Decor} can skip the sort
+     * precisely because nothing can ever stand on them.
+     */
+    private static final class Marker extends Entity {
         final SpawnPoint.Kind kind;
-        final float x;
-        final float y;
         boolean used;
+        /** Set when the chest is opened, so the lid animation plays once. */
+        private int openSteps = -1;
+        private Anim resting;
+        private Anim afterUse;
+        /** False holds frame 0: a chest lid is an event, a shopkeeper breathes. */
+        private boolean animates;
 
         Marker(SpawnPoint.Kind kind, float x, float y) {
             this.kind = kind;
             this.x = x;
             this.y = y;
+            this.bodyW = 16f;
+            // 16, so footY() lands 8 below the centre and a 16px sprite draws
+            // centred on the tile. The marker's position IS the thing the
+            // player walks up to, so the art has to sit on it exactly.
+            this.bodyH = 16f;
+            this.hp = 1;
+            this.maxHp = 1;
+        }
+
+        void art(Anim resting, Anim afterUse, boolean animates) {
+            this.resting = resting;
+            this.afterUse = afterUse;
+            this.animates = animates;
+        }
+
+        void open() {
+            used = true;
+            openSteps = 0;
+        }
+
+        @Override
+        public Faction faction() {
+            return Faction.HAZARD;
+        }
+
+        /** Scenery. A swing that reaches a chest passes through it. */
+        @Override
+        public void takeHit(int damage, float fromX, float fromY, float knockback) {
+        }
+
+        @Override
+        public void step(EntityWorld world) {
+            animSteps++;
+            if (openSteps >= 0) {
+                openSteps++;
+            }
+        }
+
+        @Override
+        public TextureRegion frame() {
+            if (openSteps >= 0 && afterUse != null) {
+                return afterUse.frame(facing, openSteps);
+            }
+            return resting == null ? null
+                : resting.frame(facing, animates ? animSteps : 0);
         }
     }
 
@@ -333,6 +402,9 @@ public final class EntityWorld implements World, AiContext {
         for (int i = 0; i < pickups.size; i++) {
             pickups.get(i).step(this);
         }
+        for (int i = 0; i < markers.size; i++) {
+            markers.get(i).step(this);
+        }
 
         countDeaths();
         if (spawnQueue.size > 0) {
@@ -399,6 +471,13 @@ public final class EntityWorld implements World, AiContext {
         }
         for (Pickup p : pickups) {
             drawList.add(p);
+        }
+        for (Marker m : markers) {
+            // The stairs are drawn by the screen, from the template, on a path
+            // that predates markers; two circles on one tile helps nobody.
+            if (m.kind != SpawnPoint.Kind.EXIT) {
+                drawList.add(m);
+            }
         }
         // Higher y first, so whatever stands lower on screen is drawn in front
         // of it. Without this a slime walking up past the player passes over
@@ -526,7 +605,7 @@ public final class EntityWorld implements World, AiContext {
     }
 
     private void openChest(Marker m) {
-        m.used = true;
+        m.open();
         sfx(Assets.Sfx.PICKUP);
         for (int i = 0, coins = 3 + rng.nextInt(4); i < coins; i++) {
             dropGold(m.x, m.y, 1 + rng.nextInt(3));
@@ -813,7 +892,7 @@ public final class EntityWorld implements World, AiContext {
                 case CHEST:
                 case EXIT:
                 case SHOPKEEPER:
-                    markers.add(new Marker(s.kind, s.x, s.y));
+                    markers.add(dress(new Marker(s.kind, s.x, s.y)));
                     break;
                 case PROP:
                     addDecor(s);
@@ -863,6 +942,36 @@ public final class EntityWorld implements World, AiContext {
         int phase = ((s.x * 7 + s.y * 13) % anim.frameCount()) * Decor.FLICKER_STEPS;
         boolean flip = side && s.x > RoomTemplate.PIXEL_WIDTH / 2;
         decor.add(new Decor(anim, s.x, s.y, phase, flip));
+    }
+
+    /**
+     * Gives a marker the art it draws with, if this build has any.
+     *
+     * <p>The stairs get none: {@code DungeonScreen} draws its own magic circle
+     * from the room template, on a path that predates markers entirely. Drawing
+     * one here as well would put two things on the same tile.
+     */
+    private Marker dress(Marker m) {
+        if (m.kind == SpawnPoint.Kind.CHEST) {
+            m.art(chestAnim, chestOpenAnim, false);
+        } else if (m.kind == SpawnPoint.Kind.SHOPKEEPER && npcAtlas != null
+                && npcAtlas.findRegion(Assets.Npc.idle(Assets.Npc.MERCHANT)) != null) {
+            m.art(Anim.directional(npcAtlas, Assets.Npc.idle(Assets.Npc.MERCHANT), 16,
+                Anim.DEFAULT_STEPS_PER_FRAME, true), null, true);
+        }
+        return m;
+    }
+
+    /**
+     * Hands over the village atlas, so the dungeon's shopkeeper has a face.
+     * Separate from {@link #useSharedAtlases} because that pair is on the
+     * {@code World} interface and the hub does not need this one.
+     */
+    public void useNpcAtlas(TextureAtlas npc) {
+        this.npcAtlas = npc;
+        for (Marker m : markers) {
+            dress(m);
+        }
     }
 
     /** Places an enemy. Public so a test, or a debug console, can populate a room. */
@@ -1328,6 +1437,11 @@ public final class EntityWorld implements World, AiContext {
             torchAnim = loop(Assets.Prop.TORCH);
             sideTorchAnim = loop(Assets.Prop.SIDE_TORCH);
             bannerAnim = loop(Assets.Prop.BANNER);
+            // Not loops: both strips run a lid from shut to open, so they play
+            // once and hold. CHEST_STEPS is slower than a torch flicker because
+            // this one is a single event the player should see happen.
+            chestAnim = once(Assets.Prop.CHEST);
+            chestOpenAnim = once(Assets.Prop.CHEST_OPEN);
         }
         goldRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.COIN);
         heartRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_HEART);
@@ -1338,6 +1452,12 @@ public final class EntityWorld implements World, AiContext {
     private Anim loop(String region) {
         return fxAtlas.findRegion(region) == null
             ? null : Anim.strip(fxAtlas, region, Decor.FLICKER_STEPS, true);
+    }
+
+    /** A strip that plays once and holds its last frame. */
+    private Anim once(String region) {
+        return fxAtlas.findRegion(region) == null
+            ? null : Anim.strip(fxAtlas, region, CHEST_STEPS, false);
     }
 
     private static void log(String message) {

@@ -1,0 +1,22 @@
+các việc cần làm: 
+- 0: màn hình shop ở làng (như bạn đang đề cập)
+-1 khi đi qua rương thì không thấy rương đâu, dù tôi vẫn nhặt được vật phẩm khi bấm E , tương tự với bán, tôi cũng không thấy có dấu hiệu UI nào, đi quan thấy bán thì có bán
+-2 khi đánh tay thì không thấy hiện vũ khí ra, tôi không biết được tầm đánh mức nào
+-3 điểm cải thiện: tôi muốn có hiện dame khi tấn công, tôi đang ko rõ cơ chế hiện tại của quán, nếu là số (ví dụ 100hp chẳng hạn thì mỗi lần nhân vật đánh sẽ hiện ra dame, và máu của quán cũng trừ đi)
+   và lại tôi muốn thay vì chí chố hữ ở X dame, ví dụ là 5 dame mỗi đòn, thì tôi muốn nó có xác xuất ví dụ (4 hoặc 5 hoặc 6 (3 cái này màu như nhau, giả sử xanh biển), và khi crit thì nó sẽ rơi vào đỏ, ở mức 7/9/10 ) (dame càng to thì kích cỡ sẽ to hơn 1 chút)
+   còn nếu máu của quán chỉ là thanh máu như nhân vật thì có thể hiện thanh máu mỗi khi bị ăn đòn tầm 1-2s, ko ăn đòn nữa thì thanh sẽ ẩn đi
+-4 tôi thấy có nút K là ném, tôi bấm vào thì không thấy gì, không biết do thuộc tính của kiếm là như thế hay là phải thuộc loại phi tiêu mới nếm được, giải đáp giúp tôi nhé
+- 5 ở phần làng, kiểu như 1 số cây không được tự nhiên lắm, có cách nào để tôi tự vào để xắp xếp lại bụi cây không? (tự trang trí lại map ấy) (cái này hỏi đáp thôi, chưa cần làm ngay)
+- 6 tôi muốn thiết kế cả mức nữa (3 mức: "Khó", "Bình thường", "Bạn yếu") (bạn yếu = dễ nhé, tôi thích dùng từ đó hơn thôi, dịch ra cả 3 sẽ là Hard/Norm/You're weak)
+- 7 khi sang hầm mới, tôi muốn HP của nhân vật hồi lại 100% (mức hard thì không)
+- 8 lệnh: mvn exec:java -Dexec.args="--screen fight --page 5"    thì tôi chạy bị báo build fail
+    bị báo là: Unknown lifecycle phase ".args=--screen fight --page 5". You must specify a valid lifecycle phase or a goal in the format <plugin-prefix>:<goal> or <plugin-group-id>:<plugin-artifact-id>[:<plugin-version>]:<goal>. Available lifecycle phases are: pre-clean, clean, post-clean,validate, initialize, generate-sources, process-sources, generate-resources, process-resources, compile, process-classes, generate-test-sources, process-test-sources, generate-test-resources, process-test-resources, test-compile, process-test-classes, test, prepare-package, package,pre-integration-test, integration-test, post-integration-test, verify,install, deploy, pre-site, site, post-site, site-deploy. -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/LifecyclePhaseNotFoundException
+
+
+note: việc build exe, apk cứ để đấy đã, chưa cần động vào vội
