@@ -46,6 +46,20 @@ public final class RunState {
 
     public int hp;
     public int maxHp;
+
+    /**
+     * What {@link #maxHp} was before any relic or bought upgrade raised it.
+     *
+     * <p>Belongs to the run rather than to whoever is simulating it, because a
+     * run passes through two worlds before its first fight: the village builds
+     * one and the dungeon builds another over this same object. Each used to
+     * snapshot the current maximum as the base it added to, so a bought level
+     * of vigor was applied once in the village and then again on the way down -
+     * 100 to 115 to 130. Reading the base from here makes the sum idempotent
+     * however many worlds are built.
+     */
+    public final int baseMaxHp;
+
     public int gold;
     public int keys;
 
@@ -62,6 +76,7 @@ public final class RunState {
         this.characterId = characterId;
         this.weaponId = weaponId;
         this.maxHp = maxHp;
+        this.baseMaxHp = maxHp;
         this.hp = maxHp;
     }
 

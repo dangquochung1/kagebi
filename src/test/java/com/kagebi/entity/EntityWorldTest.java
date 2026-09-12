@@ -10,12 +10,14 @@ import org.junit.jupiter.api.Test;
 import com.kagebi.Dir;
 import com.kagebi.ai.AiState;
 import com.kagebi.data.ContentRegistry;
+import com.kagebi.data.ShopCatalog;
 import com.kagebi.data.def.FloorDef;
 import com.kagebi.gen.Room;
 import com.kagebi.gen.RoomKind;
 import com.kagebi.gen.SpawnPoint;
 import com.kagebi.input.GameAction;
 import com.kagebi.run.RunState;
+import com.kagebi.save.Profile;
 
 /**
  * A whole room, headless: what spawns, what survives bad content, what the run
@@ -404,6 +406,39 @@ class EntityWorldTest {
         assertEquals(EntityWorld.PROMPT_DESCEND, w.promptKey());
         w.interact();
         assertTrue(w.descendRequested());
+    }
+
+    // ---- the village ------------------------------------------------------------
+
+    /**
+     * A run passes through two worlds before the first fight: the village builds
+     * one, and the dungeon builds another over the same {@link RunState}. The
+     * bought maximum-health upgrade must be worth the same either way.
+     *
+     * <p>It was not. Each world took the run's <em>current</em> maximum as the
+     * base it added to, so the village raised 100 to 115 and the dungeon then
+     * read 115 as the base and raised it to 130. Nobody could see it before the
+     * shop screen existed, because until then {@code ShopCatalog.buy} was only
+     * ever called from a test.
+     */
+    @Test
+    void aBoughtUpgradeIsWorthTheSameHoweverManyWorldsTheRunPassesThrough() {
+        ShopCatalog shop = new ShopCatalog();
+        shop.add(new ShopCatalog.Upgrade("vigor", "n", "d", 0, 4,
+            new int[] {350, 700, 1400, 2600}, "max_hp_add", 15f));
+        Profile profile = new Profile();
+        profile.upgrades.put("vigor", 1);
+
+        RunState run = TestDefs.run();
+        assertEquals(100, run.maxHp);
+
+        EntityWorld village = world(registry(), run);
+        village.useVillage(shop, profile);
+        assertEquals(115, run.maxHp, "the village should apply one level of vigor");
+
+        EntityWorld dungeon = world(registry(), run);
+        dungeon.useVillage(shop, profile);
+        assertEquals(115, run.maxHp, "descending must not apply it a second time");
     }
 
     // ---- replayability ----------------------------------------------------------

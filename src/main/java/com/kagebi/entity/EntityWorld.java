@@ -152,12 +152,6 @@ public final class EntityWorld implements World, AiContext {
     private Room room;
     private Random rng = new Random(0L);
 
-    /**
-     * The run's maximum health before any relic touched it, so that recomputing
-     * after a second pickup adds the second relic rather than the first twice.
-     */
-    private final int baseMaxHp;
-
     private ShopCatalog shop;
     private Profile profile;
     private AudioService audio;
@@ -279,7 +273,6 @@ public final class EntityWorld implements World, AiContext {
         this.content = content != null ? content : new ContentRegistry();
         this.run = run;
         this.settings = settings;
-        this.baseMaxHp = run.maxHp;
         this.player = new Player(run, resolveWeapon(run.weaponId),
             ActorSprites.player(actors, run.characterId), new Random(run.seed ^ 0x5DEECE66DL));
         refreshMods();
@@ -347,12 +340,16 @@ public final class EntityWorld implements World, AiContext {
      * Recomputes what the player's relics, upgrades and perk add up to. Called
      * whenever the set changes - which is to say when a relic is picked up -
      * rather than every step, because nothing else can change it.
+     *
+     * <p>The base is read from the run, not snapshotted here: see
+     * {@link RunState#baseMaxHp}. Recomputing after a second relic must add the
+     * second relic rather than the first twice, and so must a second world.
      */
     public void refreshMods() {
         player.setMods(Loadout.of(run, content, shop, profile));
         int bonus = player.mods().maxHpAdd();
-        if (bonus > 0 && run.maxHp < baseMaxHp + bonus) {
-            int added = baseMaxHp + bonus - run.maxHp;
+        if (bonus > 0 && run.maxHp < run.baseMaxHp + bonus) {
+            int added = run.baseMaxHp + bonus - run.maxHp;
             run.maxHp += added;
             // Extra maximum health that does not also heal is a relic the
             // player cannot feel picking up.
