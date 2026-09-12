@@ -23,6 +23,9 @@ import xml.etree.ElementTree as ET
 
 from PIL import Image, ImageDraw
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TILE = 16
+
 # One letter per SpawnPoint.Kind, and a colour that survives being drawn over
 # both a cream floor and a near-black one.
 SPAWN_STYLE = {
@@ -81,17 +84,55 @@ def load(tmx_path):
     return out, [l.get("name") for l in layers], objects, (mw, mh)
 
 
-def draw_spawns(image, objects, zoom):
+# Wall dressing is a spawn marker rather than a tile - see WALL_TORCHES in
+# make_maps.py - so a plain tile render leaves every room's walls bare and this
+# sheet stops being a picture of the room. These are drawn as the art instead of
+# as a letter, and the rest of the markers stay letters: a torch is scenery that
+# is always there, while an enemy or a chest is a position, not a picture.
+PROP_ART = {
+    "torch": "assets/gfx/props/depths/torch/torch.png",
+    "banner": "assets/gfx/props/depths/flag/flag.png",
+}
+_SIDE_TORCH = "assets/gfx/props/depths/torch/side_torch.png"
+
+
+def prop_frame(tag, side):
+    """Frame 0 of a prop's loop, matching EntityWorld.addDecor's choice."""
+    path = _SIDE_TORCH if (tag == "torch" and side) else PROP_ART.get(tag)
+    if path is None:
+        return None
+    src = Image.open(os.path.join(ROOT, path)).convert("RGBA")
+    return src.crop((0, 0, src.height, src.height))
+
+
+def draw_objects(image, objects, zoom, width, letters):
     """Object markers, drawn in the map's own y-down pixel space.
 
     No flip here on purpose: this renders what Tiled would show, so a marker
     that looks wrong in this preview is wrong in the file. RoomCatalog does the
     y flip on the way into the game and nowhere else.
+
+    Wall dressing is drawn always, letters only when asked. A torch is part of
+    what the room looks like; an enemy marker is a position, and drawing the
+    monster there would claim the room ships with that monster in it.
     """
     d = ImageDraw.Draw(image, "RGBA")
     for kind, x, y, tag in objects:
-        letter, colour = SPAWN_STYLE.get(kind, ("?", (255, 255, 255)))
         cx, cy = x * zoom, y * zoom
+        if kind == "PROP":
+            side = x < TILE or x > width - TILE
+            art = prop_frame(tag, side)
+            if art is None:
+                continue
+            art = art.resize((art.width * zoom, art.height * zoom), Image.NEAREST)
+            if side and x > width / 2:
+                art = art.transpose(Image.FLIP_LEFT_RIGHT)
+            image.alpha_composite(art, (int(cx - art.width / 2),
+                                        int(cy - art.height / 2)))
+            continue
+        if not letters:
+            continue
+        letter, colour = SPAWN_STYLE.get(kind, ("?", (255, 255, 255)))
         r = 4 * zoom // 2
         d.ellipse([cx - r, cy - r, cx + r, cy + r],
                   fill=colour + (170,), outline=(0, 0, 0, 220))
@@ -100,11 +141,11 @@ def draw_spawns(image, objects, zoom):
 
 def render(tmx_path, out_path, zoom=2, spawns=False):
     image, layer_names, objects, (mw, mh) = load(tmx_path)
+    width = image.width
     if zoom != 1:
         image = image.resize((image.width * zoom, image.height * zoom),
                              Image.NEAREST)
-    if spawns:
-        draw_spawns(image, objects, zoom)
+    draw_objects(image, objects, zoom, width, spawns)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     image.convert("RGB").save(out_path)
     print("  %s -> %s  (%dx%d tiles, %d layers: %s, %d objects)"
@@ -121,10 +162,10 @@ def contact(folder, out_path, zoom=2, spawns=False, columns=3):
     shots = []
     for f in files:
         image, _, objects, _ = load(os.path.join(folder, f))
+        width = image.width
         image = image.resize((image.width * zoom, image.height * zoom),
                              Image.NEAREST)
-        if spawns:
-            draw_spawns(image, objects, zoom)
+        draw_objects(image, objects, zoom, width, spawns)
         shots.append((f, image))
 
     cw, ch = shots[0][1].size

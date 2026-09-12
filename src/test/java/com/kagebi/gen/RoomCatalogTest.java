@@ -2,6 +2,7 @@ package com.kagebi.gen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.image.BufferedImage;
@@ -56,8 +57,8 @@ class RoomCatalogTest {
         Set.of("ruins", "ruins_green", "ruins_orange", "depths");
 
     private static final String[] LAYERS = {
-        TiledRooms.GROUND, TiledRooms.DECOR, TiledRooms.WALLS,
-        TiledRooms.PROPS, TiledRooms.OVERHEAD,
+        TiledRooms.GROUND, TiledRooms.DRESSING, TiledRooms.DECOR,
+        TiledRooms.WALLS, TiledRooms.PROPS, TiledRooms.OVERHEAD,
     };
 
     private static final int W = RoomTemplate.WIDTH;
@@ -157,6 +158,47 @@ class RoomCatalogTest {
                 e.getKey() + " layer names or order");
             assertEquals(List.of("spawns"), e.getValue().objectGroups, e.getKey());
         }
+    }
+
+    /**
+     * The two overlay layers stop nobody, and the human's is painted last.
+     *
+     * <p>Both halves are one line to get wrong and expensive to notice. Making
+     * {@code dressing} blocking turns every skull scattered on the crypt floor
+     * into an invisible obstacle - the player is stopped by something that
+     * plainly is not in the way. Ordering {@code decor} under {@code dressing}
+     * means a tile someone placed by hand in Tiled can be covered by generated
+     * debris, which is the same as losing the work.
+     */
+    @Test
+    void theOverlayLayersBlockNothingAndTheHandDrawnOneIsOnTop() {
+        assertFalse(TiledRooms.blocks(TiledRooms.DRESSING));
+        assertFalse(TiledRooms.blocks(TiledRooms.DECOR));
+        assertTrue(TiledRooms.blocks(TiledRooms.WALLS));
+        assertTrue(TiledRooms.blocks(TiledRooms.PROPS));
+
+        List<String> below = Arrays.asList(TiledRooms.BELOW);
+        assertTrue(below.indexOf(TiledRooms.DRESSING) < below.indexOf(TiledRooms.DECOR),
+            "decor is the human's layer and must paint over the generator's");
+        assertTrue(below.indexOf(TiledRooms.GROUND) < below.indexOf(TiledRooms.DRESSING));
+    }
+
+    /** The generator owns dressing, so unlike decor it is checked for content. */
+    @Test
+    void theCryptFloorsAreDressed() {
+        int dressed = 0;
+        for (Map.Entry<String, Tmx> e : files.entrySet()) {
+            if (!e.getKey().startsWith("depths/")) {
+                continue;
+            }
+            for (int gid : e.getValue().layers.get(TiledRooms.DRESSING)) {
+                if ((gid & GID_MASK) != 0) {
+                    dressed++;
+                }
+            }
+        }
+        assertTrue(dressed >= 200, "only " + dressed + " bones across the depths; "
+            + "its floor is one flat purple and has nothing else to read against");
     }
 
     // Deliberately no "decor is empty" test. The generator never writes decor,
@@ -276,11 +318,58 @@ class RoomCatalogTest {
         for (Map.Entry<String, Tmx> e : files.entrySet()) {
             boolean[][] solid = e.getValue().solid();
             for (Obj o : e.getValue().objects) {
+                if ("PROP".equals(o.type)) {
+                    continue;   // wall dressing; see the test below
+                }
                 int tx = (int) Math.floor(o.x / 16), ty = (int) Math.floor(o.y / 16);
                 assertTrue(tx >= 0 && ty >= 0 && tx < W && ty < H, e.getKey() + ": " + o + " outside the room");
                 assertFalse(solid[ty][tx], e.getKey() + ": " + o + " is inside a wall or a prop");
             }
         }
+    }
+
+    /**
+     * Wall dressing obeys the opposite rule, and it is asserted rather than
+     * merely exempted.
+     *
+     * <p>A torch is bracketed to stone, so it belongs on a cell that is solid -
+     * which is also what makes it free: the cell already blocked the player, so
+     * no torch can ever narrow a room or stand in the open to be walked
+     * through. Letting PROP off the floor rule without pinning the inverse
+     * would have allowed exactly that, and a torch standing in the middle of
+     * the floor with the player passing through it is precisely what the first
+     * cut of this produced.
+     */
+    @Test
+    void everyWallPropIsBracketedToStoneAndClearOfTheDoors() {
+        int found = 0;
+        for (Map.Entry<String, Tmx> e : files.entrySet()) {
+            boolean[][] solid = e.getValue().solid();
+            for (Obj o : e.getValue().objects) {
+                if (!"PROP".equals(o.type)) {
+                    continue;
+                }
+                found++;
+                int tx = (int) Math.floor(o.x / 16), ty = (int) Math.floor(o.y / 16);
+                assertTrue(tx >= 0 && ty >= 0 && tx < W && ty < H,
+                    e.getKey() + ": " + o + " outside the room");
+                assertTrue(tx == 0 || ty == 0 || tx == W - 1 || ty == H - 1,
+                    e.getKey() + ": " + o + " is not on the perimeter");
+                assertTrue(solid[ty][tx],
+                    e.getKey() + ": " + o + " hangs on open floor, so the player walks through it");
+                for (int[] door : doorCells()) {
+                    assertFalse(door[0] == tx && door[1] == ty,
+                        e.getKey() + ": " + o + " blocks a doorway");
+                }
+                // The top row belongs to the HUD. The heart bar runs along it
+                // from the left and lengthens as maximum health is bought, and
+                // the minimap covers the right; a torch up there is paid for
+                // and never seen, which is what the first pass placed.
+                assertNotEquals(0, ty, e.getKey() + ": " + o + " is on the top wall, under the HUD");
+            }
+        }
+        assertTrue(found >= 200, "only " + found + " wall props across " + files.size()
+            + " rooms; every room is meant to be lit");
     }
 
     @Test
@@ -423,10 +512,13 @@ class RoomCatalogTest {
             return false;
         }
 
-        /** Walls or props, which is what TiledRooms treats as blocking. */
+        /** Exactly the layers TiledRooms treats as blocking; asked, not copied. */
         boolean[][] solid() {
             boolean[][] s = new boolean[height][width];
-            for (String name : new String[] {TiledRooms.WALLS, TiledRooms.PROPS}) {
+            for (String name : LAYERS) {
+                if (!TiledRooms.blocks(name)) {
+                    continue;
+                }
                 int[] g = layers.get(name);
                 for (int i = 0; i < g.length; i++) {
                     if ((g[i] & GID_MASK) != 0) {

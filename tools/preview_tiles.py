@@ -80,10 +80,15 @@ def name_for(path):
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    argv = sys.argv[1:]
     zoom = 4
-    if "--zoom" in sys.argv:
-        zoom = int(sys.argv[sys.argv.index("--zoom") + 1])
+    if "--zoom" in argv:
+        at = argv.index("--zoom")
+        zoom = int(argv[at + 1])
+        # Drop the value as well as the flag. Leaving it behind made "5" the
+        # output path, and the failure was a makedirs("") deep inside grid().
+        del argv[at:at + 2]
+    args = [a for a in argv if not a.startswith("--")]
 
     if "--all" in sys.argv:
         for biome in ("ruins", "depths"):

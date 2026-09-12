@@ -404,22 +404,52 @@ RUINS_WALL_ORIGIN = {
     "cream": (0, 0), "orange": (5, 0), "brown": (0, 6), "green": (5, 6),
 }
 
-# Floors from tilesetinteriorfloor.png (22x17), each pair verified seamless by
-# tiling it 5x4 in tools/preview/swatch_ruins_floor.png.
+# Floors from tilesetinteriorfloor.png (22x17).
 #
-# One base tile and one accent from the SAME colour block, at roughly one
-# accent in eight. The first draft mixed the flat tan (12,1) into the yellow
-# cobble floor because both are warm, and the result was a floor of two
-# obviously different materials: scattered accents that differ in MATERIAL
-# rather than in wear clump into visible patches, because neighbouring picks
-# merge. Tone variation is free, material variation is not.
-RUINS_FLOORS = {
-    "cream": ((1, 1), (8, 2)),
-    "orange": ((1, 7), (8, 8)),
-    "brown": ((1, 13), (5, 13)),
-    "green": ((12, 7), (17, 7)),
+# One base tile per colour, plus the tiles that may be scattered through a field
+# of it. Whether a tile MAY be scattered is not a matter of taste: a tile drops
+# into a field of the base without a seam exactly when its outer one-pixel ring
+# equals the base's ring. That is checkable, and checking it condemned three of
+# the four accents this table used to carry.
+#
+# Grouping all 374 tiles by their ring turns up only two families in the whole
+# sheet - the sheet's author drew a wear set for two floors and for no others:
+#
+#   tan   base (12,1) + cracks (11,4) + rubble (13,5) + star (14,5)
+#   green base (12,7) + cracks (11,10) + rubble (13,11) + star (14,11)
+#
+# What the old table scattered instead were fragments of the big medallion
+# panels, which have no business repeating: the orange floor was strewn with
+# broken chevrons and the green floor with quarter-arcs, both of them plainly
+# wrong once tiled and both invisible at thumbnail size. They are gone.
+#
+# Orange and cream therefore get NO wear at all, because the sheet contains
+# none that fits them, and a brick floor with nothing scattered on it is
+# honest where a floor strewn with medallion corners is not. Both have a
+# texture of their own to carry the room; the two flat floors are the ones
+# that needed the help, and those are exactly the two that have it.
+RUINS_FLOOR = {
+    "cream": (1, 1), "orange": (1, 7), "brown": (1, 13), "green": (12, 7),
 }
-FLOOR_ACCENT = 0.12
+RUINS_WEAR = {
+    "cream": [],
+    "orange": [],
+    # Not a ring match - it is 16.7 apart, where the two families score 0.0 -
+    # but the gold cobble is busy enough to swallow the difference, and it is
+    # the only variation a floor this large has. Kept on the evidence of the
+    # render rather than on the rule.
+    "brown": [(5, 13)],
+    # Weighted by repetition. The three tiles are cracks, a star ornament and a
+    # near-white rubble clump, and at equal weight the rubble reads as snow
+    # scattered over a sage floor - it is the only one of the three that differs
+    # from the base in VALUE rather than in pattern, so a room gets a couple
+    # rather than a dozen.
+    "green": [(11, 10)] * 3 + [(14, 11)] * 3 + [(13, 11)],
+}
+# The flat floors need more of it than the textured one. A sage field with one
+# tile in eight marked still reads as an empty sheet of colour.
+FLOOR_WEAR_RATE = {"green": 0.16}
+FLOOR_WEAR_DEFAULT = 0.12
 
 # elements.png is 9x3. The 2x3 orange double door at (0,0) is the only art in
 # the ruins set that reads as a way out, so it marks the stairs.
@@ -718,15 +748,17 @@ def paint_ruins(variant, blocks, singles, rng):
         fx, fy = RUINS_FRAME[piece]
         return wall.gid(ox + fx, oy + fy)
 
-    ground, decor, walls, props, overhead = room_layers()
+    ground, dressing, decor, walls, props, overhead = room_layers()
 
     # Floor goes under the walls too. The frame tiles have transparent pixels
     # at their outer rim, and with nothing behind them the screen's clear
     # colour shows through as a black fringe around the room.
-    base, accent = RUINS_FLOORS[variant]
+    base = RUINS_FLOOR[variant]
+    wear = RUINS_WEAR[variant]
+    rate = FLOOR_WEAR_RATE.get(variant, FLOOR_WEAR_DEFAULT)
     for y in range(ROOM_H):
         for x in range(ROOM_W):
-            pick = accent if rng.random() < FLOOR_ACCENT else base
+            pick = rng.choice(wear) if wear and rng.random() < rate else base
             ground.put(x, y, floor.gid(*pick))
 
     perimeter(walls, frame)
@@ -740,7 +772,8 @@ def paint_ruins(variant, blocks, singles, rng):
                         props.put(px + dx, py + dy, elem.gid(*RUINS_CRATE))
     for (x, y) in singles:
         props.put(x, y, elem.gid(*RUINS_CRATE))
-    return [wall, floor, elem], [ground, decor, walls, props, overhead], sets
+    return ([wall, floor, elem],
+            [ground, dressing, decor, walls, props, overhead], sets)
 
 
 def ruins_pieces(x, y, w, h, rng):
@@ -772,7 +805,7 @@ def paint_depths(blocks, singles, rng):
     sets = {"dungeon": Tileset("dungeon", "dungeon_tileset.png", 1,
                                folder=DEPTHS_TILES)}
     d = sets["dungeon"]
-    ground, decor, walls, props, overhead = room_layers()
+    ground, dressing, decor, walls, props, overhead = room_layers()
 
     for y in range(ROOM_H):
         for x in range(ROOM_W):
@@ -795,16 +828,61 @@ def paint_depths(blocks, singles, rng):
                 props.put(x + dx, y + dy, frame(piece))
     for (x, y) in singles:
         props.put(x, y, d.gid(*rng.choice(DEPTHS_BARRELS + DEPTHS_CRATES)))
-    return [d], [ground, decor, walls, props, overhead], sets
+    scatter_bones(dressing, d, solid_grid(blocks, singles), rng)
+    return [d], [ground, dressing, decor, walls, props, overhead], sets
+
+
+# Roughly one tile in fourteen. Enough that a room is never bare and few enough
+# that two rarely touch, which is what separates debris from a carpet of it.
+BONE_RATE = 0.07
+
+
+def scatter_bones(dressing, d, solid, rng):
+    """Bones across the crypt floor, in the generator's own overlay layer.
+
+    The depths pack draws one floor in one flat purple - twelve variants whose
+    borders are identical and whose faces differ by a scratch - so a 20x11 field
+    of it reads as a block of colour with a brick grain and nothing else. These
+    three tiles are drawn as standalone objects on transparency, which is why
+    they go in `dressing` rather than `ground`: pasted into the floor they would
+    punch holes in it, and pasted into `props` they would stop the player dead
+    on a skull.
+
+    Doorway aprons are left clear. Debris there is the first thing the player
+    walks over on entering and it reads as something to pick up.
+    """
+    # DEPTHS_BONES is (pile, skull, single bone) and only two of the three are
+    # used. The pile does not read: at 16px on a dark floor it is a pale
+    # angular tangle that the eye lands on and resolves as a torn flag or a
+    # cobweb, and four of them in one room dominated it. The skull and the
+    # single bone are legible instantly. It stays in the measured table, and
+    # out of the rooms.
+    usable = [DEPTHS_BONES[1], DEPTHS_BONES[2]]
+    clear = apron_cells()
+    for y in range(ROOM_H):
+        for x in range(ROOM_W):
+            if solid[y][x] or (x, y) in clear or rng.random() >= BONE_RATE:
+                continue
+            dressing.put(x, y, d.gid(*rng.choice(usable)))
 
 
 def room_layers():
-    """The five layers every room carries, in render order.
+    """The six layers every room carries, in render order.
 
-    `decor` is created and left empty on purpose: it is the layer a human opens
-    in Tiled to scatter detail into, and nothing generated here writes to it.
+    Two of them are non-blocking overlay under the actors, and which is which
+    is a matter of ownership rather than of drawing:
+
+      `dressing` is this script's, for scenery drawn with transparency - the
+        bones on a crypt floor. Opaque floor variation does not come here; it
+        is written straight into `ground`, because a tile that replaces the
+        floor should BE the floor.
+      `decor` is created and left empty on purpose. It is the layer a human
+        opens in Tiled, nothing generated here ever writes to it, and
+        carry_decor copies it forward across a regenerate. It is painted last
+        of the two, so a tile placed by hand covers anything under it.
     """
     return (Layer("ground", ROOM_W, ROOM_H),
+            Layer("dressing", ROOM_W, ROOM_H),
             Layer("decor", ROOM_W, ROOM_H),
             Layer("walls", ROOM_W, ROOM_H),
             Layer("props", ROOM_W, ROOM_H),
@@ -870,19 +948,94 @@ ENTRIES = [
 # Enemies stand off the centre line so a room never opens with something
 # directly on top of the door the player walked through.
 ENEMY_ANCHORS = [(4, 3), (15, 3), (4, 7), (15, 7), (9, 3), (9, 7), (7, 5), (12, 5)]
-PROP_ANCHORS = [(2, 2), (ROOM_W - 3, 2), (2, ROOM_H - 3), (ROOM_W - 3, ROOM_H - 3)]
 
 SPAWN_RULES = {
-    # kind: (enemies, chests, props, extra)
-    "start": (0, 0, 2, None),
-    "normal": (5, 0, 1, None),
-    "treasure": (0, 1, 2, None),
-    "locked": (0, 1, 2, None),
-    "shop": (0, 3, 0, "SHOPKEEPER"),
-    "secret": (0, 1, 1, None),
-    "boss": (0, 0, 2, "BOSS"),
-    "exit": (0, 0, 2, "EXIT"),
+    # kind: (enemies, chests, extra). Wall dressing is counted separately, in
+    # WALL_DRESSING, because it is placed on wall cells rather than searched
+    # for among the free floor.
+    "start": (0, 0, None),
+    "normal": (5, 0, None),
+    "treasure": (0, 1, None),
+    "locked": (0, 1, None),
+    "shop": (0, 3, "SHOPKEEPER"),
+    "secret": (0, 1, None),
+    "boss": (0, 0, "BOSS"),
+    "exit": (0, 0, "EXIT"),
 }
+
+
+# --------------------------------------------------------------------------
+# Wall dressing
+# --------------------------------------------------------------------------
+#
+# Torches and banners, as spawn markers rather than tiles.
+#
+# Neither ruins sheet draws a torch - there is no lamp, brazier or candle
+# anywhere in the Ninja Adventure tile art, only a one-shot fire PARTICLE that
+# shrinks to nothing over twelve frames and cannot loop. So the light comes
+# from the Pixel Dungeon prop set, which ships purpose-built four-frame loops.
+#
+# That crosses the project's own rule that the dungeon pack stays on floors 4
+# and 5. It is a deliberate exception and a narrow one: a 16px torch is mostly
+# flame, and flame carries no pack's palette. Rendered against all four wall
+# colours before this was written, it reads on every one. The alternative was
+# three floors whose walls have no feature of any kind, which is the note that
+# started this work.
+#
+# Markers, not tiles, because the tile sheets have no torch to place and
+# because a marker animates: a still flame is worse than no flame. They land on
+# cells the perimeter already made solid, so they change no collision - see
+# wall_prop_cells for why the bottom wall is left alone.
+#
+# Every pair below sums to ROOM_W - 1, so it is symmetric about the doorway and
+# any prefix of the list is balanced.
+#
+# The TOP wall carries none of it, which is the opposite of where this started.
+# That row is the HUD's: the heart bar runs along it from the left and grows as
+# maximum health is bought, the minimap covers the right, and what is left in
+# between is five tiles that are not symmetric about the door. Four torches
+# were placed there first and the screenshot showed two of them behind the
+# hearts and two behind the minimap - decoration paid for and never seen.
+#
+# The BOTTOM wall was excluded in that same first pass, on the reasoning that a
+# 16px sprite centred on the last row would hang off the foot of a 176px room.
+# Rendering it proved that wrong - the row is fully on screen and nothing draws
+# over it - and it is now the best surface in the room.
+WALL_TORCHES = [
+    (3, ROOM_H - 1), (ROOM_W - 4, ROOM_H - 1),
+    (0, ROOM_H - 3), (ROOM_W - 1, ROOM_H - 3),
+    (5, ROOM_H - 1), (ROOM_W - 6, ROOM_H - 1),
+    (0, 3), (ROOM_W - 1, 3),
+]
+# Flanking the bottom door, where a banner reads as marking the way through.
+WALL_BANNERS = [(7, ROOM_H - 1), (ROOM_W - 8, ROOM_H - 1)]
+
+# How lit each kind of room is. The rooms with nothing in them get the most,
+# which is the point: a boss arena and a start room are deliberately empty of
+# obstacles, so the walls are the only thing left to carry them.
+WALL_DRESSING = {
+    "start": (4, 0),
+    "normal": (2, 0),
+    "treasure": (4, 2),
+    "locked": (4, 2),
+    "shop": (4, 2),
+    "secret": (2, 0),
+    "boss": (8, 2),
+    "exit": (4, 0),
+}
+
+
+def wall_prop_cells(kind):
+    """(tile, tag) for every torch and banner bracketed to this room's walls."""
+    torches, banners = WALL_DRESSING[kind]
+    out = [(cell, "torch") for cell in WALL_TORCHES[:torches]]
+    out += [(cell, "banner") for cell in WALL_BANNERS[:banners]]
+    for (x, y), _ in out:
+        if (x, y) in door_cells():
+            raise ValueError("%s: wall prop at %d,%d is in a doorway" % (kind, x, y))
+        if 0 < x < ROOM_W - 1 and 0 < y < ROOM_H - 1:
+            raise ValueError("%s: wall prop at %d,%d is not on a wall" % (kind, x, y))
+    return out
 
 
 def spawns_for(kind, walkable, rng):
@@ -896,7 +1049,7 @@ def spawns_for(kind, walkable, rng):
     x, y = nearest_free(walkable, ROOM_W // 2, ROOM_H // 2, used)
     out.append(("ENTRY", *at(x, y), ""))
 
-    enemies, chests, props, extra = SPAWN_RULES[kind]
+    enemies, chests, extra = SPAWN_RULES[kind]
 
     if extra == "BOSS":
         x, y = nearest_free(walkable, ROOM_W // 2, ROOM_H // 2 + 1, used)
@@ -921,9 +1074,12 @@ def spawns_for(kind, walkable, rng):
         x, y = nearest_free(walkable, tx, ty, used)
         out.append(("CHEST", *at(x, y), tag))
 
-    for tx, ty in PROP_ANCHORS[:props]:
-        x, y = nearest_free(walkable, tx, ty, used)
-        out.append(("PROP", *at(x, y), "torch"))
+    # Wall dressing is placed, not searched for: these cells are wall, so
+    # nearest_free would push every one of them onto the floor - which is how
+    # the first pass ended up with torches standing in the middle of the room
+    # that the player walked straight through.
+    for (tx, ty), tag in wall_prop_cells(kind):
+        out.append(("PROP", *at(tx, ty), tag))
 
     return out
 
@@ -976,7 +1132,6 @@ def make_room(folder, pack, variant, kind, layout, index, seed):
         tilesets, layers, sets = paint_ruins(variant, blocks, singles, rng)
     else:
         tilesets, layers, sets = paint_depths(blocks, singles, rng)
-        decorate_depths(layers[3], sets["dungeon"], rng)
 
     objects = spawns_for(kind, sorted(walkable), rng)
     path = os.path.join(OUT, "rooms", folder, name + ".tmx")
@@ -985,15 +1140,10 @@ def make_room(folder, pack, variant, kind, layout, index, seed):
     return path, len(objects)
 
 
-def decorate_depths(props, d, rng):
-    """Lit torches bracketed to the top wall.
-
-    They sit on cells the wall already made solid, so this is pure decoration
-    with no effect on collision - and the depths floor is one flat purple, so
-    without a light source the room has nothing to read against.
-    """
-    for x in (3, 6, ROOM_W - 7, ROOM_W - 4):
-        props.put(x, 0, d.gid(*rng.choice(DEPTHS_TORCHES)))
+# The depths rooms used to get four torches painted into the props LAYER here,
+# from DEPTHS_TORCHES. They are gone, and the depths now takes its light from
+# the same wall markers as every other biome: two torches in the same room, one
+# a still tile and one a four-frame flicker, read as the still one being broken.
 
 
 def rooms():

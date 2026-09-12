@@ -127,7 +127,16 @@ public final class EntityWorld implements World, AiContext {
     private final Array<Projectile> projectiles = new Array<>();
     private final Array<Pickup> pickups = new Array<>();
     private final Array<Marker> markers = new Array<>();
+    private final Array<Decor> decor = new Array<>();
     private final Array<Entity> drawList = new Array<>();
+
+    /**
+     * The clock the wall torches flicker on. Separate from the combat step
+     * because it keeps running through hit-stop: hit-stop is a device for
+     * selling an impact, and freezing the scenery with it would say the impact
+     * stopped the room rather than the fight.
+     */
+    private int decorSteps;
 
     private final Intent intent = new Intent();
     private InputService boundInput;
@@ -163,6 +172,9 @@ public final class EntityWorld implements World, AiContext {
     private boolean ownsUi;
     private Anim orbAnim;
     private Anim cloudAnim;
+    private Anim torchAnim;
+    private Anim sideTorchAnim;
+    private Anim bannerAnim;
     private TextureRegion kunaiRegion;
     private TextureRegion goldRegion;
     private TextureRegion heartRegion;
@@ -257,6 +269,7 @@ public final class EntityWorld implements World, AiContext {
         projectiles.clear();
         pickups.clear();
         markers.clear();
+        decor.clear();
         hitstop = 0;
         shake = 0f;
         descendRequested = false;
@@ -294,6 +307,7 @@ public final class EntityWorld implements World, AiContext {
             intent.clear();
         }
         run.elapsedSeconds += Cfg.STEP;
+        decorSteps++;
         shake = shake * SHAKE_DECAY < 0.05f ? 0f : shake * SHAKE_DECAY;
 
         if (hitstop > 0) {
@@ -363,6 +377,13 @@ public final class EntityWorld implements World, AiContext {
 
     @Override
     public void renderActors(SpriteBatch batch) {
+        // Wall dressing before anything that moves. It needs no place in the
+        // depth sort: every piece sits on a solid wall cell, so no actor can
+        // ever occupy the same pixels and there is no ordering to get wrong.
+        for (Decor d : decor) {
+            d.draw(batch, decorSteps);
+        }
+
         // Floor-level hazards first, so actors stand in a cloud rather than
         // under it.
         for (Projectile p : projectiles) {
@@ -794,6 +815,9 @@ public final class EntityWorld implements World, AiContext {
                 case SHOPKEEPER:
                     markers.add(new Marker(s.kind, s.x, s.y));
                     break;
+                case PROP:
+                    addDecor(s);
+                    break;
                 default:
                     break;
             }
@@ -805,6 +829,40 @@ public final class EntityWorld implements World, AiContext {
                     RoomTemplate.PIXEL_WIDTH / 2f, RoomTemplate.PIXEL_HEIGHT * 0.62f);
             }
         }
+    }
+
+    /**
+     * Turns one wall marker into a piece of scenery.
+     *
+     * <p>Which torch to use is read off the position rather than named by the
+     * map: a marker against the left or right wall gets the side-on sprite, and
+     * the one on the right is mirrored so its bracket faces into the stone.
+     * The generator would have to spell all three cases out otherwise, and a
+     * map that said "side torch" while sitting on the top wall would draw a
+     * torch bracketed to thin air.
+     *
+     * <p>An unknown tag is skipped silently on purpose. It is scenery: a map
+     * naming a prop this build has no art for should cost the player nothing,
+     * and the log line would fire once per room for the whole run.
+     */
+    private void addDecor(SpawnPoint s) {
+        boolean side = s.x < Cfg.TILE || s.x > RoomTemplate.PIXEL_WIDTH - Cfg.TILE;
+        Anim anim;
+        if ("banner".equals(s.tag)) {
+            anim = bannerAnim;
+        } else if ("torch".equals(s.tag)) {
+            anim = side ? sideTorchAnim : torchAnim;
+        } else {
+            return;
+        }
+        if (anim == null) {
+            return;
+        }
+        // Phase from the position, not from a counter, so the same room always
+        // flickers the same way and a screenshot of it is reproducible.
+        int phase = ((s.x * 7 + s.y * 13) % anim.frameCount()) * Decor.FLICKER_STEPS;
+        boolean flip = side && s.x > RoomTemplate.PIXEL_WIDTH / 2;
+        decor.add(new Decor(anim, s.x, s.y, phase, flip));
     }
 
     /** Places an enemy. Public so a test, or a debug console, can populate a room. */
@@ -1256,6 +1314,9 @@ public final class EntityWorld implements World, AiContext {
         orbAnim = null;
         cloudAnim = null;
         kunaiRegion = null;
+        torchAnim = null;
+        sideTorchAnim = null;
+        bannerAnim = null;
         if (fxAtlas != null) {
             if (fxAtlas.findRegion(Assets.Fx.PROJECTILE_ORB) != null) {
                 orbAnim = Anim.strip(fxAtlas, Assets.Fx.PROJECTILE_ORB, 4, true);
@@ -1264,10 +1325,19 @@ public final class EntityWorld implements World, AiContext {
                 cloudAnim = Anim.strip(fxAtlas, Assets.Fx.HAZARD_CLOUD, 8, true);
             }
             kunaiRegion = fxAtlas.findRegion(Assets.Fx.PROJECTILE_KUNAI);
+            torchAnim = loop(Assets.Prop.TORCH);
+            sideTorchAnim = loop(Assets.Prop.SIDE_TORCH);
+            bannerAnim = loop(Assets.Prop.BANNER);
         }
         goldRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.COIN);
         heartRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_HEART);
         keyRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.KEY);
+    }
+
+    /** A looping strip from the fx atlas, or null when it is not packed. */
+    private Anim loop(String region) {
+        return fxAtlas.findRegion(region) == null
+            ? null : Anim.strip(fxAtlas, region, Decor.FLICKER_STEPS, true);
     }
 
     private static void log(String message) {

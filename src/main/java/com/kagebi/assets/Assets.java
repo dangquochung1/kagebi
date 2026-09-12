@@ -436,5 +436,36 @@ public final class Assets {
         private Fx() {}
     }
 
+    /**
+     * Scenery bracketed to a room's walls, from {@link #ATLAS_FX}.
+     *
+     * <p>All three are four-frame loops of 16x16, which is what makes them
+     * worth spawning at all: a still torch is a smudge on a wall, and a
+     * flickering one is the only thing in a stone room that moves while the
+     * player stands still.
+     *
+     * <p>These come from the Pixel Dungeon pack, which the art plan otherwise
+     * confines to floors 4 and 5. The exception is deliberate: no Ninja
+     * Adventure tileset draws a torch, lamp or brazier anywhere, and the one
+     * fire sprite in that pack is a twelve-frame particle that shrinks to
+     * nothing and cannot loop. A 16px torch is mostly flame, and flame reads
+     * the same in any palette - checked against all four wall colours before
+     * this was written.
+     */
+    public static final class Prop {
+
+        /** Front-facing, for the top wall: the bracket reads straight on. */
+        public static final String TORCH = "props/depths/torch/torch";
+        /**
+         * Seen from the side, bracket against the left edge of its cell, so it
+         * suits a wall on the player's left and is mirrored for the right.
+         */
+        public static final String SIDE_TORCH = "props/depths/torch/side_torch";
+        /** A hanging heraldic banner. Used to flag a room worth entering. */
+        public static final String BANNER = "props/depths/flag/flag";
+
+        private Prop() {}
+    }
+
     private Assets() {}
 }
