@@ -109,14 +109,14 @@
   "unlocks": [
     {
       "id": "ninjared", "kind": "CHARACTER",
-      "nameKey": "character.ninjared.name", "descKey": "character.ninjared.desc",
+      "nameKey": "char.ninjared.name", "descKey": "character.ninjared.desc",
       "icon": "stat_strength", "cost": 600,
       "requirement": "deepest_floor", "requirementValue": 3,
       "effect": "melee_damage_mult", "magnitude": 1.10
     },
     {
       "id": "ninjablue", "kind": "CHARACTER",
-      "nameKey": "character.ninjablue.name", "descKey": "character.ninjablue.desc",
+      "nameKey": "char.ninjablue.name", "descKey": "character.ninjablue.desc",
       "icon": "stat_armour", "cost": 900,
       // Twelve of the twenty-two enemies, which is everything on floors 1 to 3
       // plus one of the depths. It asks the player to have looked around.
@@ -125,7 +125,7 @@
     },
     {
       "id": "ninjawater", "kind": "CHARACTER",
-      "nameKey": "character.ninjawater.name", "descKey": "character.ninjawater.desc",
+      "nameKey": "char.ninjawater.name", "descKey": "character.ninjawater.desc",
       "icon": "drop_blue", "cost": 1200,
       // Fifteen runs. The consolation unlock: it arrives for persistence
       // rather than for skill, and it is the one that catches a player who is
@@ -135,14 +135,14 @@
     },
     {
       "id": "ninjadark", "kind": "CHARACTER",
-      "nameKey": "character.ninjadark.name", "descKey": "character.ninjadark.desc",
+      "nameKey": "char.ninjadark.name", "descKey": "character.ninjadark.desc",
       "icon": "tail_purple", "cost": 1400,
       "requirement": "deepest_floor", "requirementValue": 5,
       "effect": "move_speed_mult", "magnitude": 1.08
     },
     {
       "id": "ninjafire", "kind": "CHARACTER",
-      "nameKey": "character.ninjafire.name", "descKey": "character.ninjafire.desc",
+      "nameKey": "char.ninjafire.name", "descKey": "character.ninjafire.desc",
       "icon": "flame_orange", "cost": 2000,
       // Requires a win. The master's own colours, and the only thing in the
       // game gated behind finishing it.

@@ -131,14 +131,10 @@
   "upgrade.wardstone.desc": "Once per run, get back up at 40% health.",
   "upgrade.flamekeeper.name": "Flamekeeper",
   "upgrade.flamekeeper.desc": "The village dims more slowly with every failed descent.",
-  "character.ninjared.name": "Crimson Shadow",
+  "character.ninjagreen.desc": "No perk. The starting ninja, and the measure the other five are set against.",
   "character.ninjared.desc": "Strikes 10% harder. Unlocked by reaching the Broken Shrine.",
-  "character.ninjablue.name": "Azure Shadow",
   "character.ninjablue.desc": "20 more health. Unlocked after meeting twelve kinds of monster.",
-  "character.ninjawater.name": "Tide Shadow",
   "character.ninjawater.desc": "Finds 15% more gold. Unlocked after fifteen runs.",
-  "character.ninjadark.name": "Umbral Shadow",
   "character.ninjadark.desc": "Moves 8% faster. Unlocked by setting foot in the Flame Core.",
-  "character.ninjafire.name": "Flame Shadow",
   "character.ninjafire.desc": "Once per run, get back up at 30% health. Unlocked by winning."
 }

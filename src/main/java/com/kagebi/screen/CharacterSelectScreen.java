@@ -276,9 +276,12 @@ public class CharacterSelectScreen extends SimScreen {
         batch.setColor(unlockedCharacter(character) ? INK : SOFT);
         Hud.centred(batch, font, t.get("char." + id + ".name"), Cfg.VIRT_W / 2f, NAME_TOP);
         batch.setColor(SOFT);
-        Hud.centred(batch, font,
-            unlockedCharacter(character) ? t.get("char." + id + ".passive")
-                                         : t.get("select.locked_hint"),
+        // The perk line comes from the same file the perk itself does. It used
+        // to come from "char.<id>.passive", a second set of strings written
+        // beside these names - and five of the six described a perk the game
+        // has never had. A locked ninja's line is the one the shop shows, which
+        // says what it costs to find out.
+        Hud.centred(batch, font, t.get("character." + id + ".desc"),
             Cfg.VIRT_W / 2f, NAME_TOP - Hud.LINE);
         batch.setColor(Color.WHITE);
     }

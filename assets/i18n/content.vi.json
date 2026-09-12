@@ -131,14 +131,10 @@
   "upgrade.wardstone.desc": "Một lần mỗi lượt chơi, hồi sinh với 40% máu.",
   "upgrade.flamekeeper.name": "Người Giữ Lửa",
   "upgrade.flamekeeper.desc": "Làng tối đi chậm hơn sau mỗi lần thất bại.",
-  "character.ninjared.name": "Xích Ảnh",
+  "character.ninjagreen.desc": "Không có nội tại. Ninja khởi đầu, và là thước đo cho năm người kia.",
   "character.ninjared.desc": "Đánh mạnh hơn 10%. Xuống được tới Đền Đổ thì mở khoá.",
-  "character.ninjablue.name": "Thanh Ảnh",
   "character.ninjablue.desc": "Thêm 20 máu tối đa. Mở khoá khi đã gặp mười hai loài quái.",
-  "character.ninjawater.name": "Thuỷ Ảnh",
   "character.ninjawater.desc": "Nhặt thêm 15% vàng. Mở khoá sau mười lăm lượt chơi.",
-  "character.ninjadark.name": "Hắc Ảnh",
   "character.ninjadark.desc": "Chạy nhanh hơn 8%. Mở khoá khi đặt chân tới Lõi Lửa.",
-  "character.ninjafire.name": "Hoả Ảnh",
   "character.ninjafire.desc": "Một lần mỗi lượt, hồi sinh với 30% máu. Mở khoá khi đã thắng."
 }
