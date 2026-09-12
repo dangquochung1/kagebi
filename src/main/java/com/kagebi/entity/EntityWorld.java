@@ -346,7 +346,8 @@ public final class EntityWorld implements World, AiContext {
         // Seeded by run and room, so the same room in the same run plays out
         // the same way - which is what makes a reported bug reproducible.
         rng = new Random(run.seed * 31L + room.gx * 73856093L + room.gy * 19349663L);
-        player.setWeapon(resolveWeapon(run.weaponId));
+        WeaponDef held = resolveWeapon(run.weaponId);
+        player.setWeapon(held, heldArt(held));
 
         placePlayer(room, enteredFrom);
         spawn(room);
@@ -1446,6 +1447,22 @@ public final class EntityWorld implements World, AiContext {
         goldRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.COIN);
         heartRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_HEART);
         keyRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.KEY);
+    }
+
+    /**
+     * The sheet of this weapon being swung, or null when there is not one.
+     *
+     * <p>One step per frame and non-looping, the same as the player's own
+     * attack sheet, because {@code ActorSprites.frameOf} stretches the frames
+     * over the swing's real length rather than the art assuming a tempo. That
+     * is what keeps the blade on the same frame as the arm holding it.
+     */
+    private Anim heldArt(WeaponDef w) {
+        if (actors == null || w == null || w.sprite == null || w.thrown()
+                || actors.findRegion(w.sprite) == null) {
+            return null;
+        }
+        return Anim.directional(actors, w.sprite, Player.WEAPON_CELL, 1, false);
     }
 
     /** A looping strip from the fx atlas, or null when it is not packed. */

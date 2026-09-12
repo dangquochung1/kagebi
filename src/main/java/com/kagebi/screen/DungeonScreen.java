@@ -18,6 +18,7 @@ import com.kagebi.Dir;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.def.FloorDef;
+import com.kagebi.entity.DemoInput;
 import com.kagebi.entity.EntityWorld;
 import com.kagebi.entity.World;
 import com.kagebi.gen.CollisionGrid;
@@ -174,6 +175,22 @@ public class DungeonScreen extends SimScreen {
      */
     DungeonScreen openIn(RoomKind kind) {
         openIn = kind;
+        return this;
+    }
+
+    private DemoInput demo;
+
+    /**
+     * Swings on a timer instead of reading the keyboard, for
+     * {@code --screen swing}.
+     *
+     * <p>A swing is eighteen steps of a whole run, so the held weapon and the
+     * slash arc could not be screenshotted at all - and the only other way to
+     * catch one is to press the key by hand while the capture runs, which is
+     * unrepeatable and leaks keystrokes into whatever window has focus.
+     */
+    DungeonScreen swinging() {
+        demo = new DemoInput(GameAction.ATTACK);
         return this;
     }
 
@@ -416,7 +433,12 @@ public class DungeonScreen extends SimScreen {
             hud.toggleMap();
         }
 
-        world.step(input());
+        if (demo != null && world instanceof EntityWorld) {
+            demo.tick();
+            ((EntityWorld) world).stepWith(demo);
+        } else {
+            world.step(input());
+        }
 
         if (world.roomCleared()) {
             run.room.cleared = true;

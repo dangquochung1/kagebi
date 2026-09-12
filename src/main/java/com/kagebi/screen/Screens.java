@@ -29,6 +29,7 @@ import com.kagebi.run.RunState;
  *   dungeon   --page 1-5   the start room of that floor
  *   map       --page 1-5   the same, with the floor map expanded
  *   fight     --page 1-5   the first room of that floor that has enemies in it
+ *   swing     --page 1-5   the same, swinging on a timer so a blade is visible
  *   treasure  --page 1-5   the first treasure room, for looking at a chest
  *   shop      --page 1-5   the first shop room, for looking at the shopkeeper
  *   slide                  halfway through the first room transition
@@ -93,6 +94,10 @@ public final class Screens {
             case "fight":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.NORMAL)};
+            case "swing":
+                startRun(game, page);
+                return new GameScreen[] {
+                    new DungeonScreen(game).openIn(RoomKind.NORMAL).swinging()};
             case "treasure":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.TREASURE)};
@@ -137,13 +142,28 @@ public final class Screens {
         run.elapsedSeconds = 3725f;
     }
 
+    private static Long fixedSeed;
+
+    /**
+     * Pins the seed every later run is built from, for {@code --seed}.
+     *
+     * <p>The whole point of a screenshot is to compare it with another one, and
+     * without this every launch draws a different dungeon - so two shots of the
+     * same feature are taken in two different rooms, with different enemies, at
+     * different distances. {@code --frames} says when to look; this says where.
+     */
+    public static void fixSeed(long seed) {
+        fixedSeed = seed;
+    }
+
     /**
      * A new run for a character, at full health, on no floor yet. The seed is
-     * drawn here and nowhere else, so that a seeded-run option later is one
-     * parameter rather than a search.
+     * drawn here and nowhere else, which is what made {@link #fixSeed} one
+     * field rather than a search.
      */
     public static RunState freshRun(String characterId, String weaponId, int maxHp) {
-        return new RunState(MathUtils.random.nextLong(), characterId, weaponId, maxHp);
+        long seed = fixedSeed != null ? fixedSeed : MathUtils.random.nextLong();
+        return new RunState(seed, characterId, weaponId, maxHp);
     }
 
     private Screens() {}

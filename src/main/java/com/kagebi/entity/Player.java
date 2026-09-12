@@ -1,5 +1,6 @@
 package com.kagebi.entity;
 
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
@@ -11,6 +12,7 @@ import com.kagebi.combat.Hitbox;
 import com.kagebi.combat.Modifiers;
 import com.kagebi.data.def.WeaponDef;
 import com.kagebi.gen.CollisionGrid;
+import com.kagebi.gfx.Anim;
 import com.kagebi.run.RunState;
 
 /**
@@ -79,12 +81,17 @@ public final class Player extends Entity {
     /** The ninja occupies roughly the middle 12x12 of its 32x32 cell. */
     public static final float BODY = 12f;
 
+    /** One cell of a held-weapon sheet: 256/4 across and 256/4 down. */
+    public static final int WEAPON_CELL = 64;
+    /** Where the 32px body cell sits inside it: (64 - 32) / 2, on both axes. */
+    public static final int WEAPON_INSET = (WEAPON_CELL - 32) / 2;
+
     private final RunState run;
     private final AttackState swing = new AttackState();
 
     private WeaponDef weapon;
+    private Anim weaponArt;
 
-    /** Recomputed from the run's relics on entering a room; see EntityWorld. */
     /**
      * Base crit before relics. Five percent is low enough that a crit reads as
      * luck rather than as the normal case, which is what makes the relics that
@@ -150,7 +157,21 @@ public final class Player extends Entity {
     }
 
     public void setWeapon(WeaponDef weapon) {
+        setWeapon(weapon, null);
+    }
+
+    /**
+     * The weapon, and the sheet of it being swung.
+     *
+     * <p>The art travels with the definition because the two have to change
+     * together: a katana frame drawn over an axe swing is worse than no weapon
+     * at all. Null art is the headless case and the case where the atlas has no
+     * sheet for this weapon, and both draw the swing without it - which is
+     * exactly what the game did for its whole life until now.
+     */
+    public void setWeapon(WeaponDef weapon, Anim art) {
         this.weapon = weapon;
+        this.weaponArt = art;
     }
 
     public boolean rolling() {
@@ -501,6 +522,45 @@ public final class Player extends Entity {
     @Override
     protected boolean castsShadow() {
         return alive();
+    }
+
+    /**
+     * The held weapon, drawn over the swing.
+     *
+     * <p>The five weapon sheets are 256x256: four columns of {@link
+     * #WEAPON_CELL} by four rows, column per facing and row per frame - the
+     * same shape as every other sheet in the packs, so the frame index that
+     * picks the body picks the blade. The player's own cell is 32 and sits
+     * centred inside the 64, which is where the offset comes from and why it is
+     * exact rather than tuned: {@code (64 - 32) / 2}.
+     *
+     * <p>This was left undone for a long time on the grounds that per-frame
+     * hand anchors would have to be guessed. They do not - the two sheets were
+     * drawn to be composited, and measuring the figure inside each cell shows
+     * them already lined up.
+     *
+     * <p>Thrown weapons are skipped: their sprite points at the projectile in
+     * the fx atlas, not at a sheet of someone holding one.
+     */
+    @Override
+    protected void drawOverlay(SpriteBatch batch, int drawX, int drawY, boolean flip) {
+        if (weaponArt == null || weapon == null || weapon.thrown() || !swing.busy()) {
+            return;
+        }
+        TextureRegion held = ActorSprites.frameOf(weaponArt, facing,
+            swing.elapsed(), Math.max(1, swing.totalSteps()));
+        if (held == null) {
+            return;
+        }
+        int w = held.getRegionWidth();
+        int h = held.getRegionHeight();
+        int x0 = drawX - WEAPON_INSET;
+        int y0 = drawY - WEAPON_INSET;
+        if (flip) {
+            batch.draw(held, x0 + w, y0, -w, h);
+        } else {
+            batch.draw(held, x0, y0, w, h);
+        }
     }
 
     @Override

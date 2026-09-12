@@ -69,6 +69,15 @@ public final class DesktopLauncher {
                         boot.screenshotAfterFrames = Integer.parseInt(args[++i]);
                     }
                 }
+                // Without this every screenshot is of a different dungeon, so
+                // two shots of the same feature cannot be compared and the
+                // player may not even be in the same room. --frames says WHEN
+                // to look; this says WHERE.
+                case "--seed" -> {
+                    if (hasValue) {
+                        boot.seed = Long.parseLong(args[++i]);
+                    }
+                }
                 default -> { }
             }
         }

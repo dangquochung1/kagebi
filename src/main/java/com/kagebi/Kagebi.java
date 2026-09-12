@@ -57,6 +57,13 @@ public class Kagebi extends ApplicationAdapter {
         /** Frames to render before saving a screenshot and quitting; -1 to disable. */
         public int screenshotAfterFrames = -1;
         public String screenshotPath;
+        /**
+         * Run seed, or null to draw a fresh one. Fixing it is what makes two
+         * screenshots comparable: without it every launch builds a different
+         * floor, and the same feature is photographed in a different room each
+         * time - which is not a review, it is two unrelated pictures.
+         */
+        public Long seed;
     }
 
     private final Boot boot;
@@ -158,6 +165,9 @@ public class Kagebi extends ApplicationAdapter {
         profile = saves.load();
 
         screens = new ScreenStack();
+        if (boot.seed != null) {
+            Screens.fixSeed(boot.seed);
+        }
         for (GameScreen screen : Screens.build(this, boot.screen, boot.page)) {
             screens.push(screen);
         }

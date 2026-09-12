@@ -242,6 +242,7 @@ public abstract class Entity implements Updatable, Damageable {
         }
 
         blit(batch, f, drawX, drawY, flip);
+        drawOverlay(batch, drawX, drawY, flip);
 
         // A second additive pass rather than a colour tint: SpriteBatch's tint
         // multiplies, so it can only ever darken a sprite, and "flash white"
@@ -251,9 +252,25 @@ public abstract class Entity implements Updatable, Damageable {
             batch.flush();
             batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
             blit(batch, f, drawX, drawY, flip);
+            drawOverlay(batch, drawX, drawY, flip);
             batch.flush();
             batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         }
+    }
+
+    /**
+     * A second sprite over this one, in the same frame and under the same rules.
+     *
+     * <p>A hook rather than an override of {@link #draw} because the two guards
+     * above it have to apply to both halves: an invulnerable player blinks out
+     * entirely, and a player being hit flashes white entirely. Drawing the
+     * overlay outside them gives a sword that stays solid while its owner
+     * blinks, which reads as the sword being a separate object.
+     *
+     * @param drawX left edge of the body frame, already rounded
+     * @param drawY bottom edge of the body frame, already rounded
+     */
+    protected void drawOverlay(SpriteBatch batch, int drawX, int drawY, boolean flip) {
     }
 
     private static void blit(SpriteBatch batch, TextureRegion f, int drawX, int drawY,
