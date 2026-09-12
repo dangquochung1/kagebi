@@ -64,6 +64,42 @@ public final class Assets {
     public static final String MUSIC_END = MUSIC_DIR + "8_end_theme.ogg";
     public static final String MUSIC_SAD = MUSIC_DIR + "7_sad_theme.ogg";
 
+    /**
+     * The one hand-drawn map in the game. Everything else is a generated room
+     * template under {@link #ROOMS_DIR}.
+     */
+    public static final String MAP_VILLAGE = MAPS_DIR + "village.tmx";
+
+    /**
+     * Stings, not music: short enough to decode into memory, which is what lets
+     * them start on the frame the run ends instead of a beat later. Both are
+     * exactly 2.0 s, measured from the WAV headers. {@code success1} is 0.45 s
+     * and over before the victory panel has finished appearing.
+     */
+    public static final String JINGLE_SUCCESS = JINGLE_DIR + "success3.wav";
+    public static final String JINGLE_GAMEOVER = JINGLE_DIR + "gameover.wav";
+
+    public static final String SFX_ACCEPT = SFX_DIR + "menu/accept.wav";
+    public static final String SFX_CANCEL = SFX_DIR + "menu/cancel.wav";
+    public static final String SFX_MOVE = SFX_DIR + "menu/move1.wav";
+    public static final String SFX_DOOR = SFX_DIR + "menu/menu5.wav";
+
+    /**
+     * A music path from a content field. {@code floors.json} may name a track
+     * as a bare file ({@code 21_dungeon}) or as a full path, and resolving that
+     * here keeps the one place that knows where music lives the one place that
+     * builds its paths.
+     */
+    public static String music(String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        if (name.startsWith(MUSIC_DIR)) {
+            return name;
+        }
+        return MUSIC_DIR + (name.endsWith(".ogg") ? name : name + ".ogg");
+    }
+
     /** Region names in {@link #ATLAS_UI}. */
     public static final class Ui {
         public static final String PANEL = "ui/panel";
@@ -103,12 +139,67 @@ public final class Assets {
 
         public static final String DIALOG = "ui/dialog";
         public static final String DIALOG_FACESET = "ui/dialog_faceset";
+        /**
+         * The same box without the baked-in name tab. That tab is nine pixels
+         * tall, which fits a Latin capital and not a Vietnamese one - see
+         * {@code ui.DialogBox} for what that costs.
+         */
+        public static final String DIALOG_SIMPLE = "ui/dialog/dialogueboxsimple";
         public static final String FACESET_FRAME = "ui/faceset_frame";
 
-        /** Floor pickups. Single images, 7 to 12 pixels across. */
-        public static final String PICKUP_GOLD = "items/treasure/goldcoin";
+        /**
+         * Five 16x16 frames in one 80x16 strip, empty through to full, so the
+         * frame index <em>is</em> the quarter-hearts remaining. That is why the
+         * player's hit points are a multiple of four.
+         */
+        public static final String HEART = "ui/receptacle/heart";
+        public static final int HEART_STEPS = 4;
+
+        public static final String COIN = "items/treasure/goldcoin";
+        public static final String KEY = "items/treasure/goldkey";
+
+        /**
+         * The heart a dead enemy drops. A potion rather than the HUD's
+         * receptacle art above: lying on the floor it has to read as a thing to
+         * walk over, not as a gauge.
+         */
         public static final String PICKUP_HEART = "items/potion/heart";
-        public static final String PICKUP_KEY = "items/treasure/goldkey";
+
+        /**
+         * What covers a doorway that leads nowhere. A boulder rather than a wall
+         * tile on purpose: every template carries all four doorways and is drawn
+         * in its own biome's tileset, so a patch cut from one tileset would be
+         * visibly wrong in the next. A boulder belongs to no tileset and reads
+         * as "not this way" at a glance.
+         */
+        public static final String SEAL = "items/resource/rock";
+
+        /** Inventory and relic icons, drawn at 16x16 in a {@link #CELL} grid. */
+        public static final String ICON_KATANA = "items/weapons/katana/sprite";
+        public static final String ICON_AXE = "items/weapons/axe/sprite";
+        public static final String ICON_HAMMER = "items/weapons/hammer/sprite";
+        public static final String ICON_PICKAXE = "items/weapons/pickaxe/sprite";
+        public static final String ICON_SWORD = "items/weapons/sword/sprite";
+        public static final String ICON_KUNAI = "items/projectile/kunai";
+        public static final String ICON_SHURIKEN = "items/projectile/shuriken";
+        public static final String ICON_RELIC = "items/scroll/scrollrock";
+
+        /**
+         * The icon for a weapon id, falling back to a plain sword. Weapon defs
+         * carry their own icon once content exists; this is what the character
+         * select shows before it does.
+         */
+        public static String weaponIcon(String weaponId) {
+            switch (weaponId) {
+                case "katana": return ICON_KATANA;
+                case "axe": return ICON_AXE;
+                case "hammer": return ICON_HAMMER;
+                case "pickaxe": return ICON_PICKAXE;
+                case "kunai": return ICON_KUNAI;
+                case "shuriken": return ICON_SHURIKEN;
+                default: return ICON_SWORD;
+            }
+        }
 
         /** The font page, bound by name when the Skin loads its BitmapFont. */
         public static final String FONT_PAGE = "pixeloid_9";
@@ -257,10 +348,50 @@ public final class Assets {
     }
 
     /**
+     * Region names in {@link #ATLAS_NPC}.
+     *
+     * <p>Ninety villagers ship in the pack and the hub uses three of them, so
+     * these are named rather than generated: which villager stands outside
+     * which house is art direction, and belongs somewhere a reviewer can read
+     * it. The sheets are 4 columns x 7 rows of 16x16, the same shape as the
+     * monsters, so {@code Anim.directional} slices them unchanged.
+     */
+    public static final class Npc {
+
+        /** The village elder, who keeps the flame. */
+        public static final String ELDER = "oldman";
+        /** The one who trained the player, outside the middle house. */
+        public static final String MASTER = "master";
+        /** The herbalist, who sells nothing yet. */
+        public static final String HERBALIST = "woman";
+
+        public static final String[] VILLAGERS = {ELDER, MASTER, HERBALIST};
+
+        public static String idle(String npcId) {
+            return "npc/" + npcId + "/anim/idle";
+        }
+
+        public static String face(String npcId) {
+            return "npc/" + npcId + "/faceset";
+        }
+
+        private Npc() {}
+    }
+
+    /**
      * Region names in {@link #ATLAS_FX}. Not walked by {@code AssetsContractTest},
-     * which predates it, so {@code entity.FxRegionsTest} checks these instead.
+     * which only reaches Ui and Actor, so {@code entity.FxRegionsTest} checks
+     * these instead.
      */
     public static final class Fx {
+
+        /**
+         * The way down: a four-frame strip of 32x32 magic circle. The packs
+         * ship no stairs, and a glowing circle on the floor of the last room
+         * reads as "step here" in any tileset.
+         */
+        public static final String EXIT = "fx/magic/circle/spritesheetorange";
+
         /** 64x16: four 16px frames of a radial glow, so it needs no rotation. */
         public static final String PROJECTILE_ORB = "fx/projectile/energyball";
         /** 14x5, drawn pointing right, so it is rotated to its heading. */

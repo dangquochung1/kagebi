@@ -835,9 +835,9 @@ public final class EntityWorld implements World, AiContext {
             }
             kunaiRegion = fxAtlas.findRegion(Assets.Fx.PROJECTILE_KUNAI);
         }
-        goldRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_GOLD);
+        goldRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.COIN);
         heartRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_HEART);
-        keyRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_KEY);
+        keyRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.KEY);
     }
 
     private static void log(String message) {

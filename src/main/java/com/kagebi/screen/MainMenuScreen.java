@@ -108,9 +108,14 @@ public class MainMenuScreen extends GameScreen {
         panel.add(new Label(t.get("game.title"), game.skin(), "dim")).padBottom(5).row();
 
         addMenuButton(panel, t.get("menu.continue"), true, null);
-        addMenuButton(panel, t.get("menu.newgame"), false, null);
+        // set() rather than push(): a new run should not leave a title screen,
+        // its map and its fog texture alive underneath it for the whole run.
+        addMenuButton(panel, t.get("menu.newgame"), false,
+            () -> stack().set(new CharacterSelectScreen(game, 0)));
         addMenuButton(panel, t.get("menu.settings"), false,
             () -> stack().push(new SettingsScreen(game)));
+        addMenuButton(panel, t.get("menu.credits"), false,
+            () -> stack().set(new CreditsScreen(game, 1)));
         addMenuButton(panel, t.get("menu.quit"), false, Gdx.app::exit);
 
         // Reachable before the player can read the settings label, which is the
