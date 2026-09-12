@@ -72,7 +72,7 @@ class RealInputBufferTest {
 
     @Test
     void anAttackTappedDuringRecoveryQueuesOnTheRealService() {
-        InputService input = new InputService(new InputMap());
+        InputService input = new InputService(InputMap.defaults());
         EntityWorld w = world();
         Player p = w.player();
 
@@ -92,7 +92,7 @@ class RealInputBufferTest {
 
     @Test
     void oneTapIsOneSwingOnTheRealService() {
-        InputService input = new InputService(new InputMap());
+        InputService input = new InputService(InputMap.defaults());
         EntityWorld w = world();
         Player p = w.player();
 
@@ -113,7 +113,7 @@ class RealInputBufferTest {
         // Pressed and released before the step that reads it: at 144Hz this is
         // the normal case, and a service that cleared presses on render would
         // drop it.
-        InputService input = new InputService(new InputMap());
+        InputService input = new InputService(InputMap.defaults());
         EntityWorld w = world();
         tap(input, GameAction.ROLL);
         tick(input, w);

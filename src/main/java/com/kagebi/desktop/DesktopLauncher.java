@@ -2,6 +2,7 @@ package com.kagebi.desktop;
 
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
+import com.badlogic.gdx.backends.lwjgl3.Lwjgl3WindowAdapter;
 import com.kagebi.Cfg;
 import com.kagebi.Kagebi;
 import com.kagebi.Kagebi.Boot;
@@ -89,7 +90,23 @@ public final class DesktopLauncher {
         config.setWindowSizeLimits(Cfg.VIRT_W * 2, Cfg.VIRT_H * 2, -1, -1);
         config.useVsync(true);
         config.setForegroundFPS(60);
-        new Lwjgl3Application(new Kagebi(boot), config);
+
+        // The desktop stops delivering key events the instant focus moves, so a
+        // key held while alt-tabbing away is never reported released and the
+        // ninja keeps walking. Clearing on focus loss is the only place that
+        // can be known, and it is why this needs a window listener rather than
+        // pauseWhenLostFocus - that would stop the render loop and the music
+        // too, which is a different decision.
+        final Kagebi game = new Kagebi(boot);
+        config.setWindowListener(new Lwjgl3WindowAdapter() {
+            @Override
+            public void focusLost() {
+                if (game.input() != null) {
+                    game.input().clear();
+                }
+            }
+        });
+        new Lwjgl3Application(game, config);
     }
 
     private DesktopLauncher() {}

@@ -62,7 +62,7 @@ class SimScreenTest {
     }
 
     private static InputService input() {
-        return new InputService(new InputMap());
+        return new InputService(InputMap.defaults());
     }
 
     @Test

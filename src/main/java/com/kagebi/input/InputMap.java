@@ -24,6 +24,26 @@ public final class InputMap {
         load();
     }
 
+    private InputMap(boolean readSavedBindings) {
+        resetToDefaults();
+        if (readSavedBindings) {
+            load();
+        }
+    }
+
+    /**
+     * The shipped bindings, without reading the ones the player has saved.
+     *
+     * <p>For tests. {@link #load} reads a real Preferences file out of the home
+     * directory, so a test that says "space is roll" was in fact asserting
+     * something about whoever happened to run it - and on this machine that
+     * developer had rebound roll to L, so the test failed for a reason that had
+     * nothing to do with the code under test.
+     */
+    public static InputMap defaults() {
+        return new InputMap(false);
+    }
+
     public void resetToDefaults() {
         for (GameAction a : GameAction.values()) {
             primary[a.ordinal()] = a.defaultPrimary;
