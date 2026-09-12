@@ -136,6 +136,13 @@ public final class Player extends Entity {
 
     /** Rolled once when the swing starts, not once per target. */
     private int swingDamage;
+    /**
+     * Whether that roll crit. Kept rather than discarded because it is the one
+     * thing about a hit the player most wants told: it was thrown away the
+     * moment it was rolled, so a crit was a number nobody could see being
+     * bigger than a number nobody could see.
+     */
+    private boolean swingCrit;
     /** Hits landed this step, so the world can shake the camera and freeze a frame. */
     public int hitsLandedThisStep;
 
@@ -353,10 +360,10 @@ public final class Player extends Entity {
         if (intent.moving()) {
             facing = Dir.of(intent.moveX, intent.moveY);
         }
-        boolean crit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
+        swingCrit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
         swingDamage = Damage.outgoing(weapon.damage,
             damageMult * mods.outgoingMult(hpFraction()),
-            crit, critMult * mods.critDamageMult());
+            swingCrit, critMult * mods.critDamageMult(), rng);
         // Attack speed shortens the parts the player waits through. The active
         // window is left alone: shrinking it would make a faster weapon harder
         // to land, which is the opposite of what the relic promises.
@@ -384,7 +391,7 @@ public final class Player extends Entity {
         hitsLandedThisStep += landed;
         if (landed > 0) {
             world.onPlayerHitLanded(this, swingDamage, landed);
-            world.applyOnHit(this, struck, swingDamage);
+            world.applyOnHit(this, struck, swingDamage, swingCrit);
         }
     }
 

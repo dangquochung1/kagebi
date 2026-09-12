@@ -232,6 +232,7 @@ public class DungeonScreen extends SimScreen {
             // The dungeon shopkeeper is a villager sprite, and this is the only
             // screen that ever puts one underground.
             ((EntityWorld) world).useNpcAtlas(Preload.npc());
+            ((EntityWorld) world).useFont(font);
         }
         startFloor(Math.max(1, run.floor));
         if (mapOnShow) {
@@ -434,8 +435,10 @@ public class DungeonScreen extends SimScreen {
         }
 
         if (demo != null && world instanceof EntityWorld) {
+            EntityWorld w = (EntityWorld) world;
+            demo.aimAt(w.player(), w.hostiles());
             demo.tick();
-            ((EntityWorld) world).stepWith(demo);
+            w.stepWith(demo);
         } else {
             world.step(input());
         }

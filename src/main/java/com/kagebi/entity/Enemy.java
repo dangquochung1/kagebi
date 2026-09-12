@@ -102,6 +102,33 @@ public class Enemy extends Entity {
     /** Set by the world once this death has been counted into the run. */
     public boolean deathCounted;
 
+    /** Steps a health bar stays up after a hit. 90 is a second and a half. */
+    public static final int BAR_STEPS = 90;
+
+    /**
+     * Counts down the health bar over this enemy's head.
+     *
+     * <p>Its own counter rather than a reuse of {@link #flashSteps}, which
+     * looks like the same signal and is not: flash is also set by a poison tick
+     * and by the attack telegraph, so a bar riding on it would appear on an
+     * enemy nobody has touched and blink on every windup.
+     */
+    private int barSteps;
+
+    public void showHealthBar() {
+        barSteps = BAR_STEPS;
+    }
+
+    /** 0 when the bar should be hidden, else how much of its life is left. */
+    public float healthBarFade() {
+        if (barSteps <= 0 || maxHp <= 0) {
+            return 0f;
+        }
+        // Fades out over the last third, so it leaves rather than vanishing.
+        float left = barSteps / (float) BAR_STEPS;
+        return left > 0.33f ? 1f : left / 0.33f;
+    }
+
     public Enemy(EnemyDef def, AiBrain brain, ActorSprites sprites) {
         this.def = def;
         this.brain = brain;
@@ -243,6 +270,9 @@ public class Enemy extends Entity {
      * stack into anything unfair.
      */
     private void stepStatus() {
+        if (barSteps > 0) {
+            barSteps--;
+        }
         if (slowSteps > 0 && --slowSteps == 0) {
             speedMult = 1f;
         }

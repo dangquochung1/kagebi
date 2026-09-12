@@ -3,6 +3,8 @@ package com.kagebi.entity;
 import java.util.Random;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -131,6 +133,7 @@ public final class EntityWorld implements World, AiContext {
     private final Array<Pickup> pickups = new Array<>();
     private final Array<Marker> markers = new Array<>();
     private final Array<Decor> decor = new Array<>();
+    private final Array<DamagePop> pops = new Array<>();
     private final Array<Entity> drawList = new Array<>();
 
     /**
@@ -181,6 +184,8 @@ public final class EntityWorld implements World, AiContext {
     private Anim chestAnim;
     private Anim chestOpenAnim;
     private TextureAtlas npcAtlas;
+    private BitmapFont font;
+    private TextureRegion pixel;
     private TextureRegion kunaiRegion;
     private TextureRegion goldRegion;
     private TextureRegion heartRegion;
@@ -305,6 +310,40 @@ public final class EntityWorld implements World, AiContext {
     }
 
     /**
+     * The font damage numbers are drawn in. Null leaves them unspawned, which
+     * is the headless case: a test that drives a whole fight must not need a
+     * glyph atlas to do it.
+     */
+    public void useFont(BitmapFont font) {
+        this.font = font;
+    }
+
+    /**
+     * Floats a damage number off an enemy and shows its health bar for a while.
+     *
+     * <p>Both cues at once because they answer different questions. The number
+     * says how hard that hit was - which is the only way a crit, a relic or the
+     * damage roll is ever visible. The bar says how much is left, which the
+     * numbers cannot: the final boss has eighteen hundred health and no amount
+     * of arithmetic in the player's head turns a stream of sevens into "nearly
+     * there".
+     */
+    public void popDamage(Enemy e, int amount, boolean crit) {
+        e.showHealthBar();
+        if (font != null) {
+            // Above the bar, not level with it. Started at the same height the
+            // two drew over each other for the first half of the number's life,
+            // and a figure sitting in a red bar is unreadable.
+            pops.add(new DamagePop(amount, crit, e.x, barTop(e) + 8f));
+        }
+    }
+
+    /** Bottom of an enemy's health bar: just clear of the top of its sprite. */
+    private static float barTop(Enemy e) {
+        return e.y + e.bodyH * 0.6f + 3f;
+    }
+
+    /**
      * Recomputes what the player's relics, upgrades and perk add up to. Called
      * whenever the set changes - which is to say when a relic is picked up -
      * rather than every step, because nothing else can change it.
@@ -339,6 +378,7 @@ public final class EntityWorld implements World, AiContext {
         pickups.clear();
         markers.clear();
         decor.clear();
+        pops.clear();
         hitstop = 0;
         shake = 0f;
         descendRequested = false;
@@ -405,6 +445,12 @@ public final class EntityWorld implements World, AiContext {
         }
         for (int i = 0; i < markers.size; i++) {
             markers.get(i).step(this);
+        }
+        for (int i = pops.size - 1; i >= 0; i--) {
+            pops.get(i).step();
+            if (pops.get(i).done()) {
+                pops.removeIndex(i);
+            }
         }
 
         countDeaths();
@@ -499,6 +545,52 @@ public final class EntityWorld implements World, AiContext {
                 p.draw(batch);
             }
         }
+
+        // Last, and in world space: a number or a bar hidden behind the sprite
+        // it describes is worse than not drawing it, because the player sees a
+        // flicker and learns to distrust it.
+        for (Enemy e : enemies) {
+            drawHealthBar(batch, e);
+        }
+        if (font != null) {
+            for (DamagePop pop : pops) {
+                pop.draw(batch, font);
+            }
+        }
+    }
+
+    /**
+     * Width of an enemy's health bar, and how tall its filled strip is.
+     *
+     * <p>Fourteen, which is under the 16px an enemy occupies. Eighteen plus its
+     * outline came to twenty and read as a wider object than the thing it
+     * belonged to, which on a 320px screen is a lot of furniture for a cue that
+     * is meant to be glanced at.
+     */
+    public static final int BAR_WIDTH = 14;
+    public static final int BAR_HEIGHT = 2;
+
+    private void drawHealthBar(SpriteBatch batch, Enemy e) {
+        float fade = e.healthBarFade();
+        if (pixel == null || fade <= 0f || !e.alive()) {
+            return;
+        }
+        int x = Math.round(e.x - BAR_WIDTH / 2f);
+        int y = Math.round(barTop(e));
+        float left = Math.max(0f, Math.min(1f, e.hp / (float) e.maxHp));
+
+        Color was = batch.getColor();
+        float r = was.r;
+        float g = was.g;
+        float b = was.b;
+        float a = was.a;
+        // A dark trough under a red fill, so the bar reads on a cream floor and
+        // on a near-black one without either needing its own colour.
+        batch.setColor(0.07f, 0.05f, 0.08f, 0.8f * fade);
+        batch.draw(pixel, x - 1, y - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2);
+        batch.setColor(0.85f, 0.24f, 0.20f, fade);
+        batch.draw(pixel, x, y, Math.max(1, Math.round(BAR_WIDTH * left)), BAR_HEIGHT);
+        batch.setColor(r, g, b, a);
     }
 
     @Override
@@ -1071,7 +1163,14 @@ public final class EntityWorld implements World, AiContext {
      * second target that was not one of the first.
      */
     public void applyOnHit(Player p, java.util.List<com.kagebi.combat.Combatant> struck,
-                           int damage) {
+                           int damage, boolean crit) {
+        // Numbers first, and outside the early return below: every hit gets one
+        // whether or not the player happens to own an on-hit relic.
+        for (com.kagebi.combat.Combatant c : struck) {
+            if (c instanceof Enemy) {
+                popDamage((Enemy) c, damage, crit);
+            }
+        }
         Modifiers mods = p.mods();
         float slow = mods.slowOnHit();
         int poison = mods.poisonOnHit();
@@ -1444,6 +1543,7 @@ public final class EntityWorld implements World, AiContext {
             chestAnim = once(Assets.Prop.CHEST);
             chestOpenAnim = once(Assets.Prop.CHEST_OPEN);
         }
+        pixel = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PIXEL);
         goldRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.COIN);
         heartRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_HEART);
         keyRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.KEY);

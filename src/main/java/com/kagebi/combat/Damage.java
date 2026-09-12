@@ -46,11 +46,40 @@ public final class Damage {
      */
     private static final float ROUNDING_NUDGE = 0.001f;
 
+    /**
+     * How far a hit may land either side of its nominal damage.
+     *
+     * <p>Twenty percent, which on the starting katana turns every swing reading
+     * 7 into one reading 6, 7 or 8. The point is legibility rather than
+     * balance: with a fixed number, every hit on a given enemy with a given
+     * weapon shows the same figure forever, and the only variety in the whole
+     * damage path is a five percent crit. Symmetric, so the <em>mean</em> is
+     * unchanged and {@code BalanceTest}'s damage-per-second model still holds -
+     * this adds texture, it does not move any balance number.
+     */
+    public static final float SPREAD = 0.20f;
+
     /** Weapon number scaled by the attacker's multipliers and its crit roll. */
     public static int outgoing(int base, float damageMult, boolean crit, float critMult) {
+        return outgoing(base, damageMult, crit, critMult, null);
+    }
+
+    /**
+     * As above, with the swing's damage roll.
+     *
+     * <p>Rolled once per swing rather than once per target, for the same reason
+     * the crit is: a wide hammer that reads 9 on the left enemy and 6 on the
+     * right one looks like two different weapons. A null {@code rng} skips the
+     * roll entirely, which is what keeps every existing test deterministic.
+     */
+    public static int outgoing(int base, float damageMult, boolean crit, float critMult,
+                               Random rng) {
         float raw = base * damageMult;
         if (crit) {
             raw *= critMult;
+        }
+        if (rng != null) {
+            raw *= 1f + SPREAD * (rng.nextFloat() * 2f - 1f);
         }
         return Math.max(MIN, Math.round(raw + ROUNDING_NUDGE));
     }

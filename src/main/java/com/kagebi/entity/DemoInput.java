@@ -21,11 +21,69 @@ public final class DemoInput implements ActionSource {
     /** Steps between swings. Longer than any weapon's recovery, so none is cut. */
     public static final int PERIOD = 48;
 
+    /** Stop this far short of the target, inside the starting katana's reach. */
+    private static final float STRIKE = 16f;
+
     private final GameAction action;
     private int steps;
+    private int moveX;
+    private int moveY;
 
     public DemoInput(GameAction action) {
         this.action = action;
+    }
+
+    /**
+     * Walks at the nearest living enemy and stops in reach of it.
+     *
+     * <p>Without this the demo swings at empty air, which shows the blade and
+     * nothing else - no hit flash, no damage number, no health bar. Those are
+     * the things worth photographing, and every one of them needs a swing that
+     * actually connects.
+     */
+    public void aimAt(Player player, Iterable<Enemy> enemies) {
+        moveX = 0;
+        moveY = 0;
+        if (player == null) {
+            return;
+        }
+        Enemy best = null;
+        float bestD = Float.MAX_VALUE;
+        for (Enemy e : enemies) {
+            if (!e.alive()) {
+                continue;
+            }
+            float dx = e.x - player.x;
+            float dy = e.y - player.y;
+            float d = (float) Math.sqrt(dx * dx + dy * dy);
+            if (d < bestD) {
+                bestD = d;
+                best = e;
+            }
+        }
+        if (best == null) {
+            return;
+        }
+        float dx = best.x - player.x;
+        float dy = best.y - player.y;
+        // Face it whether or not we still need to close, so the swing lands on
+        // the side the target is actually on.
+        boolean far = bestD > STRIKE;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            moveX = dx > 0 ? 1 : -1;
+            moveY = far && Math.abs(dy) > 4f ? (dy > 0 ? 1 : -1) : 0;
+        } else {
+            moveY = dy > 0 ? 1 : -1;
+            moveX = far && Math.abs(dx) > 4f ? (dx > 0 ? 1 : -1) : 0;
+        }
+        if (!far) {
+            // In reach: keep the facing key, drop the other, and stop closing.
+            if (Math.abs(dx) > Math.abs(dy)) {
+                moveY = 0;
+            } else {
+                moveX = 0;
+            }
+        }
     }
 
     /** Advances the clock. Call once per fixed step, before stepping the world. */
@@ -40,7 +98,13 @@ public final class DemoInput implements ActionSource {
 
     @Override
     public boolean isDown(GameAction a) {
-        return false;
+        return switch (a) {
+            case MOVE_RIGHT -> moveX > 0;
+            case MOVE_LEFT -> moveX < 0;
+            case MOVE_UP -> moveY > 0;
+            case MOVE_DOWN -> moveY < 0;
+            default -> false;
+        };
     }
 
     @Override

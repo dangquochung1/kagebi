@@ -167,6 +167,56 @@ class EntityWorldTest {
         assertEquals(dropped, run.gold);
     }
 
+    // ---- hit feedback ---------------------------------------------------------
+
+    /**
+     * A swing that lands shows the target's health bar, and it times out.
+     *
+     * <p>The bar is the only cue that answers "how much is left" - the damage
+     * numbers cannot, because no player turns a stream of sevens into a sense
+     * of an eighteen-hundred-health boss being nearly down.
+     */
+    @Test
+    void aLandedHitRaisesTheHealthBarAndItFadesOnItsOwn() {
+        EntityWorld w = world(registry(), TestDefs.run());
+        Room room = TestDefs.room(RoomKind.NORMAL, TestDefs.at(ENEMY, 100, 60, "larva"));
+        w.enterRoom(room, TestDefs.walled(), null);
+        Enemy e = w.hostiles().get(0);
+        assertEquals(0f, e.healthBarFade(), "no bar before anything touches it");
+
+        w.popDamage(e, 4, false);
+        assertEquals(1f, e.healthBarFade(), "up at once, and at full strength");
+
+        ScriptedInput in = new ScriptedInput();
+        in.ticks(w, Enemy.BAR_STEPS / 2);
+        assertEquals(1f, e.healthBarFade(), "still solid halfway through");
+        in.ticks(w, Enemy.BAR_STEPS);
+        assertEquals(0f, e.healthBarFade(), "gone once its time is up");
+    }
+
+    /**
+     * Poison does not raise the bar, and that is the point of it having its own
+     * counter.
+     *
+     * <p>{@code flashSteps} looks like the same signal and is not: it is set by
+     * a poison tick and by the attack telegraph as well as by a hit. A bar
+     * riding on it would appear over an enemy nobody has touched and blink on
+     * every windup, which is worse than no bar.
+     */
+    @Test
+    void aPoisonTickDoesNotRaiseTheHealthBar() {
+        EntityWorld w = world(registry(), TestDefs.run());
+        Room room = TestDefs.room(RoomKind.NORMAL, TestDefs.at(ENEMY, 100, 60, "larva"));
+        w.enterRoom(room, TestDefs.walled(), null);
+        Enemy e = w.hostiles().get(0);
+        e.poison(1, com.kagebi.combat.Modifiers.POISON_STEPS);
+
+        int before = e.hp;
+        new ScriptedInput().ticks(w, com.kagebi.combat.Modifiers.TICK_STEPS + 2);
+        assertTrue(e.hp < before, "the poison should have ticked");
+        assertEquals(0f, e.healthBarFade(), "and raised no bar doing it");
+    }
+
     @Test
     void aSplitterSplitsOnceIntoTwoHalves() {
         RunState run = TestDefs.run();

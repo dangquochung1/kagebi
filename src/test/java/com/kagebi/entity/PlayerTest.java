@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import com.kagebi.Dir;
 import com.kagebi.ai.AiState;
+import com.kagebi.combat.Damage;
 import com.kagebi.combat.Faction;
 import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
@@ -70,13 +71,22 @@ class PlayerTest {
             hpByTick.add(target.hp);
         }
         // The katana is 4 windup / 3 active / 11 recover. Ticks 1-4 are the
-        // windup: nothing. Tick 5 is the first active step: one hit of 7.
+        // windup: nothing. Tick 5 is the first active step.
         for (int t = 0; t < 4; t++) {
             assertEquals(500, hpByTick.get(t), "no hitbox during windup, tick " + (t + 1));
         }
-        assertEquals(493, hpByTick.get(4), "hit lands on the first active step");
+        // The amount is a range, not a number: the katana's 7 is rolled within
+        // Damage.SPREAD, so this asserts that ONE hit landed rather than
+        // pinning its size. Pinning it made this test fail the day damage
+        // gained a roll, which is the test complaining about the wrong thing.
+        int landed = 500 - hpByTick.get(4);
+        int low = Math.round(7 * (1f - Damage.SPREAD));
+        int high = Math.round(7 * (1f + Damage.SPREAD));
+        assertTrue(landed >= low && landed <= high,
+            "hit lands on the first active step, for " + low + " to " + high
+            + " damage; took " + landed);
         for (int t = 5; t < 30; t++) {
-            assertEquals(493, hpByTick.get(t),
+            assertEquals(hpByTick.get(4), hpByTick.get(t),
                 "the target has no i-frames; only the swing's memory stops tick " + (t + 1));
         }
     }

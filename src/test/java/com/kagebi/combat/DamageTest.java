@@ -82,4 +82,60 @@ class DamageTest {
             assertTrue(Damage.rollCrit(r, 1f));
         }
     }
+
+    // ---- the damage roll ------------------------------------------------------
+
+    /** A null generator skips the roll, which is what keeps old tests exact. */
+    @Test
+    void withoutAGeneratorTheDamageIsStillTheOldFixedNumber() {
+        assertEquals(Damage.outgoing(7, 1f, false, 2f),
+                     Damage.outgoing(7, 1f, false, 2f, null));
+    }
+
+    /** The katana's 7 lands as 6, 7 or 8 - three values the player can see. */
+    @Test
+    void theRollStaysInsideItsSpreadAndUsesTheWholeOfIt() {
+        Random r = new Random(11L);
+        int low = Math.round(7 * (1f - Damage.SPREAD));
+        int high = Math.round(7 * (1f + Damage.SPREAD));
+        java.util.Set<Integer> seen = new java.util.TreeSet<>();
+        for (int i = 0; i < 4000; i++) {
+            int rolled = Damage.outgoing(7, 1f, false, 2f, r);
+            assertTrue(rolled >= low && rolled <= high, "rolled " + rolled);
+            seen.add(rolled);
+        }
+        assertEquals(java.util.Set.of(6, 7, 8), seen,
+            "all three values should turn up, or the spread is invisible");
+    }
+
+    /**
+     * The mean is unchanged, which is the whole reason this could be added
+     * without retuning anything: {@code BalanceTest} models damage per second
+     * from the flat number, and a symmetric roll leaves that model true.
+     */
+    @Test
+    void theRollDoesNotMoveTheAverage() {
+        Random r = new Random(3L);
+        long total = 0;
+        int rolls = 200_000;
+        for (int i = 0; i < rolls; i++) {
+            total += Damage.outgoing(20, 1f, false, 2f, r);
+        }
+        assertEquals(20.0, total / (double) rolls, 0.1);
+    }
+
+    /** A crit is scaled first and then rolled, so it is always the bigger band. */
+    @Test
+    void aCritOutrangesAnOrdinaryHit() {
+        Random r = new Random(5L);
+        int worstCrit = Integer.MAX_VALUE;
+        int bestPlain = 0;
+        for (int i = 0; i < 4000; i++) {
+            worstCrit = Math.min(worstCrit, Damage.outgoing(7, 1f, true, 2f, r));
+            bestPlain = Math.max(bestPlain, Damage.outgoing(7, 1f, false, 2f, r));
+        }
+        assertTrue(worstCrit > bestPlain,
+            "the weakest crit (" + worstCrit + ") must beat the strongest normal hit ("
+            + bestPlain + "), or the red number is sometimes smaller than the blue one");
+    }
 }
