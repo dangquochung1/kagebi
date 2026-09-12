@@ -105,6 +105,11 @@ public final class Assets {
         public static final String DIALOG_FACESET = "ui/dialog_faceset";
         public static final String FACESET_FRAME = "ui/faceset_frame";
 
+        /** Floor pickups. Single images, 7 to 12 pixels across. */
+        public static final String PICKUP_GOLD = "items/treasure/goldcoin";
+        public static final String PICKUP_HEART = "items/potion/heart";
+        public static final String PICKUP_KEY = "items/treasure/goldkey";
+
         /** The font page, bound by name when the Skin loads its BitmapFont. */
         public static final String FONT_PAGE = "pixeloid_9";
 
@@ -139,6 +144,24 @@ public final class Assets {
             "idle", "walk", "attack", "roll", "hit", "dead", "pickup",
         };
 
+        /**
+         * The animation names in {@link #PLAYER_ANIMS}, by role. A nested class
+         * rather than String fields here, because AssetsContractTest reads every
+         * String field of Actor as a complete region name.
+         */
+        public static final class PlayerAnim {
+            public static final String IDLE = "idle";
+            public static final String WALK = "walk";
+            public static final String ATTACK = "attack";
+            public static final String ROLL = "roll";
+            public static final String HIT = "hit";
+            /** 32x64: one column of two frames, not a directional sheet. */
+            public static final String DEAD = "dead";
+            public static final String PICKUP = "pickup";
+
+            private PlayerAnim() {}
+        }
+
         /** e.g. {@code player(CHARACTERS[0], "walk")} -> player/ninjagreen/walk */
         public static String player(String characterId, String animation) {
             return "player/" + characterId + "/" + animation;
@@ -168,7 +191,86 @@ public final class Assets {
             return "bosses/" + id + "/" + animation;
         }
 
+        /**
+         * The boss id inside a boss sprite path, or null if it is not one:
+         * {@code bosses/giantfrog2/idle} gives {@code giantfrog2}.
+         */
+        public static String bossIdOf(String spriteRegion) {
+            if (spriteRegion == null || !spriteRegion.startsWith("bosses/")) {
+                return null;
+            }
+            String[] parts = spriteRegion.split("/");
+            return parts.length >= 2 ? parts[1] : null;
+        }
+
+        /*
+         * Boss strip names, probed in order. Measured across the 20 boss folders:
+         * no animation name is shared by all of them - giantfrog ships
+         * "idle40x40" where giantfrog2 ships "idle", the samurai split attack
+         * into "attackleft" and "attackright", the racoons ship "sprite" - so
+         * each role lists what to try and the first that exists wins. Arrays
+         * rather than String constants so AssetsContractTest does not read an
+         * animation name as a region name.
+         */
+        public static final String[] BOSS_IDLE = {"idle", "idle40x40", "sprite"};
+        public static final String[] BOSS_MOVE = {"walk", "jump", "idle", "idle40x40"};
+        public static final String[] BOSS_ATTACK = {"attack", "charge", "attackright", "shoot"};
+        public static final String[] BOSS_HURT = {"hit"};
+        /** Only the two-phase bosses have one; tengured's is eleven frames. */
+        public static final String[] BOSS_TRANSFORM = {"trans"};
+
+        /*
+         * The depths pack (floors 4 and 5) ships each actor as five separate
+         * single-facing strips, 32px tall, rather than one sheet:
+         * skeleton1_{idle,movement,attack,take_damage,death}, measured at 6, 10,
+         * 9, 5 and 17 frames. An EnemyDef names the idle strip and the rest are
+         * found by swapping the suffix here.
+         *
+         * No String field holds the suffix: AssetsContractTest reads every
+         * String field of this class, private ones included, as a region name.
+         */
+        public static boolean isDepthsSet(String region) {
+            return region != null && region.startsWith("depths/") && region.endsWith("_idle");
+        }
+
+        public static String depthsMove(String idleRegion) {
+            return depthsSibling(idleRegion, "_movement");
+        }
+
+        public static String depthsAttack(String idleRegion) {
+            return depthsSibling(idleRegion, "_attack");
+        }
+
+        public static String depthsHurt(String idleRegion) {
+            return depthsSibling(idleRegion, "_take_damage");
+        }
+
+        public static String depthsDeath(String idleRegion) {
+            return depthsSibling(idleRegion, "_death");
+        }
+
+        private static String depthsSibling(String idleRegion, String suffix) {
+            return idleRegion.substring(0, idleRegion.length() - "_idle".length()) + suffix;
+        }
+
         private Actor() {}
+    }
+
+    /**
+     * Region names in {@link #ATLAS_FX}. Not walked by {@code AssetsContractTest},
+     * which predates it, so {@code entity.FxRegionsTest} checks these instead.
+     */
+    public static final class Fx {
+        /** 64x16: four 16px frames of a radial glow, so it needs no rotation. */
+        public static final String PROJECTILE_ORB = "fx/projectile/energyball";
+        /** 14x5, drawn pointing right, so it is rotated to its heading. */
+        public static final String PROJECTILE_KUNAI = "fx/projectile/kunai";
+        /** 32x16: two frames of a spinning star. */
+        public static final String PROJECTILE_SHURIKEN = "fx/projectile/shuriken";
+        /** A lingering area, for casters' clouds. Same radial glow, different use. */
+        public static final String HAZARD_CLOUD = "fx/projectile/energyball";
+
+        private Fx() {}
     }
 
     private Assets() {}
