@@ -16,6 +16,11 @@ out/
 *.class
 *.jar
 
+# Standalone Windows build - rebuild with:  python tools/make_exe.py
+# 289 MB of staged assets and a bundled JRE; nothing here is a source.
+build/
+dist/
+
 # Scratch
 tools/__pycache__/
 *.pyc
