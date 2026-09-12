@@ -3,7 +3,9 @@ package com.kagebi.screen;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.kagebi.assets.Assets;
+import com.kagebi.assets.IconSheet;
 
 /**
  * The atlases every in-game screen shares, loaded once.
@@ -62,6 +64,20 @@ public final class Preload {
             m.finishLoadingAsset(Assets.ICONS);
         }
         return m.get(Assets.ICONS, Texture.class);
+    }
+
+    /**
+     * One icon, by the one-based index the content files use, or null for an
+     * index that names nothing. See {@link IconSheet} for why it is one-based -
+     * the two screens that used to cut this sheet up themselves both read it as
+     * zero-based and drew every icon's neighbour.
+     */
+    public static TextureRegion icon(int index) {
+        if (!IconSheet.has(index)) {
+            return null;
+        }
+        return new TextureRegion(icons(), IconSheet.x(index), IconSheet.y(index),
+                                 IconSheet.SIZE, IconSheet.SIZE);
     }
 
     private static TextureAtlas atlas(String path) {

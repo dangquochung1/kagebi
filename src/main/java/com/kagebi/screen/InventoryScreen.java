@@ -40,10 +40,6 @@ public class InventoryScreen extends SimScreen {
     private static final int CELL = 20;
     private static final int GAP = 2;
 
-    /** The Raven icon sheet is sixteen 16px icons across. */
-    private static final int ICON_COLUMNS = 16;
-    private static final int ICON = 16;
-
     private static final Color INK = new Color(0x131b1bff);
     private static final Color SOFT = new Color(0x46503cff);
 
@@ -124,16 +120,7 @@ public class InventoryScreen extends SimScreen {
     }
 
     private TextureRegion ravenIcon(int index) {
-        if (index < 0) {
-            return null;
-        }
-        Texture sheet = Preload.icons();
-        int x = (index % ICON_COLUMNS) * ICON;
-        int y = (index / ICON_COLUMNS) * ICON;
-        if (y + ICON > sheet.getHeight()) {
-            return null;
-        }
-        return new TextureRegion(sheet, x, y, ICON, ICON);
+        return Preload.icon(index);
     }
 
     private int slotCount() {
