@@ -194,6 +194,12 @@ public class DungeonScreen extends SimScreen {
         return this;
     }
 
+    /** The same, on the throw button, for {@code --screen throw}. */
+    DungeonScreen throwing() {
+        demo = new DemoInput(GameAction.THROW);
+        return this;
+    }
+
     @Override
     public InputProcessor inputProcessor() {
         return game.input();

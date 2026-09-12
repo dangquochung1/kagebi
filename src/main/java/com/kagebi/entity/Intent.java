@@ -31,6 +31,15 @@ public final class Intent {
     public int moveY;
 
     public boolean attack;
+    /**
+     * The throw button, which for a long time nothing read.
+     *
+     * <p>{@code GameAction.THROW} was declared, bound to K, translated, and
+     * listed on the controls screen as rebindable - and no line of code asked
+     * about it. The player could see and rebind a key that did nothing, which
+     * is the worst shape a missing feature can take.
+     */
+    public boolean throwing;
     public boolean roll;
     public boolean interact;
     public boolean useItem;
@@ -44,6 +53,7 @@ public final class Intent {
         moveY = (src.isDown(GameAction.MOVE_UP) ? 1 : 0)
               - (src.isDown(GameAction.MOVE_DOWN) ? 1 : 0);
         attack = src.buffered(GameAction.ATTACK, BUFFER_STEPS);
+        throwing = src.buffered(GameAction.THROW, BUFFER_STEPS);
         roll = src.buffered(GameAction.ROLL, BUFFER_STEPS);
         interact = src.buffered(GameAction.INTERACT, BUFFER_STEPS);
         useItem = src.buffered(GameAction.USE_ITEM, BUFFER_STEPS);
@@ -52,6 +62,11 @@ public final class Intent {
     public void consumeAttack() {
         spend(GameAction.ATTACK);
         attack = false;
+    }
+
+    public void consumeThrow() {
+        spend(GameAction.THROW);
+        throwing = false;
     }
 
     public void consumeRoll() {
@@ -82,6 +97,7 @@ public final class Intent {
         moveX = 0;
         moveY = 0;
         attack = false;
+        throwing = false;
         roll = false;
         interact = false;
         useItem = false;

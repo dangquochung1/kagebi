@@ -68,6 +68,12 @@
   "select.weapon.axe": "Axe",
   "select.weapon.hammer": "Hammer",
   "select.weapon.pickaxe": "Pickaxe",
+  "select.weapon.net": "Net",
+  "select.weapon.kunai": "Kunai",
+  "select.weapon.shuriken": "Shuriken",
+  "select.throw": "Throwing weapon",
+  "select.throw.none": "None",
+  "select.throw_hint": "Buy a kunai in the village to fill this slot",
 
   "char.ninjagreen.name": "Green Shade",
   "char.ninjagreen.passive": "Heals a quarter heart after each room",

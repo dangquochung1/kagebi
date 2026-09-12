@@ -167,6 +167,65 @@ class EntityWorldTest {
         assertEquals(dropped, run.gold);
     }
 
+    // ---- the off hand ---------------------------------------------------------
+
+    /**
+     * The throw key throws the off-hand weapon, and does nothing without one.
+     *
+     * <p>For most of this project's life {@code GameAction.THROW} was declared,
+     * bound to K, translated into both languages and listed on the controls
+     * screen as rebindable - and read by no line of code. Throwing itself
+     * worked, but only by equipping a kunai INSTEAD of a sword, which meant
+     * giving up melee for the run. This is the test that would have caught it.
+     */
+    @Test
+    void theThrowKeyThrowsTheOffHandWeapon() {
+        ContentRegistry r = registry();
+        r.put(TestDefs.katana());
+        r.put(TestDefs.kunai());
+        RunState run = TestDefs.run();
+        run.throwWeaponId = "kunai";
+        EntityWorld w = world(r, run);
+        w.enterRoom(TestDefs.room(RoomKind.START), TestDefs.walled(), null);
+        assertEquals("katana", w.player().weapon().id, "the sword stays in the main hand");
+        assertEquals("kunai", w.player().throwWeapon().id);
+
+        ScriptedInput in = new ScriptedInput();
+        in.tap(GameAction.THROW);
+        in.ticks(w, 10);
+        assertTrue(w.projectiles().size > 0, "pressing throw should let something fly");
+    }
+
+    @Test
+    void anEmptyOffHandMakesTheThrowKeyDoNothing() {
+        ContentRegistry r = registry();
+        r.put(TestDefs.katana());
+        r.put(TestDefs.kunai());
+        EntityWorld w = world(r, TestDefs.run());     // no throwWeaponId
+        w.enterRoom(TestDefs.room(RoomKind.START), TestDefs.walled(), null);
+        assertNull(w.player().throwWeapon());
+
+        ScriptedInput in = new ScriptedInput();
+        in.tap(GameAction.THROW);
+        in.ticks(w, 20);
+        assertEquals(0, w.projectiles().size);
+        assertFalse(w.player().attacking(), "and it does not start a swing either");
+    }
+
+    /** A melee id in the off-hand slot is refused rather than thrown. */
+    @Test
+    void aSwordCannotBePutInTheThrowingSlot() {
+        ContentRegistry r = registry();
+        r.put(TestDefs.katana());
+        r.put(TestDefs.hammer());
+        RunState run = TestDefs.run();
+        run.throwWeaponId = "hammer";
+        EntityWorld w = world(r, run);
+        w.enterRoom(TestDefs.room(RoomKind.START), TestDefs.walled(), null);
+        assertNull(w.player().throwWeapon(),
+            "a hammer in the off hand would fly across the room as a kunai sprite");
+    }
+
     // ---- hit feedback ---------------------------------------------------------
 
     /**

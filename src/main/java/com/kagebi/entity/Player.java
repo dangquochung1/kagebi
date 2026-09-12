@@ -91,6 +91,7 @@ public final class Player extends Entity {
 
     private WeaponDef weapon;
     private Anim weaponArt;
+    private WeaponDef throwWeapon;
 
     /**
      * Base crit before relics. Five percent is low enough that a crit reads as
@@ -143,6 +144,8 @@ public final class Player extends Entity {
      * bigger than a number nobody could see.
      */
     private boolean swingCrit;
+    /** Whether the busy swing is a throw. One pair of hands, one action. */
+    private boolean swingIsThrow;
     /** Hits landed this step, so the world can shake the camera and freeze a frame. */
     public int hitsLandedThisStep;
 
@@ -179,6 +182,15 @@ public final class Player extends Entity {
     public void setWeapon(WeaponDef weapon, Anim art) {
         this.weapon = weapon;
         this.weaponArt = art;
+    }
+
+    /** The thrown weapon in the off hand, or null when there is none. */
+    public WeaponDef throwWeapon() {
+        return throwWeapon;
+    }
+
+    public void setThrowWeapon(WeaponDef weapon) {
+        this.throwWeapon = weapon;
     }
 
     public boolean rolling() {
@@ -282,6 +294,8 @@ public final class Player extends Entity {
         // later. One step of added latency at 60Hz is measurable by hand.
         if (canRoll(intent)) {
             beginRoll(intent);
+        } else if (canThrow(intent)) {
+            beginThrow(intent, world);
         } else if (canAttack(intent)) {
             beginSwing(intent, world);
         }
@@ -318,6 +332,38 @@ public final class Player extends Entity {
 
     private boolean canAttack(Intent intent) {
         return intent.attack && !rolling && !swing.busy() && hurtSteps == 0;
+    }
+
+    /** Nothing in the off hand means the key does nothing, quietly. */
+    private boolean canThrow(Intent intent) {
+        return intent.throwing && throwWeapon != null
+            && !rolling && !swing.busy() && hurtSteps == 0;
+    }
+
+    /**
+     * A throw, on its own button and its own weapon.
+     *
+     * <p>It runs through the same {@link AttackState} as a swing, which is what
+     * stops the two being usable at once: one pair of hands, one action. The
+     * timings come from the thrown weapon, so a shuriken is quicker to let go
+     * of than a kunai exactly as its numbers say.
+     */
+    private void beginThrow(Intent intent, EntityWorld world) {
+        intent.consumeThrow();
+        if (intent.moving()) {
+            facing = Dir.of(intent.moveX, intent.moveY);
+        }
+        swingIsThrow = true;
+        swingCrit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
+        swingDamage = Damage.outgoing(throwWeapon.damage,
+            damageMult * mods.outgoingMult(hpFraction()),
+            swingCrit, critMult * mods.critDamageMult(), rng);
+        float haste = Math.max(0.25f, mods.attackSpeedMult());
+        world.onSwingBegun(throwWeapon);
+        swing.begin(Math.max(1, Math.round(throwWeapon.windupSteps / haste)),
+            throwWeapon.activeSteps,
+            Math.max(1, Math.round(throwWeapon.recoverSteps / haste)),
+            throwWeapon.rootSteps);
     }
 
     private void beginRoll(Intent intent) {
@@ -360,6 +406,7 @@ public final class Player extends Entity {
         if (intent.moving()) {
             facing = Dir.of(intent.moveX, intent.moveY);
         }
+        swingIsThrow = false;
         swingCrit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
         swingDamage = Damage.outgoing(weapon.damage,
             damageMult * mods.outgoingMult(hpFraction()),
@@ -376,11 +423,12 @@ public final class Player extends Entity {
     }
 
     private void resolveSwing(EntityWorld world) {
-        if (weapon.thrown()) {
+        WeaponDef using = swingIsThrow ? throwWeapon : weapon;
+        if (using != null && using.thrown()) {
             // A thrown weapon leaves the hand once, on the first active step;
             // the rest of the window is follow-through with nothing attached.
             if (swing.stepsInPhase() == 0) {
-                world.throwFrom(this, swingDamage);
+                world.throwFrom(this, using, swingDamage);
             }
             return;
         }
@@ -551,7 +599,8 @@ public final class Player extends Entity {
      */
     @Override
     protected void drawOverlay(SpriteBatch batch, int drawX, int drawY, boolean flip) {
-        if (weaponArt == null || weapon == null || weapon.thrown() || !swing.busy()) {
+        if (weaponArt == null || weapon == null || weapon.thrown()
+                || swingIsThrow || !swing.busy()) {
             return;
         }
         TextureRegion held = ActorSprites.frameOf(weaponArt, facing,

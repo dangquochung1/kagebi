@@ -120,6 +120,12 @@ public final class TestDefs {
             "player/weapons/hammer", -1, 26, 28f, 22f, 16, 5, 25, 190f, 24, null);
     }
 
+    /** The kunai, as weapons.json has it: the off-hand throwable. */
+    public static WeaponDef kunai() {
+        return new WeaponDef("kunai", "weapon.kunai.name", "weapon.kunai.desc",
+            "fx/projectile/kunai/spritesheet", -1, 6, 140f, 5f, 5, 2, 13, 30f, 3, "kunai");
+    }
+
     // ---- rooms ---------------------------------------------------------------
 
     public static RunState run() {

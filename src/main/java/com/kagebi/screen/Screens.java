@@ -30,6 +30,7 @@ import com.kagebi.run.RunState;
  *   map       --page 1-5   the same, with the floor map expanded
  *   fight     --page 1-5   the first room of that floor that has enemies in it
  *   swing     --page 1-5   the same, swinging on a timer so a blade is visible
+ *   throw     --page 1-5   the same with a kunai in the off hand, throwing
  *   treasure  --page 1-5   the first treasure room, for looking at a chest
  *   shop      --page 1-5   the first shop room, for looking at the shopkeeper
  *   slide                  halfway through the first room transition
@@ -98,6 +99,16 @@ public final class Screens {
                 startRun(game, page);
                 return new GameScreen[] {
                     new DungeonScreen(game).openIn(RoomKind.NORMAL).swinging()};
+            case "throw":
+                // The off hand is empty on a fresh profile, so this hands one
+                // over: otherwise the throw could not be looked at until
+                // someone had banked 350 gold.
+                startRun(game, page).throwWeaponId = "kunai";
+                // The start room, not a fight: enemies chase, and a kunai that
+                // hits something a step after it leaves the hand cannot be
+                // photographed in flight at all.
+                return new GameScreen[] {
+                    new DungeonScreen(game).openIn(RoomKind.START).throwing()};
             case "treasure":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.TREASURE)};

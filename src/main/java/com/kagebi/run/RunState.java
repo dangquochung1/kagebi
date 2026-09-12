@@ -27,6 +27,18 @@ public final class RunState {
 
     public String weaponId;
 
+    /**
+     * The thrown weapon in the off hand, or null for none.
+     *
+     * <p>Empty at the start of the game and filled only once a kunai or a
+     * shuriken has been bought, which is the whole shape of the feature: the
+     * player begins with reach and nothing else, and buying a throwable is what
+     * turns one attack button into two. Before this existed, a thrown weapon
+     * was a REPLACEMENT for the sword - picking one meant giving up melee
+     * entirely - and the throw key did nothing at all.
+     */
+    public String throwWeaponId;
+
     /** 1 to 5 while in the dungeon; 0 in the village. */
     public int floor;
     public FloorLayout layout;

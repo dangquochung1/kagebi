@@ -388,6 +388,7 @@ public final class EntityWorld implements World, AiContext {
         rng = new Random(run.seed * 31L + room.gx * 73856093L + room.gy * 19349663L);
         WeaponDef held = resolveWeapon(run.weaponId);
         player.setWeapon(held, heldArt(held));
+        player.setThrowWeapon(resolveThrowWeapon(run.throwWeaponId));
 
         placePlayer(room, enteredFrom);
         spawn(room);
@@ -893,8 +894,7 @@ public final class EntityWorld implements World, AiContext {
      * shots on the same line would land on the same target and read as one
      * shot doing more damage, which is what a damage relic is for.
      */
-    void throwFrom(Player p, int damage) {
-        WeaponDef w = p.weapon();
+    void throwFrom(Player p, WeaponDef w, int damage) {
         int life = Math.max(1, Math.round(w.reach / THROW_SPEED / Cfg.STEP));
         int extra = Math.max(0, p.mods().throwExtra());
         sfx(Assets.Sfx.THROW);
@@ -933,6 +933,26 @@ public final class EntityWorld implements World, AiContext {
             }
         }
         return FALLBACK_WEAPON;
+    }
+
+    /**
+     * The off hand, or null.
+     *
+     * <p>No fallback, because an empty off hand is the normal state - the game
+     * starts with one and the throw key is meant to do nothing until a kunai is
+     * bought. A melee weapon named here is refused rather than equipped: the
+     * throw path would send a hammer flying as a kunai sprite.
+     */
+    private WeaponDef resolveThrowWeapon(String id) {
+        if (id == null) {
+            return null;
+        }
+        for (WeaponDef w : content.allWeapons()) {
+            if (id.equals(w.id)) {
+                return w.thrown() ? w : null;
+            }
+        }
+        return null;
     }
 
     private void placePlayer(Room room, Dir enteredFrom) {

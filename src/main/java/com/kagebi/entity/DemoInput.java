@@ -23,14 +23,21 @@ public final class DemoInput implements ActionSource {
 
     /** Stop this far short of the target, inside the starting katana's reach. */
     private static final float STRIKE = 16f;
+    /**
+     * Where to stand to throw. Well outside melee, because a kunai spawned on
+     * top of its target is a projectile nobody can photograph in flight.
+     */
+    private static final float THROW_FROM = 90f;
 
     private final GameAction action;
+    private final float strike;
     private int steps;
     private int moveX;
     private int moveY;
 
     public DemoInput(GameAction action) {
         this.action = action;
+        this.strike = action == GameAction.THROW ? THROW_FROM : STRIKE;
     }
 
     /**
@@ -68,7 +75,7 @@ public final class DemoInput implements ActionSource {
         float dy = best.y - player.y;
         // Face it whether or not we still need to close, so the swing lands on
         // the side the target is actually on.
-        boolean far = bestD > STRIKE;
+        boolean far = bestD > strike;
         if (Math.abs(dx) > Math.abs(dy)) {
             moveX = dx > 0 ? 1 : -1;
             moveY = far && Math.abs(dy) > 4f ? (dy > 0 ? 1 : -1) : 0;

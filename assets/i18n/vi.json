@@ -68,6 +68,12 @@
   "select.weapon.axe": "Rìu",
   "select.weapon.hammer": "Búa",
   "select.weapon.pickaxe": "Cuốc chim",
+  "select.weapon.net": "Lưới",
+  "select.weapon.kunai": "Kunai",
+  "select.weapon.shuriken": "Phi tiêu",
+  "select.throw": "Vũ khí ném",
+  "select.throw.none": "Chưa có",
+  "select.throw_hint": "Mua kunai ở làng để mở ô này",
 
   "char.ninjagreen.name": "Lục Ảnh",
   "char.ninjagreen.passive": "Hồi một phần tư tim sau mỗi phòng",

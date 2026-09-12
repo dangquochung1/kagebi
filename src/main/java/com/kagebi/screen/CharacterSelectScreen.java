@@ -16,6 +16,7 @@ import com.kagebi.data.def.WeaponDef;
 import com.kagebi.gfx.Anim;
 import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
+import com.kagebi.run.RunState;
 import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
 
@@ -38,6 +39,8 @@ public class CharacterSelectScreen extends SimScreen {
     private static final int GAP = 6;
     private static final int WEAPON_CELL = 20;
     private static final int WEAPON_GAP = 4;
+    /** Extra space before the off-hand cell, so it reads as its own slot. */
+    private static final int OFF_HAND_GAP = 8;
 
     // The column, top to bottom. Line tops include the four rows above cap
     // height that a stacked Vietnamese tone mark needs; see Hud.line.
@@ -78,6 +81,9 @@ public class CharacterSelectScreen extends SimScreen {
     private TextureAtlas actors;
     private Anim[] idle;
     private final Array<String> weapons = new Array<>();
+    /** Thrown weapons the profile owns, with a null at index 0 for "none". */
+    private final Array<String> throwables = new Array<>();
+    private int throwable;
 
     private int character;
     private int weapon;
@@ -111,11 +117,26 @@ public class CharacterSelectScreen extends SimScreen {
         game.audio().playMusic(Assets.MUSIC_INTRO);
     }
 
-    /** Content first, the pack's own five second, so an empty registry still works. */
+    /**
+     * Content first, the pack's own five second, so an empty registry still works.
+     *
+     * <p>Split in two, which is the whole of the off-hand feature. A thrown
+     * weapon used to sit in this one list beside the swords, so choosing a
+     * kunai meant giving up melee for the whole run - and the throw key did
+     * nothing whatever you picked. Now the main hand is melee, the off hand is
+     * thrown, and the off hand is empty until one has been bought.
+     */
     private void collectWeapons() {
         weapons.clear();
+        throwables.clear();
         for (WeaponDef def : game.content().allWeapons()) {
-            weapons.add(def.id);
+            if (def.thrown()) {
+                if (game.profile().unlockedWeapons.contains(def.id)) {
+                    throwables.add(def.id);
+                }
+            } else {
+                weapons.add(def.id);
+            }
         }
         if (weapons.isEmpty()) {
             for (String id : FALLBACK_WEAPONS) {
@@ -123,6 +144,10 @@ public class CharacterSelectScreen extends SimScreen {
             }
         }
         weapon = Math.max(0, weapons.indexOf(currentUnlockedWeapon(), false));
+        // Index 0 is always "nothing in the off hand", so a player who owns a
+        // kunai may still choose to run without one.
+        throwables.insert(0, null);
+        throwable = 0;
     }
 
     private String currentUnlockedWeapon() {
@@ -158,6 +183,14 @@ public class CharacterSelectScreen extends SimScreen {
             game.audio().playSfx(Assets.SFX_MOVE);
         }
 
+        // The throw key picks what it will throw. Cycling the off hand with the
+        // button it is used with beats a fourth direction to remember, and it
+        // is the only key on this screen that is otherwise idle.
+        if (input().justPressed(GameAction.THROW) && throwables.size > 1) {
+            throwable = Math.floorMod(throwable + 1, throwables.size);
+            game.audio().playSfx(Assets.SFX_MOVE);
+        }
+
         if (input().justPressed(GameAction.PAUSE)) {
             game.audio().playSfx(Assets.SFX_CANCEL);
             stack().set(new MainMenuScreen(game));
@@ -174,8 +207,10 @@ public class CharacterSelectScreen extends SimScreen {
             return;
         }
         game.audio().playSfx(Assets.SFX_ACCEPT);
-        game.setRun(Screens.freshRun(Assets.Actor.CHARACTERS[character],
-                                     weapons.get(weapon), Screens.DEFAULT_MAX_HP));
+        RunState run = Screens.freshRun(Assets.Actor.CHARACTERS[character],
+                                        weapons.get(weapon), Screens.DEFAULT_MAX_HP);
+        run.throwWeaponId = throwables.get(throwable);
+        game.setRun(run);
         stack().set(new HubScreen(game));
     }
 
@@ -249,8 +284,13 @@ public class CharacterSelectScreen extends SimScreen {
     }
 
     private void drawWeapons(SpriteBatch batch, I18n t) {
-        int total = weapons.size * WEAPON_CELL + Math.max(0, weapons.size - 1) * WEAPON_GAP;
+        // The off hand rides on the end of the same row, behind a wider gap so
+        // it reads as a separate slot rather than a sixth sword.
+        int cells = weapons.size + 1;
+        int total = cells * WEAPON_CELL + Math.max(0, cells - 1) * WEAPON_GAP + OFF_HAND_GAP;
         int left = (Cfg.VIRT_W - total) / 2;
+        int offHandX = left + weapons.size * (WEAPON_CELL + WEAPON_GAP) + OFF_HAND_GAP;
+        drawOffHand(batch, offHandX);
         for (int i = 0; i < weapons.size; i++) {
             int x = left + i * (WEAPON_CELL + WEAPON_GAP);
             game.skin().getDrawable(Assets.Ui.CELL)
@@ -268,12 +308,44 @@ public class CharacterSelectScreen extends SimScreen {
         }
         if (weapons.size > 0) {
             // One line, label and name together: a separate heading above the
-            // icons cost fourteen pixels the footer needed.
+            // icons cost fourteen pixels the footer needed. The off hand shares
+            // it for the same reason - there is no room for a second heading.
+            String offHand = throwables.get(throwable);
+            // The off hand is named even when it is empty. An unexplained empty
+            // cell on the end of the row is a question; "Throwing weapon: none"
+            // is an answer, and it is the one that sends a player to the shop.
+            String line = t.get("select.weapon") + ": "
+                + t.get("select.weapon." + weapons.get(weapon))
+                + "   " + t.get("select.throw") + ": " + (offHand == null
+                    ? t.get("select.throw.none") : t.get("select.weapon." + offHand));
             batch.setColor(SOFT);
-            Hud.centred(batch, font, t.get("select.weapon") + ": "
-                        + t.get("select.weapon." + weapons.get(weapon)),
-                        Cfg.VIRT_W / 2f, WEAPON_BOTTOM - 4);
+            Hud.centred(batch, font, line, Cfg.VIRT_W / 2f, WEAPON_BOTTOM - 4);
             batch.setColor(Color.WHITE);
+        }
+    }
+
+    /**
+     * The off-hand slot: a throwing weapon, or an empty cell with a hint.
+     *
+     * <p>Drawn even when the player owns nothing throwable. An empty slot says
+     * the game has a second attack and this run does not have it yet, which is
+     * the whole reason to go and buy a kunai; hiding it would make the feature
+     * invisible to exactly the players who have not found it.
+     */
+    private void drawOffHand(SpriteBatch batch, int x) {
+        game.skin().getDrawable(Assets.Ui.CELL)
+            .draw(batch, x, WEAPON_BOTTOM, WEAPON_CELL, WEAPON_CELL);
+        String id = throwables.get(throwable);
+        if (id != null) {
+            TextureRegion icon = game.skin().getRegion(Assets.Ui.weaponIcon(id));
+            batch.draw(icon,
+                x + (WEAPON_CELL - icon.getRegionWidth()) / 2,
+                WEAPON_BOTTOM + (WEAPON_CELL - icon.getRegionHeight()) / 2);
+        }
+        if (throwables.size > 1) {
+            Hud.prompt(batch, game.skin(), font,
+                game.input().map().primary(GameAction.THROW), "",
+                x + WEAPON_CELL / 2f, WEAPON_BOTTOM + WEAPON_CELL + 2);
         }
     }
 
