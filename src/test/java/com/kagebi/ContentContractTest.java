@@ -107,6 +107,62 @@ class ContentContractTest {
         assertTrue(missing.isEmpty(), "font is missing glyphs for: " + missing);
     }
 
+    /**
+     * The character select screen draws a ninja's perk on one line, and the
+     * screen is 320 pixels wide.
+     *
+     * <p>Written after that line ran off both edges. The perk text used to be a
+     * separate short string; when it was merged with the shop's - which also
+     * carried the unlock condition - it became a sentence and a half and there
+     * was nothing to stop it. Measured against the font's own advance widths
+     * rather than counted in characters, because Vietnamese runs longer than
+     * English for the same sentence and neither has a fixed width.
+     */
+    @Test
+    void everyPerkLineFitsTheCharacterSelectScreen() {
+        Map<Integer, Integer> advance = glyphAdvances();
+        List<String> tooWide = new ArrayList<>();
+        for (String lang : new String[] {"vi", "en"}) {
+            for (Map.Entry<String, String> e : readStrings(lang).entrySet()) {
+                if (!e.getKey().startsWith("character.") || !e.getKey().endsWith(".desc")) {
+                    continue;
+                }
+                int width = textWidth(advance, e.getValue());
+                if (width > PERK_WIDTH) {
+                    tooWide.add(e.getKey() + " (" + lang + ") is " + width
+                        + "px, over " + PERK_WIDTH);
+                }
+            }
+        }
+        assertTrue(tooWide.isEmpty(), "perk lines that will not fit: " + tooWide);
+    }
+
+    /** {@code CharacterSelectScreen.PERK_WIDTH}: 320 less a 14px margin a side. */
+    private static final int PERK_WIDTH = 320 - 2 * 14;
+
+    private static int textWidth(Map<Integer, Integer> advance, String text) {
+        int total = 0;
+        for (int cp : text.codePoints().toArray()) {
+            total += advance.getOrDefault(cp, 0);
+        }
+        return total;
+    }
+
+    private static final Pattern ADVANCE_LINE = Pattern.compile(
+        "char id=(-?\\d+).*?xadvance=(-?\\d+)");
+
+    private static Map<Integer, Integer> glyphAdvances() {
+        Map<Integer, Integer> out = new HashMap<>();
+        for (String line : fontLines()) {
+            Matcher m = ADVANCE_LINE.matcher(line);
+            if (m.find()) {
+                out.put(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)));
+            }
+        }
+        assertTrue(out.size() > 50, "font advances not parsed");
+        return out;
+    }
+
     // ---- font ------------------------------------------------------------
 
     private static final Pattern CHAR_LINE = Pattern.compile(

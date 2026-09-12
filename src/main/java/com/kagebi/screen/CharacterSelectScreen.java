@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.kagebi.Cfg;
@@ -47,6 +48,9 @@ public class CharacterSelectScreen extends SimScreen {
     private static final int TITLE_TOP = 169;
     private static final int PORTRAIT_BOTTOM = 114;
     private static final int NAME_TOP = 109;
+    /** The perk block, inside the panel's own border on both sides. */
+    private static final int PERK_X = 14;
+    private static final int PERK_WIDTH = Cfg.VIRT_W - 2 * PERK_X;
     private static final int WEAPON_BOTTOM = 56;
     /** Above the panel's bottom border, which is seven pixels of art. */
     private static final int FOOTER_BOTTOM = 16;
@@ -275,15 +279,23 @@ public class CharacterSelectScreen extends SimScreen {
         String id = Assets.Actor.CHARACTERS[character];
         batch.setColor(unlockedCharacter(character) ? INK : SOFT);
         Hud.centred(batch, font, t.get("char." + id + ".name"), Cfg.VIRT_W / 2f, NAME_TOP);
-        batch.setColor(SOFT);
         // The perk line comes from the same file the perk itself does. It used
         // to come from "char.<id>.passive", a second set of strings written
         // beside these names - and five of the six described a perk the game
         // has never had. A locked ninja's line is the one the shop shows, which
         // says what it costs to find out.
-        Hud.centred(batch, font, t.get("character." + id + ".desc"),
-            Cfg.VIRT_W / 2f, NAME_TOP - Hud.LINE);
+        //
+        // Wrapped, not centred on one line. These sentences were written for
+        // the shop's wrapped block and are longer than a name; drawn as a
+        // single centred line the longest of them ran off both edges of the
+        // screen. Two lines fit between the name and the weapon row, and
+        // wrapping is also the only thing that stays right when the language
+        // changes - Vietnamese runs longer than English for the same sentence.
         batch.setColor(Color.WHITE);
+        font.setColor(SOFT);
+        font.draw(batch, t.get("character." + id + ".desc"), PERK_X,
+                  NAME_TOP - Hud.LINE - font.getAscent(), PERK_WIDTH, Align.center, true);
+        font.setColor(Color.WHITE);
     }
 
     private void drawWeapons(SpriteBatch batch, I18n t) {
