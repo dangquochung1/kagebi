@@ -51,9 +51,9 @@
     {
       "id": "bluebat", "nameKey": "enemy.bluebat.name",
       "sprite": "monsters/bluebat/spritesheet", "cell": 16,
-      // Eight hit points because it dies to one katana swing. A flier that
+      // Seven hit points, which is exactly the katana's damage: a flier that
       // survives the first hit while weaving is genuinely unpleasant at 16px.
-      "maxHp": 8, "contactDamage": 4, "attackDamage": 0, "moveSpeed": 62,
+      "maxHp": 7, "contactDamage": 4, "attackDamage": 0, "moveSpeed": 62,
       "brain": "flyer", "aggroRange": 120, "attackRange": 0,
       "windupSteps": 4, "activeSteps": 6, "recoverSteps": 8, "cooldownSteps": 24,
       "knockbackResist": 0.0, "hurtInvulnSteps": 8,
@@ -223,7 +223,7 @@
 
     {
       "id": "wraith", "nameKey": "enemy.wraith.name",
-      "sprite": "depths/monsters_idle/skull/v1/skull_v1", "cell": 16,
+      "sprite": "depths/monsters_idle/skull/v2/skull_v2", "cell": 16,
       "maxHp": 66, "contactDamage": 12, "attackDamage": 0, "moveSpeed": 58,
       "brain": "flyer", "aggroRange": 180, "attackRange": 0,
       "windupSteps": 8, "activeSteps": 8, "recoverSteps": 12, "cooldownSteps": 26,
