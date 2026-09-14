@@ -109,8 +109,18 @@ public class WorldMapScreen extends SimScreen {
         this.game = game;
     }
 
-    /** Opens with that stage under the ring, for {@code --screen world --page N}. */
+    /**
+     * Opens with that stage under the ring, for {@code --screen world --page N}.
+     *
+     * <p>A stage of 1 leaves the ring where it would land on its own, which is
+     * the stage the player is working on. {@code --page} defaults to 1, so
+     * without this the debug flag would show every profile opening on stage
+     * one and hide the behaviour it exists to photograph.
+     */
     WorldMapScreen focusOn(int stage) {
+        if (stage <= 1) {
+            return this;
+        }
         focusOnShow = true;
         focusWanted = stage - 1;
         return this;
