@@ -107,7 +107,7 @@ public class PauseScreen extends SimScreen {
             return;
         }
         // Abandoning is a failed descent, and is scored as one: the gold is
-        // banked and the village dims, exactly as if the player had died.
+        // banked exactly as if the player had died.
         ScreenStack s = stack();
         s.pop();
         s.push(new GameOverScreen(game));

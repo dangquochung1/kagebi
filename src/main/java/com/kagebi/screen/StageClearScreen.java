@@ -16,8 +16,7 @@ import com.kagebi.save.Profile;
  *
  * <p>What differs is four lines: the headline, the sting, the track, and the
  * fact that this banks through {@code bankStage} - which opens the next stage
- * without counting a win or relighting the village. Both of those belong to
- * the last stage alone.
+ * without counting a win. That belongs to the last stage alone.
  */
 public class StageClearScreen extends RunEndScreen {
 

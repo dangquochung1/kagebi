@@ -49,11 +49,11 @@ import com.kagebi.ui.I18n;
  * the camera scrolls. It follows the player and is clamped to the map; the
  * rounding to whole pixels happens inside {@link CameraController}.
  *
- * <p><b>The village darkens with every failed descent.</b> The story is that
- * the flame the village is named for weakens each time someone does not come
- * back, and {@code Profile.villageDarkness} counts that. It is drawn as a dusk
- * wash over the whole scene rather than said in a line of dialogue - the one
- * place the narrative is carried by the art.
+ * <p><b>Drawn in the art's own colours, every visit.</b> The village used to
+ * darken a step with each failed descent, as a wash over the finished frame.
+ * Nothing on screen said why, so a player who saw it bright one day and dim
+ * the next read it as the game breaking - and a tint that has to be explained
+ * is not carrying a story.
  *
  * <p>The villagers are drawn and managed here, not by the {@link World}. They
  * are furniture that talks: they do not move, fight or drop anything, and
@@ -62,14 +62,6 @@ import com.kagebi.ui.I18n;
  */
 public class HubScreen extends SimScreen {
 
-    /**
-     * How much dusk one failed descent adds, as the alpha of the wash. Six
-     * failures reach the cap; past that the village is dark but still legible,
-     * which matters more than the metaphor.
-     */
-    private static final float DUSK_PER_STEP = 0.09f;
-    private static final float DUSK_MAX = 0.54f;
-    private static final Color DUSK = new Color(0x0c0a1aff);
     private static final Color GOLD = new Color(0xffad55ff);
 
     /** Fallbacks, in map pixels y-up, for a map with no {@code spawns} layer. */
@@ -399,10 +391,7 @@ public class HubScreen extends SimScreen {
     private void talk(Villager v) {
         I18n t = game.i18n();
         String prefix = "npc." + v.id + ".";
-        // The elder is the one who notices the flame going out. One line is
-        // enough; the wash over the scene is saying the rest.
-        String first = v.id.equals(Assets.Npc.ELDER) && game.profile().villageDarkness > 0
-            ? t.get(prefix + "dim") : t.get(prefix + "1");
+        String first = t.get(prefix + "1");
         // The herbalist with an empty customer says so and opens nothing. A
         // shop screen where every price is out of reach is a worse answer than
         // a sentence, and she is the one who can give the sentence.
@@ -504,23 +493,8 @@ public class HubScreen extends SimScreen {
         ui.apply();
         batch.setProjectionMatrix(ui.camera().combined);
         batch.begin();
-        drawDusk(batch);
         drawOverlay(batch);
         batch.end();
-    }
-
-    private void drawDusk(SpriteBatch batch) {
-        int darkness = game.profile().villageDarkness;
-        if (darkness <= 0) {
-            return;
-        }
-        // A wash over the finished frame rather than a tint on the batch: the
-        // actors are drawn by the world, which is free to set its own colour
-        // for a hit flash and would quietly undo a tint set from out here.
-        float alpha = Math.min(DUSK_MAX, darkness * DUSK_PER_STEP);
-        batch.setColor(DUSK.r, DUSK.g, DUSK.b, alpha);
-        batch.draw(game.skin().getRegion(Assets.Ui.PIXEL), 0, 0, Cfg.VIRT_W, Cfg.VIRT_H);
-        batch.setColor(Color.WHITE);
     }
 
     private void drawOverlay(SpriteBatch batch) {

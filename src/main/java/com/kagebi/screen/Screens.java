@@ -27,7 +27,7 @@ import com.kagebi.settings.Difficulty;
  *   style     --page 1-2   widget sheet, surface sheet
  *   select    --page 1-6   character select, with that ninja highlighted
  *   loadout   --page 1-6   the same screen editing the run, over the village
- *   hub       --page N     the village, dimmed by N-1 failed descents
+ *   hub                    the village, arriving home
  *   home                   inside the player's house
  *   world     --page 1-5   the world map, open to that stage and focused on it
  *   stage     --page 1-5   the same, with that stage's panel and difficulty row
@@ -102,7 +102,6 @@ public final class Screens {
                 sampleRun(game, page);
                 return new GameScreen[] {new StageClearScreen(game)};
             case "hub":
-                game.profile().villageDarkness = Math.max(0, page - 1);
                 return new GameScreen[] {new HubScreen(game)};
             case "home":
                 return new GameScreen[] {new HubScreen(game), new HomeScreen(game)};
@@ -211,7 +210,7 @@ public final class Screens {
             p.upgrades.put("vigor", 1);
         }
         if (p.runs >= 3) {
-            p.upgrades.put("flamekeeper", 2);
+            p.upgrades.put("keyring", 2);
         }
     }
 

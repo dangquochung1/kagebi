@@ -278,18 +278,17 @@ public final class ShopCatalog {
 
     /**
      * What the game-over and victory screens call. Kept here rather than in
-     * the screens so the flamekeeper upgrade and the banking rule are read in
-     * one place; the arithmetic itself is {@link Progression#bank}, which
-     * knows nothing of the shop.
+     * the screens so there is one way to write a run into a profile; the
+     * arithmetic itself is {@link Progression#bank}, which knows nothing of
+     * the shop.
      */
     public void bank(Profile p, RunSummary summary) {
-        Progression.bank(p, summary, upgradeValue("darkness_resist", p));
+        Progression.bank(p, summary);
     }
 
     /**
-     * As {@link #bank}, for a stage cleared that is not the last one. Nothing
-     * dims, so the flamekeeper has nothing to say and no resist is read - but
-     * it comes through here anyway so that the end screens keep having exactly
+     * As {@link #bank}, for a stage cleared that is not the last one. It comes
+     * through here for the same reason: the end screens keep having exactly
      * one way to write a run into a profile.
      */
     public void bankStage(Profile p, RunSummary summary) {

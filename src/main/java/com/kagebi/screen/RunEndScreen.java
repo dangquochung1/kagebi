@@ -109,7 +109,7 @@ abstract class RunEndScreen extends SimScreen {
 
     /**
      * Freezes the run into a summary and moves what survives death into the
-     * profile. A failed descent dims the village one step; see HubScreen.
+     * profile.
      */
     private void bank() {
         RunState run = game.run();
@@ -121,9 +121,8 @@ abstract class RunEndScreen extends SimScreen {
         summary = run.summary();
         banked = run.gold;
 
-        // What a death is worth, and how far the village dims, are balance
-        // decisions with a test behind them; keeping them out of this screen is
-        // what stops the two drifting apart.
+        // What a death is worth is a balance decision with a test behind it;
+        // keeping it out of this screen is what stops the two drifting apart.
         Profile profile = game.profile();
         bankInto(profile, summary);
         if (!game.saves().save(profile)) {

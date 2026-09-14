@@ -36,7 +36,6 @@ class SaveManagerTest {
         p.runs = 7;
         p.wins = 1;
         p.deepestFloor = 5;
-        p.villageDarkness = 3;
         p.upgrades.put("vigor", 2);
         p.upgrades.put("edge", 1);
         p.unlockedCharacters.add("ninjared");
@@ -52,7 +51,6 @@ class SaveManagerTest {
         assertEquals(a.runs, b.runs, "runs");
         assertEquals(a.wins, b.wins, "wins");
         assertEquals(a.deepestFloor, b.deepestFloor, "deepestFloor");
-        assertEquals(a.villageDarkness, b.villageDarkness, "villageDarkness");
         assertEquals(a.upgrades, b.upgrades, "upgrades");
         assertEquals(a.unlockedCharacters, b.unlockedCharacters, "characters");
         assertEquals(a.unlockedWeapons, b.unlockedWeapons, "weapons");

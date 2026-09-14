@@ -190,7 +190,6 @@ public final class SaveManager {
         root.addChild("wins", new JsonValue(p.wins));
         root.addChild("deepestFloor", new JsonValue(p.deepestFloor));
         root.addChild("clearedStages", new JsonValue(p.clearedStages));
-        root.addChild("villageDarkness", new JsonValue(p.villageDarkness));
 
         JsonValue upgrades = new JsonValue(JsonValue.ValueType.object);
         List<String> ids = new ArrayList<>();
@@ -254,7 +253,6 @@ public final class SaveManager {
         // Inferring beats defaulting to zero, which would shut a returning
         // player out of stages they have already finished.
         p.clearedStages = root.getInt("clearedStages", Math.max(0, p.deepestFloor - 1));
-        p.villageDarkness = root.getInt("villageDarkness", p.villageDarkness);
 
         JsonValue upgrades = root.get("upgrades");
         if (upgrades != null) {

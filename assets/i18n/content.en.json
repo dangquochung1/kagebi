@@ -138,8 +138,6 @@
   "upgrade.keyring.desc": "Start every run with one more key, per level.",
   "upgrade.wardstone.name": "Wardstone",
   "upgrade.wardstone.desc": "Once per run, get back up at 40% health.",
-  "upgrade.flamekeeper.name": "Flamekeeper",
-  "upgrade.flamekeeper.desc": "The village dims more slowly with every failed descent.",
   "character.ninjagreen.desc": "No perk. The measure the other five are set against.",
   "character.ninjared.desc": "Strikes 10% harder.",
   "character.ninjablue.desc": "20 more maximum health.",

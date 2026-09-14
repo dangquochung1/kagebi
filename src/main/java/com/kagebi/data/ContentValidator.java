@@ -59,7 +59,7 @@ public final class ContentValidator {
     /** Every village-upgrade and character-perk effect run start must apply. */
     public static final Set<String> UPGRADE_EFFECTS = Set.of(
         "max_hp_add", "melee_damage_mult", "move_speed_mult", "gold_mult",
-        "potion_capacity_add", "start_keys_add", "revive_once", "darkness_resist");
+        "potion_capacity_add", "start_keys_add", "revive_once");
 
     /** Every brain the ai package must provide. See notes/d.md section 2. */
     public static final Set<String> BRAINS = Set.of(

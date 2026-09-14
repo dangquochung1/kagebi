@@ -20,13 +20,13 @@ class ProgressionTest {
     @Test
     void goldBanksInFullAndTheRecordsMove() {
         Profile p = new Profile();
-        Progression.bank(p, died(2, 240), 0f);
+        Progression.bank(p, died(2, 240));
         assertEquals(240, p.gold, "no tax on death");
         assertEquals(1, p.runs);
         assertEquals(0, p.wins);
         assertEquals(2, p.deepestFloor);
 
-        Progression.bank(p, died(1, 90), 0f);
+        Progression.bank(p, died(1, 90));
         assertEquals(330, p.gold);
         assertEquals(2, p.deepestFloor, "the record is a maximum, not the last run");
     }
@@ -40,9 +40,9 @@ class ProgressionTest {
     @Test
     void gemsBankWholeOnDeathAsWellAsOnAWin() {
         Profile p = new Profile();
-        Progression.bank(p, new RunSummary(3, 40, 500, 6, 600f, false), 0f);
+        Progression.bank(p, new RunSummary(3, 40, 500, 6, 600f, false));
         assertEquals(6, p.diamonds, "nothing taxed on death");
-        Progression.bank(p, new RunSummary(5, 250, 900, 11, 1900f, true), 0f);
+        Progression.bank(p, new RunSummary(5, 250, 900, 11, 1900f, true));
         assertEquals(17, p.diamonds, "and they accumulate across runs");
     }
 
@@ -65,29 +65,23 @@ class ProgressionTest {
 
     /**
      * The distinction the second method exists for. {@code wins} is what the
-     * shop's unlock requirements count and the flame comes home only when the
-     * last stage falls; folding stage clears into {@link Progression#bank}
-     * would relight the village after stage one and buy a character with it.
+     * shop's unlock requirements count, so folding stage clears into
+     * {@link Progression#bank} would buy a character with stage one.
      */
     @Test
-    void aClearedStageIsNotAWinAndDoesNotRelightTheVillage() {
+    void aClearedStageIsNotAWin() {
         Profile p = new Profile();
-        Progression.bank(p, died(1, 0), 0f);
-        assertEquals(1, p.villageDarkness);
-
         Progression.bankStage(p, cleared(1, 100));
         assertEquals(0, p.wins, "clearing stage one has not won the game");
-        assertEquals(1, p.villageDarkness, "and has not brought the flame home");
     }
 
     @Test
     void clearingTheLastStageBothWinsAndRecordsTheStage() {
         Profile p = new Profile();
         p.clearedStages = 4;
-        Progression.bank(p, won(2000), 0f);
+        Progression.bank(p, won(2000));
         assertEquals(1, p.wins);
         assertEquals(5, p.clearedStages, "the final stage records itself too");
-        assertEquals(0, p.villageDarkness);
     }
 
     @Test
@@ -100,50 +94,21 @@ class ProgressionTest {
     }
 
     @Test
-    void eachFailureDimsTheVillageUpToTheCap() {
+    void aWinAfterDeathsCountsOnceAndKeepsTheDeepestRecord() {
         Profile p = new Profile();
-        for (int i = 1; i <= Progression.MAX_DARKNESS + 5; i++) {
-            Progression.bank(p, died(1, 0), 0f);
-            assertEquals(Math.min(i, Progression.MAX_DARKNESS), p.villageDarkness, "after " + i);
-        }
-    }
-
-    @Test
-    void aWinBringsTheFlameHome() {
-        Profile p = new Profile();
-        Progression.bank(p, died(3, 0), 0f);
-        Progression.bank(p, died(4, 0), 0f);
-        Progression.bank(p, won(3000), 0f);
-        assertEquals(0, p.villageDarkness);
+        Progression.bank(p, died(3, 0));
+        Progression.bank(p, died(4, 0));
+        Progression.bank(p, won(3000));
         assertEquals(1, p.wins);
+        assertEquals(3, p.runs);
         assertEquals(5, p.deepestFloor);
-    }
-
-    /** Flamekeeper level 1: the village dims on every second failure. */
-    @Test
-    void halfResistDimsEveryOtherFailure() {
-        Profile p = new Profile();
-        int[] expected = {0, 1, 1, 2, 2, 3};
-        for (int i = 0; i < expected.length; i++) {
-            Progression.bank(p, died(1, 0), 0.5f);
-            assertEquals(expected[i], p.villageDarkness, "after failure " + (i + 1));
-        }
-    }
-
-    @Test
-    void fullResistNeverDims() {
-        Profile p = new Profile();
-        for (int i = 0; i < 20; i++) {
-            Progression.bank(p, died(1, 0), 1f);
-        }
-        assertEquals(0, p.villageDarkness);
     }
 
     @Test
     void negativeRunGoldIsNeverDebited() {
         Profile p = new Profile();
         p.gold = 100;
-        Progression.bank(p, died(1, -50), 0f);
+        Progression.bank(p, died(1, -50));
         assertEquals(100, p.gold);
     }
 }

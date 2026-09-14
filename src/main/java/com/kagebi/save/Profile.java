@@ -13,8 +13,14 @@ import com.badlogic.gdx.utils.ObjectSet;
  */
 public final class Profile {
 
-    /** Bump when the shape changes, and add a migration beside it. */
-    public static final int CURRENT_VERSION = 1;
+    /**
+     * Bump when the shape changes, and add a migration beside it.
+     *
+     * <p>2: the village stopped darkening, so its darkness count left the file
+     * and the flamekeeper upgrade that slowed it was paid back in gold. See
+     * {@code migration.V1ToV2}.
+     */
+    public static final int CURRENT_VERSION = 2;
 
     public int version = CURRENT_VERSION;
 
@@ -60,13 +66,6 @@ public final class Profile {
      * every character on that shelf.
      */
     public int clearedStages;
-
-    /**
-     * How far the village has dimmed. The story says the flame weakens with
-     * every failed descent, and the hub renders one step darker per point - the
-     * one place the narrative is stated by the art rather than by text.
-     */
-    public int villageDarkness;
 
     public Profile() {
         unlockedCharacters.add("ninjagreen");

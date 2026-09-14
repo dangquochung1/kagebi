@@ -16,8 +16,8 @@
 // the shop has run out of things to say by run four.
 //
 // A death on floor 4 banks about 1,250 and a full clear about 2,900. Maxing
-// every upgrade costs 33,830 and every unlock another 10,050, so the
-// meta-progression is roughly thirty-five runs deep at an average of 1,250.
+// every upgrade costs 28,230 and every unlock another 10,050, so the
+// meta-progression is roughly thirty runs deep at an average of 1,250.
 // Costs per level roughly double, which keeps the FIRST level of an untouched
 // track cheaper than the next level of a maxed one - the shop should always be
 // offering breadth.
@@ -85,16 +85,6 @@
       // picking up.
       "maxLevel": 1, "costs": [5000],
       "effect": "revive_once", "magnitudePerLevel": 0.40
-    },
-    {
-      "id": "flamekeeper", "nameKey": "upgrade.flamekeeper.name", "descKey": "upgrade.flamekeeper.desc",
-      "icon": "torch_lit",
-      // Profile.villageDarkness climbs on every failed descent and the hub
-      // renders one step darker for each point. This slows that by half per
-      // level - the only upgrade whose effect is entirely visual, and the only
-      // one that is about the story rather than the numbers.
-      "maxLevel": 2, "costs": [1800, 3800],
-      "effect": "darkness_resist", "magnitudePerLevel": 0.50
     }
   ],
 

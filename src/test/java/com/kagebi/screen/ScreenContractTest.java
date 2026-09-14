@@ -167,7 +167,6 @@ class ScreenContractTest {
             keys.add("npc." + id + ".1");
             keys.add("npc." + id + ".2");
         }
-        keys.add("npc." + Assets.Npc.ELDER + ".dim");
         keys.add("npc." + Assets.Npc.HERBALIST + ".broke");
         for (String id : CharacterSelectScreen.FALLBACK_WEAPONS) {
             keys.add("select.weapon." + id);

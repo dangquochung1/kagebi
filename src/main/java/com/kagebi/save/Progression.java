@@ -7,19 +7,9 @@ import com.kagebi.run.RunSummary;
  * into meta-progression.
  *
  * <p>Pure arithmetic over a {@link Profile}, so the rules - how much gold
- * banks, when the village dims - are tested rather than read off a screen.
- * The shop's flamekeeper upgrade arrives as a number rather than as the shop
- * itself, which keeps {@code save} from depending on {@code data}.
+ * banks, what counts as a win - are tested rather than read off a screen.
  */
 public final class Progression {
-
-    /**
-     * How dark the village can get. The hub renders one step darker per
-     * point, and past ten steps there is nothing left of the art to read -
-     * which is a decision for the screen, so this is the one number here the
-     * hub is welcome to change.
-     */
-    public static final int MAX_DARKNESS = 10;
 
     /**
      * Banks a run.
@@ -30,13 +20,9 @@ public final class Progression {
      * cheapest upgrades are 350 and 380 so that the first death buys exactly
      * one.
      *
-     * <p>A win restores the flame, so the village returns to full light. A
-     * loss dims it by one step, less the {@code darknessResist} the
-     * flamekeeper upgrade buys: at 0.5 it dims on every second failure, at 1.0
-     * never. That is computed from the failure count rather than accumulated,
-     * so it is deterministic and survives a save and reload.
+     * <p>A win counts, and records the last stage as cleared along with it.
      */
-    public static void bank(Profile p, RunSummary run, float darknessResist) {
+    public static void bank(Profile p, RunSummary run) {
         p.gold += Math.max(0, run.gold);
         p.diamonds += Math.max(0, run.diamonds);
         p.runs++;
@@ -44,29 +30,16 @@ public final class Progression {
         if (run.victory) {
             p.wins++;
             p.clearedStages = Math.max(p.clearedStages, run.deepestFloor);
-            p.villageDarkness = 0;
-            return;
         }
-        float keep = 1f - Math.max(0f, Math.min(1f, darknessResist));
-        int failures = p.runs - p.wins;
-        int before = (int) Math.floor((failures - 1) * keep);
-        int after = (int) Math.floor(failures * keep);
-        p.villageDarkness = Math.min(MAX_DARKNESS, p.villageDarkness + (after - before));
     }
 
     /**
      * Banks a cleared stage, and opens the next one.
      *
      * <p>Its own method rather than a flag on {@link #bank}, because clearing
-     * a stage is not winning the game and the difference is four fields.
-     * {@code wins} is what the shop's unlock requirements count and the flame
-     * comes home only when the last stage falls, so folding the two together
-     * would relight the village after stage one and pay for a character with
-     * it.
-     *
-     * <p>Nothing dims here, which is why no {@code darknessResist} is asked
-     * for: the village darkens when a descent does not come back, and this one
-     * did.
+     * a stage is not winning the game. {@code wins} is what the shop's unlock
+     * requirements count, so folding the two together would pay for a
+     * character with stage one.
      */
     public static void bankStage(Profile p, RunSummary run) {
         p.gold += Math.max(0, run.gold);

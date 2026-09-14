@@ -15,6 +15,7 @@ public final class Migrations {
     /** Oldest first. Each entry's {@code from()} is one more than the last. */
     private static final Migration[] CHAIN = {
         new V0ToV1(),
+        new V1ToV2(),
     };
 
     /** The shipped chain, from version 0 to {@code to}. */

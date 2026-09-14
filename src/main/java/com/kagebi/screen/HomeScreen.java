@@ -37,9 +37,6 @@ import com.kagebi.ui.Hud;
  * <p>Built the way {@link HubScreen} is - a Tiled map, a collision grid, an
  * {@link EntityWorld} handed one room - because that is how a walkable place
  * is made here, and the third one of these will be the one worth factoring.
- * It differs from the village in the one way that matters: there is no dusk
- * wash. The flame going out is something the village carries, and painting it
- * over somebody's kitchen would make a story point into a filter.
  */
 public class HomeScreen extends SimScreen {
 

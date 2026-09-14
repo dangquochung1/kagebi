@@ -211,10 +211,6 @@ public final class Modifiers {
         return value("luck_add");
     }
 
-    public float darknessResist() {
-        return value("darkness_resist");
-    }
-
     public int reviveCharges() {
         return reviveCharges;
     }

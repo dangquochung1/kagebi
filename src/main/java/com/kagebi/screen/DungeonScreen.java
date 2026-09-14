@@ -572,8 +572,8 @@ public class DungeonScreen extends SimScreen {
      * health, banked on its own, and handed back to the map when it is done.
      *
      * <p>The last stage keeps the victory screen, because that one is the end
-     * of the game - it is what counts a win and relights the village, and
-     * neither belongs to clearing stage two.
+     * of the game - it is what counts a win, and that does not belong to
+     * clearing stage two.
      */
     private void descend() {
         game.audio().playSfx(Assets.SFX_ACCEPT);

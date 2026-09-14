@@ -38,6 +38,11 @@ class MigrationTest {
         + " \"unlockedWeapons\": [\"katana\", \"hammer\"],"
         + " \"bestiary\": [\"slime\", \"mouse\"] }";
 
+    /** A save from the build where the village still darkened, flamekeeper bought. */
+    private static final String V1_WITH_FLAMEKEEPER =
+        "{ \"version\": 1, \"gold\": 34, \"runs\": 25, \"wins\": 2, \"villageDarkness\": 3,"
+        + " \"upgrades\": { \"edge\": 1, \"flamekeeper\": 1, \"vigor\": 2 } }";
+
     @Test
     void anOldSaveUpgradesRatherThanResetting() throws IOException {
         Files.writeString(dir.resolve("kagebi_profile.json"), V0, StandardCharsets.UTF_8);
@@ -73,17 +78,69 @@ class MigrationTest {
         assertEquals(Profile.CURRENT_VERSION, root.getInt("version"));
     }
 
+    // ---- v1 -> v2: the village stops darkening -------------------------------------
+
     /**
-     * What next month's migration will look like: a rename, which is the
-     * change that loses data if nobody writes a step for it. The hook is
-     * exercised end to end with a hypothetical v1 -> v2 step.
+     * The flamekeeper left the shop. A player who bought it is paid back rather
+     * than left holding gold spent on an upgrade that no longer does anything.
+     */
+    @Test
+    void aWithdrawnUpgradeIsPaidBackInGold() throws IOException {
+        Files.writeString(dir.resolve("kagebi_profile.json"), V1_WITH_FLAMEKEEPER,
+                          StandardCharsets.UTF_8);
+        Profile p = new SaveManager(dir).load();
+        assertEquals(34 + 1800, p.gold, "the one level owned, at the price paid");
+        assertEquals(0, p.upgrade("flamekeeper"), "and it is no longer owned");
+        assertEquals(1, p.upgrade("edge"), "the other upgrades are untouched");
+        assertEquals(2, p.upgrade("vigor"));
+        assertEquals(25, p.runs);
+    }
+
+    @Test
+    void everyLevelOwnedIsRefunded() {
+        JsonValue root = new JsonReader().parse(
+            "{ \"gold\": 10, \"upgrades\": { \"flamekeeper\": 2 } }");
+        new V1ToV2().apply(root);
+        assertEquals(10 + 1800 + 3800, root.getInt("gold"));
+        assertNull(root.get("upgrades").get("flamekeeper"));
+    }
+
+    @Test
+    void aSaveThatNeverBoughtItKeepsItsGoldAndItsUpgrades() {
+        JsonValue root = new JsonReader().parse(V0);
+        new V1ToV2().apply(root);
+        assertEquals(4321, root.getInt("gold"));
+        assertEquals(3, root.get("upgrades").getInt("vigor"));
+    }
+
+    /** Nothing of the old feature is written back out once the save is loaded. */
+    @Test
+    void theDarknessCountAndTheUpgradeAreGoneFromTheWrittenFile() throws IOException {
+        Files.writeString(dir.resolve("kagebi_profile.json"), V1_WITH_FLAMEKEEPER,
+                          StandardCharsets.UTF_8);
+        SaveManager saves = new SaveManager(dir);
+        saves.save(saves.load());
+        JsonValue written = new JsonReader().parse(
+            Files.readString(dir.resolve("kagebi_profile.json"), StandardCharsets.UTF_8));
+        assertNull(written.get("villageDarkness"));
+        assertNull(written.get("upgrades").get("flamekeeper"));
+        assertEquals(1834, written.getInt("gold"));
+        assertEquals(2, written.getInt("version"));
+    }
+
+    // ---- the machinery -----------------------------------------------------------
+
+    /**
+     * What a future migration will look like: a rename, which is the change
+     * that loses data if nobody writes a step for it. The hook is exercised end
+     * to end with a hypothetical v2 -> v3 step on top of the shipped chain.
      */
     @Test
     void aRealMigrationCanRenameAFieldWithoutLosingIt() {
         Migration renameGoldToBank = new Migration() {
             @Override
             public int from() {
-                return 1;
+                return 2;
             }
 
             @Override
@@ -94,9 +151,10 @@ class MigrationTest {
             }
         };
         JsonValue root = new JsonReader().parse(V0);
-        int version = Migrations.upgrade(root, 0, 2, new V0ToV1(), renameGoldToBank);
-        assertEquals(2, version);
-        assertEquals(2, root.getInt("version"));
+        int version = Migrations.upgrade(root, 0, 3,
+            new V0ToV1(), new V1ToV2(), renameGoldToBank);
+        assertEquals(3, version);
+        assertEquals(3, root.getInt("version"));
         assertEquals(4321, root.getInt("bank"));
         assertNull(root.get("gold"));
     }

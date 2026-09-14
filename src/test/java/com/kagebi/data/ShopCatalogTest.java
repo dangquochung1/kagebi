@@ -25,8 +25,8 @@ class ShopCatalogTest {
     }
 
     @Test
-    void theShippedShopHasEightTracksAndElevenUnlocks() {
-        assertEquals(8, shop.upgrades().size);
+    void theShippedShopHasSevenTracksAndElevenUnlocks() {
+        assertEquals(7, shop.upgrades().size);
         assertEquals(11, shop.unlocks().size);
     }
 
@@ -130,13 +130,15 @@ class ShopCatalogTest {
         }
     }
 
+    /**
+     * The end screens bank through the shop so there is one way to write a run
+     * into a profile, and that way still keeps every coin and counts every run.
+     */
     @Test
-    void bankingAppliesTheFlamekeeperUpgrade() {
-        p.upgrades.put("flamekeeper", 2);
+    void bankingThroughTheShopKeepsEveryCoinAndCountsEveryRun() {
         for (int i = 0; i < 5; i++) {
             shop.bank(p, new RunSummary(2, 30, 100, 0, 400f, false));
         }
-        assertEquals(0, p.villageDarkness, "two levels of flamekeeper hold the dark off entirely");
         assertEquals(500, p.gold);
         assertEquals(5, p.runs);
     }

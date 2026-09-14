@@ -24,7 +24,7 @@ public final class Loadout {
     /** Upgrade effects, so the shop can be asked for each exactly once. */
     private static final String[] UPGRADE_EFFECTS = {
         "max_hp_add", "melee_damage_mult", "move_speed_mult", "gold_mult",
-        "potion_capacity_add", "start_keys_add", "revive_once", "darkness_resist",
+        "potion_capacity_add", "start_keys_add", "revive_once",
     };
 
     /**
