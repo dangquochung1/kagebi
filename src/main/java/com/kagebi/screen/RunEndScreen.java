@@ -130,10 +130,17 @@ abstract class RunEndScreen extends SimScreen {
             Gdx.app.error("save", "profile not written; the previous save stands");
         }
 
-        // The next run starts from the village with the same ninja and weapon,
-        // at full health. What the dead run was carrying stays with it.
-        game.setRun(Screens.freshRun(game, run.characterId, run.weaponId,
-                                     Screens.DEFAULT_MAX_HP));
+        // The next run starts from the village with the same kit, at full
+        // health. What the dead run was carrying stays with it.
+        //
+        // The off hand comes along, which it did not used to. It was chosen at
+        // character select and only had to survive one descent; now it has to
+        // survive between stages, and dropping it here meant a player bought a
+        // kunai for 350 gold and lost it the first time they cleared anything.
+        RunState next = Screens.freshRun(game, run.characterId, run.weaponId,
+                                         Screens.DEFAULT_MAX_HP);
+        next.throwWeaponId = run.throwWeaponId;
+        game.setRun(next);
     }
 
     private void build() {
