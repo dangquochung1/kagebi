@@ -18,6 +18,7 @@ import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
 import com.kagebi.data.ContentRegistry;
 import com.kagebi.data.def.EnemyDef;
+import com.kagebi.gen.CollisionGrid;
 import com.kagebi.gen.RoomKind;
 import com.kagebi.input.GameAction;
 import com.kagebi.run.RunState;
@@ -309,6 +310,39 @@ class PlayerTest {
         float expected = Player.SPEED * 0.70710678f * 30 / 60f;
         assertEquals(expected, p.x - 100f, 0.05f,
             "the blocked axis is dropped, the free one keeps its full share");
+    }
+
+    /**
+     * Walking straight at a gap a few pixels off its line finds the gap rather
+     * than stopping dead on its edge. The garden gate is eighteen pixels
+     * between its posts and the ninja is twelve wide, and before this a player
+     * walking down the path at it had to line up to within six.
+     */
+    @Test
+    void walkingStraightAtAGapJustOffItsLineSlidesIntoIt() {
+        CollisionGrid grid = TestDefs.walled();
+        for (int tx = 0; tx < grid.width(); tx++) {
+            if (tx != 8) {
+                grid.set(tx, 5, true);
+            }
+        }
+        world.enterRoom(TestDefs.room(RoomKind.NORMAL), grid, null);
+        p = world.player();
+        // The gap is x 128 to 144, so a 12px body fits centred from 134 to 138.
+        p.placeAt(142f, 60f, Dir.UP);
+        in.press(GameAction.MOVE_UP);
+        in.ticks(world, 90);
+        assertTrue(p.y > 102f, "through the gap and out the far side: y=" + p.y);
+    }
+
+    /** A wall with no way past it is still a wall. */
+    @Test
+    void walkingStraightIntoAWallDoesNotSlideAlongIt() {
+        p.placeAt(100f, 153.5f, Dir.UP);
+        in.press(GameAction.MOVE_UP);
+        in.ticks(world, 30);
+        assertEquals(100f, p.x, 0.001f, "slid along a wall with nothing to slide towards");
+        assertTrue(p.y < 155f, "did not enter the wall: y=" + p.y);
     }
 
     // ---- being hit ------------------------------------------------------------

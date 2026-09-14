@@ -80,6 +80,13 @@ public final class Player extends Entity {
 
     /** The ninja occupies roughly the middle 12x12 of its 32x32 cell. */
     public static final float BODY = 12f;
+    /**
+     * How far off line a straight walk into an edge can be and still be slid
+     * round it, in pixels. Half the body: enough to find a gate from the path
+     * that leads to it. A flat wall never slides, however far along it the
+     * player is, because no offset clears it.
+     */
+    static final int CORNER_SLIDE = 6;
 
     /** One cell of a held-weapon sheet: 256/4 across and 256/4 down. */
     public static final int WEAPON_CELL = 64;
@@ -465,8 +472,48 @@ public final class Player extends Entity {
             facing = Dir.of(intent.moveX, intent.moveY);
         }
         float scale = intent.moveScale();
-        moveBy(grid, intent.moveX * speed * scale * Cfg.STEP,
-            intent.moveY * speed * scale * Cfg.STEP);
+        float dx = intent.moveX * speed * scale * Cfg.STEP;
+        float dy = intent.moveY * speed * scale * Cfg.STEP;
+        if (!moveBy(grid, dx, dy)) {
+            slideRoundCorner(grid, dx, dy);
+        }
+    }
+
+    /**
+     * Walking straight into the edge of something with a way past it a few
+     * pixels to one side: take a step sideways, toward the way past.
+     *
+     * <p>Without this a gap has to be lined up to the pixel. The garden gate is
+     * eighteen pixels between its posts and the ninja is twelve wide, which is
+     * six pixels of lining up - so a player walking down the path at it bumps
+     * a post, stops dead, and reads the gate as shut. Only a walk along one
+     * axis slides: a diagonal one already slides along a wall in moveBy.
+     *
+     * <p>Standing clear where the step sideways ends, and clear one step on
+     * from there, is enough to know the whole sideways step is clear: the box
+     * the player stands in and the box they end in overlap, and between them
+     * they cover every box in between.
+     */
+    private void slideRoundCorner(CollisionGrid grid, float dx, float dy) {
+        if (grid == null || (dx != 0f) == (dy != 0f)) {
+            return;
+        }
+        float halfW = bodyW / 2f;
+        float halfH = bodyH / 2f;
+        float stride = Math.abs(dx + dy);
+        for (int off = 1; off <= CORNER_SLIDE; off++) {
+            for (int side = 0; side < 2; side++) {
+                float sign = side == 0 ? 1f : -1f;
+                float ox = dx == 0f ? sign * off : 0f;
+                float oy = dy == 0f ? sign * off : 0f;
+                if (!grid.overlaps(x + ox - halfW, y + oy - halfH, bodyW, bodyH)
+                    && !grid.overlaps(x + ox + dx - halfW, y + oy + dy - halfH, bodyW, bodyH)) {
+                    float slide = Math.min(stride, off);
+                    moveBy(grid, Math.signum(ox) * slide, Math.signum(oy) * slide);
+                    return;
+                }
+            }
+        }
     }
 
     @Override
