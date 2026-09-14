@@ -109,6 +109,23 @@ public final class RunState {
         return true;
     }
 
+    /**
+     * Spends one key, and reports whether there was one to spend.
+     *
+     * <p>The counterpart to every {@code keys++} in the game. Until this
+     * existed keys were a currency that only ever went up: locked rooms
+     * documented themselves as costing one to enter and charged nothing, so
+     * the keyring upgrade, the iron keys in every loot table and the trader's
+     * key at seventy gold all bought the player a number on the HUD.
+     */
+    public boolean spendKey() {
+        if (keys <= 0) {
+            return false;
+        }
+        keys--;
+        return true;
+    }
+
     public boolean hasRelic(String id) {
         return relics.contains(id, false);
     }

@@ -12,6 +12,7 @@ import com.kagebi.Cfg;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.def.ItemDef;
+import com.kagebi.gen.Room;
 import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
 import com.kagebi.loot.TraderStock;
@@ -71,8 +72,17 @@ public class TraderScreen extends SimScreen {
     private BitmapFont font;
 
     private List<ItemDef> stock;
-    /** Parallel to {@link #stock}: whether that slot has been bought. */
-    private boolean[] sold;
+    /**
+     * The room this shelf belongs to, which is where the sold slots are kept.
+     *
+     * <p>Not a field on this screen. {@code DungeonScreen} builds a new
+     * TraderScreen every time the player presses the interact key, so anything
+     * remembered here is forgotten on the way out - while {@code
+     * TraderStock.roll} is seeded from the room and hands back the identical
+     * three items. That pair turned a three-item shelf into an unlimited one:
+     * close, reopen, and everything was for sale again.
+     */
+    private Room shelf;
     private int focus;
     private int flash;
 
@@ -102,9 +112,7 @@ public class TraderScreen extends SimScreen {
                 run.room == null ? 0 : run.room.gx,
                 run.room == null ? 0 : run.room.gy);
         stock = TraderStock.roll(game.content().allItems(), seed);
-        if (sold == null || sold.length != stock.size()) {
-            sold = new boolean[stock.size()];
-        }
+        shelf = run == null ? null : run.room;
         focus = Math.min(focus, Math.max(0, stock.size() - 1));
     }
 
@@ -140,7 +148,7 @@ public class TraderScreen extends SimScreen {
     private void buy() {
         RunState run = game.run();
         ItemDef item = selected();
-        if (run == null || item == null || sold[focus] || run.gold < item.price) {
+        if (run == null || item == null || sold(focus) || run.gold < item.price) {
             game.audio().playSfx(Assets.SFX_CANCEL);
             return;
         }
@@ -153,9 +161,15 @@ public class TraderScreen extends SimScreen {
         } else {
             run.addItem(item.id, 1);
         }
-        sold[focus] = true;
+        if (shelf != null) {
+            shelf.markSlotBought(focus);
+        }
         flash = FLASH_STEPS;
         game.audio().playSfx(Assets.SFX_ACCEPT);
+    }
+
+    private boolean sold(int slot) {
+        return shelf != null && shelf.slotBought(slot);
     }
 
     private ItemDef selected() {
@@ -217,7 +231,7 @@ public class TraderScreen extends SimScreen {
             int y = GRID_TOP - CELL;
             game.skin().getDrawable(Assets.Ui.CELL).draw(batch, x, y, CELL, CELL);
 
-            if (!sold[i]) {
+            if (!sold(i)) {
                 TextureRegion icon = iconFor(item);
                 if (icon != null) {
                     // Dimmed when it is out of reach, which says "come back"
@@ -264,7 +278,7 @@ public class TraderScreen extends SimScreen {
         }
         batch.setColor(INK);
         Hud.line(batch, font, t.get(item.nameKey), left, DETAIL_TOP);
-        if (flash > 0 || sold[focus]) {
+        if (flash > 0 || sold(focus)) {
             batch.setColor(SOLD);
             Hud.right(batch, font, t.get(flash > 0 ? "shop.bought" : "trader.sold"),
                       right, DETAIL_TOP);

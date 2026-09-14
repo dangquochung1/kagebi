@@ -103,6 +103,15 @@ public final class EntityWorld implements World, AiContext {
     /** Steps per frame of the chest lid. 8 makes the four frames read as one act. */
     public static final int CHEST_STEPS = 8;
 
+    /**
+     * The step count a lid that finished opening long ago is held at.
+     *
+     * <p>Comfortably past any lid animation, and a ceiling rather than a
+     * starting point: the counter stops here, so a chest opened on the first
+     * floor of a long run cannot quietly count its way to overflow.
+     */
+    static final int OPEN_HELD = 4096;
+
     /** Sideways nudge per extra projectile, as a fraction of forward speed. */
     public static final float FAN_SPREAD = 0.16f;
 
@@ -202,6 +211,13 @@ public final class EntityWorld implements World, AiContext {
      */
     private static final class Marker extends Entity {
         final SpawnPoint.Kind kind;
+        /**
+         * Which chest of this room's chests this is, counting CHEST spawns in
+         * template order from zero; -1 for anything that is not a chest.
+         * {@link Room#chestsOpened} is indexed by it, which is how a chest
+         * stays open after the player has walked out and back in.
+         */
+        final int index;
         boolean used;
         /** Set when the chest is opened, so the lid animation plays once. */
         private int openSteps = -1;
@@ -210,8 +226,9 @@ public final class EntityWorld implements World, AiContext {
         /** False holds frame 0: a chest lid is an event, a shopkeeper breathes. */
         private boolean animates;
 
-        Marker(SpawnPoint.Kind kind, float x, float y) {
+        Marker(SpawnPoint.Kind kind, int index, float x, float y) {
             this.kind = kind;
+            this.index = index;
             this.x = x;
             this.y = y;
             this.bodyW = 16f;
@@ -234,6 +251,21 @@ public final class EntityWorld implements World, AiContext {
             openSteps = 0;
         }
 
+        /**
+         * Opened on an earlier visit: already empty, and already finished
+         * opening.
+         *
+         * <p>Drawn rather than skipped, because the lid is the only thing that
+         * says the room has been looted. The animation is non-looping, so
+         * {@code Anim.frame} clamps a step count past its end to the last
+         * frame - which is exactly the held-open pose, without playing the
+         * lid again on every re-entry.
+         */
+        void openedEarlier() {
+            used = true;
+            openSteps = OPEN_HELD;
+        }
+
         @Override
         public Faction faction() {
             return Faction.HAZARD;
@@ -247,7 +279,7 @@ public final class EntityWorld implements World, AiContext {
         @Override
         public void step(EntityWorld world) {
             animSteps++;
-            if (openSteps >= 0) {
+            if (openSteps >= 0 && openSteps < OPEN_HELD) {
                 openSteps++;
             }
         }
@@ -688,8 +720,12 @@ public final class EntityWorld implements World, AiContext {
         }
         switch (room.kind) {
             case LOCKED: return "chest_locked";
-            case TREASURE:
-            case SECRET: return "chest_treasure";
+            case TREASURE: return "chest_treasure";
+            // chest_secret is written, balanced and was reachable from
+            // nowhere: a secret room rolled the treasure table, so the one
+            // table weighted towards things that change a run rather than pay
+            // for one had never dropped anything.
+            case SECRET: return "chest_secret";
             case BOSS: return "chest_boss";
             default: return "chest_common";
         }
@@ -697,6 +733,11 @@ public final class EntityWorld implements World, AiContext {
 
     private void openChest(Marker m) {
         m.open();
+        // Written onto the room, not just onto the marker: the marker is torn
+        // down and rebuilt on the next entry, and the room is what lasts.
+        if (room != null && m.index >= 0) {
+            room.markChestOpened(m.index);
+        }
         sfx(Assets.Sfx.PICKUP);
         for (int i = 0, coins = 3 + rng.nextInt(4); i < coins; i++) {
             dropGold(m.x, m.y, 1 + rng.nextInt(3));
@@ -993,9 +1034,21 @@ public final class EntityWorld implements World, AiContext {
         player.placeAt(px, py, face);
     }
 
+    /**
+     * Fills a room with what its template says is in it.
+     *
+     * <p>Two things are remembered from an earlier visit, and they are
+     * remembered on {@link Room} because that is the object that survives
+     * walking out of the door. Enemies do not come back once the room is
+     * cleared, and a chest does not refill once it has been opened. The
+     * second of those used to be missing, which left every treasure room a
+     * two-second loop: walk out, walk in, press E, and take the identical
+     * loot again off an RNG re-seeded to the identical state.
+     */
     private void spawn(Room room) {
         boolean spawnEnemies = !room.cleared;
         boolean bossSpawned = false;
+        int chestIndex = 0;
         for (SpawnPoint s : room.template.spawns) {
             switch (s.kind) {
                 case ENEMY:
@@ -1010,10 +1063,22 @@ public final class EntityWorld implements World, AiContext {
                         }
                     }
                     break;
-                case CHEST:
+                case CHEST: {
+                    // Still drawn when it has been emptied: the open lid is
+                    // the only thing that tells the player they have been
+                    // here. nearestMarker skips a used marker, so the prompt
+                    // does not come back with it.
+                    Marker chest = dress(new Marker(s.kind, chestIndex, s.x, s.y));
+                    if (room.chestOpened(chestIndex)) {
+                        chest.openedEarlier();
+                    }
+                    chestIndex++;
+                    markers.add(chest);
+                    break;
+                }
                 case EXIT:
                 case SHOPKEEPER:
-                    markers.add(dress(new Marker(s.kind, s.x, s.y)));
+                    markers.add(dress(new Marker(s.kind, -1, s.x, s.y)));
                     break;
                 case PROP:
                     addDecor(s);
@@ -1514,6 +1579,34 @@ public final class EntityWorld implements World, AiContext {
                 pickups.removeIndex(i);
             }
         }
+    }
+
+    /**
+     * How many chests this room has put on the floor, emptied ones included.
+     *
+     * <p>Package-private, for the test that an emptied chest is still drawn.
+     * That is the half of the fix no behaviour can show: the prompt going away
+     * is easy to check, and a chest quietly vanishing from the room because it
+     * had been looted would pass every one of those checks.
+     */
+    int chestsDrawn() {
+        int n = 0;
+        for (Marker m : markers) {
+            if (m.kind == SpawnPoint.Kind.CHEST) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Whether the chest at that template index has been emptied. */
+    boolean chestEmptied(int index) {
+        for (Marker m : markers) {
+            if (m.kind == SpawnPoint.Kind.CHEST && m.index == index) {
+                return m.used;
+            }
+        }
+        return false;
     }
 
     private Marker nearestMarker() {

@@ -138,7 +138,7 @@ class ScreenContractTest {
             "prompt.open_chest", "prompt.shop",
             "pause.title", "pause.resume", "pause.abandon", "pause.confirm", "pause.to_menu",
             "inv.title", "inv.relics", "inv.items", "inv.empty", "inv.slot_empty",
-            "end.banked", "end.to_village", "dungeon.no_rooms",
+            "end.banked", "end.to_village", "dungeon.no_rooms", "dungeon.locked",
             "game.title", "game.floor", "game.victory", "game.gameover",
             "game.stats.floor", "game.stats.kills", "game.stats.gold", "game.stats.time",
             "common.back", "common.locked", "floor.hub"}) {

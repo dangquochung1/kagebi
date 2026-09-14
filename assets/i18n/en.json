@@ -135,6 +135,7 @@
   "end.to_village": "Back to village",
 
   "dungeon.no_rooms": "No room templates to build a floor from",
+  "dungeon.locked": "The door wants an iron key",
 
   "credits.note": "A non-commercial project built on free assets",
   "credits.art": "ART",

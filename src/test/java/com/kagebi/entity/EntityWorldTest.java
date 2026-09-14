@@ -412,6 +412,72 @@ class EntityWorldTest {
         assertTrue(w.descendRequested());
     }
 
+    // ---- chests are opened once -------------------------------------------------
+
+    private static final SpawnPoint.Kind CHEST = SpawnPoint.Kind.CHEST;
+
+    /**
+     * The farm this is here to stop: a treasure room has no enemies, so it is
+     * cleared the moment it is entered, its doors never shut, and its RNG is
+     * re-seeded to the same state on every entry. Walk out, walk in, press E,
+     * and the identical loot came out again, about twice a second.
+     */
+    @Test
+    void aChestStaysEmptyAfterWalkingOutAndBackIn() {
+        RunState run = TestDefs.run();
+        EntityWorld w = world(registry(), run);
+        Room room = TestDefs.room(RoomKind.TREASURE, TestDefs.at(CHEST, 160, 88, null));
+
+        w.enterRoom(room, TestDefs.walled(), null);
+        w.player().placeAt(160f, 88f, Dir.DOWN);
+        assertEquals(EntityWorld.PROMPT_CHEST, w.promptKey());
+        w.interact();
+        assertNull(w.promptKey(), "emptied, so nothing left to offer");
+
+        w.enterRoom(room, TestDefs.walled(), Dir.LEFT);
+        w.player().placeAt(160f, 88f, Dir.DOWN);
+        assertNull(w.promptKey(), "and still emptied after leaving and coming back");
+    }
+
+    /** An emptied chest is still furniture: the open lid is what says so. */
+    @Test
+    void anEmptiedChestIsStillOnTheFloor() {
+        EntityWorld w = world(registry(), TestDefs.run());
+        Room room = TestDefs.room(RoomKind.TREASURE, TestDefs.at(CHEST, 160, 88, null));
+        w.enterRoom(room, TestDefs.walled(), null);
+        w.player().placeAt(160f, 88f, Dir.DOWN);
+        w.interact();
+
+        w.enterRoom(room, TestDefs.walled(), Dir.LEFT);
+        assertEquals(1, w.chestsDrawn(), "drawn, not deleted");
+        assertTrue(w.chestEmptied(0), "and drawn with its lid up");
+    }
+
+    /**
+     * Why the room carries a mask and not a flag. A shop room holds three
+     * chests, and buying the first must not seal the two beside it.
+     */
+    @Test
+    void openingOneChestLeavesTheOthersInTheRoom() {
+        EntityWorld w = world(registry(), TestDefs.run());
+        Room room = TestDefs.room(RoomKind.SHOP,
+            TestDefs.at(CHEST, 100, 88, null),
+            TestDefs.at(CHEST, 160, 88, null),
+            TestDefs.at(CHEST, 220, 88, null));
+
+        w.enterRoom(room, TestDefs.walled(), null);
+        w.player().placeAt(160f, 88f, Dir.DOWN);
+        w.interact();
+
+        w.enterRoom(room, TestDefs.walled(), Dir.LEFT);
+        assertTrue(w.chestEmptied(1), "the one that was opened");
+        assertFalse(w.chestEmptied(0), "not its neighbour");
+        assertFalse(w.chestEmptied(2), "nor its other neighbour");
+
+        w.player().placeAt(100f, 88f, Dir.DOWN);
+        assertEquals(EntityWorld.PROMPT_CHEST, w.promptKey(), "which is still openable");
+    }
+
     // ---- the village ------------------------------------------------------------
 
     /**

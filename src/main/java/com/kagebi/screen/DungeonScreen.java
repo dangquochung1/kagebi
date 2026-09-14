@@ -119,6 +119,8 @@ public class DungeonScreen extends SimScreen {
     private int fade;
     private Runnable fadeAction;
     private int title;
+    /** Steps left on the "you need a key" card at a locked door. */
+    private int locked;
 
     private boolean nearExit;
     private boolean ended;
@@ -405,6 +407,9 @@ public class DungeonScreen extends SimScreen {
         if (title > 0) {
             title--;
         }
+        if (locked > 0) {
+            locked--;
+        }
         if (fade > 0) {
             fade--;
             if (fade == FADE_STEPS && fadeAction != null) {
@@ -460,7 +465,11 @@ public class DungeonScreen extends SimScreen {
 
         Dir door = world.doorReached();
         if (door != null && run.room.neighbour(door) != null) {
-            startSlide(door, run.room.neighbour(door));
+            Room next = run.room.neighbour(door);
+            if (!unlock(next)) {
+                return;
+            }
+            startSlide(door, next);
             return;
         }
 
@@ -479,6 +488,35 @@ public class DungeonScreen extends SimScreen {
                 }
             }
         }
+    }
+
+    /**
+     * Charges the key a locked room costs, and says whether the player may go
+     * in.
+     *
+     * <p>{@code RoomKind.LOCKED} has described itself as costing a key since
+     * the generator was written, and nothing ever took one: {@code run.keys}
+     * was incremented in four places and decremented in none. So the keyring
+     * upgrade, every iron key in every loot table and the trader's key at
+     * seventy gold all bought a number that did nothing, and the locked room
+     * was a treasure room with a different name.
+     *
+     * <p>Charged once, on first entry, and remembered by {@code visited} - the
+     * room is unlocked after that, not repeatedly tolled. A player at the door
+     * with no key is told so and left standing there, which is the only reason
+     * this returns a boolean rather than doing the whole transition.
+     */
+    private boolean unlock(Room next) {
+        if (next.kind != RoomKind.LOCKED || next.visited) {
+            return true;
+        }
+        if (!run.spendKey()) {
+            game.audio().playSfx(Assets.SFX_CANCEL);
+            locked = Hud.CARD_STEPS / 2;
+            return false;
+        }
+        game.audio().playSfx(Assets.SFX_ACCEPT);
+        return true;
     }
 
     private void startSlide(Dir door, Room next) {
@@ -626,6 +664,13 @@ public class DungeonScreen extends SimScreen {
             return;         // still going dark on the floor above, or covered
         }
         I18n t = game.i18n();
+        // The locked door speaks over the floor name rather than beside it.
+        // They cannot both be on screen and mean anything, and the one the
+        // player has just walked into is the one they are asking about.
+        if (locked > 0) {
+            Hud.card(batch, game.skin(), font, locked, t.get("dungeon.locked"), null);
+            return;
+        }
         Hud.card(batch, game.skin(), font, title,
                  t.format("game.floor", run.floor), t.get(floorDef.nameKey));
     }
