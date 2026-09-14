@@ -26,6 +26,7 @@ import com.kagebi.settings.Difficulty;
  *   settings  --page 1-3   audio, controls, video
  *   style     --page 1-2   widget sheet, surface sheet
  *   select    --page 1-6   character select, with that ninja highlighted
+ *   loadout   --page 1-6   the same screen editing the run, over the village
  *   hub       --page N     the village, dimmed by N-1 failed descents
  *   world     --page 1-5   the world map, open to that stage and focused on it
  *   stage     --page 1-5   the same, with that stage's panel and difficulty row
@@ -86,6 +87,9 @@ public final class Screens {
                                          new SettingsScreen(game, page - 1)};
             case "select":
                 return new GameScreen[] {new CharacterSelectScreen(game, page - 1)};
+            case "loadout":
+                return new GameScreen[] {new HubScreen(game),
+                    new CharacterSelectScreen(game, page - 1).asLoadout()};
             case "world":
                 stockStages(game, page);
                 return new GameScreen[] {new WorldMapScreen(game).focusOn(page)};

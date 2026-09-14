@@ -23,8 +23,19 @@ import com.kagebi.settings.Difficulty;
 public final class RunState {
 
     public final long seed;
-    /** Player sprite folder under {@code player/}, e.g. {@code ninjagreen}. */
-    public final String characterId;
+    /**
+     * Player sprite folder under {@code player/}, e.g. {@code ninjagreen}.
+     *
+     * <p>Final until the village grew a loadout screen, and the reasoning for
+     * that was that a run's ninja is chosen once. It still is - nothing changes
+     * this underground - but the run that sits in the village between stages is
+     * a carrier for the kit rather than a fight in progress, and it is the thing
+     * {@code Screens.stageRun} copies the next stage's ninja out of. Whoever
+     * changes it is responsible for the sprites already built from it; see
+     * {@code EntityWorld.enterRoom}, which re-reads this the way it re-reads
+     * both weapons.
+     */
+    public String characterId;
 
     public String weaponId;
 

@@ -66,8 +66,11 @@
   "floor.hub": "Kagemura Village",
 
   "select.title": "Choose your ninja",
+  "select.loadout": "Your kit",
   "select.weapon": "Starting weapon",
+  "select.mainhand": "Main hand",
   "select.start": "Set out",
+  "select.done": "Done",
   "select.weapon.katana": "Katana",
   "select.weapon.axe": "Axe",
   "select.weapon.hammer": "Hammer",
@@ -101,8 +104,11 @@
   "shop.need.runs": "Play {0} runs",
   "shop.need.bestiary": "Meet {0} kinds of monster",
   "shop.bought": "Bought",
+  "shop.equip": "Equip",
+  "shop.equipped": "In hand",
 
   "prompt.talk": "Talk",
+  "prompt.loadout": "Your kit",
   "prompt.descend": "Descend",
   "prompt.escape": "Escape the depths",
   "prompt.open_chest": "Open chest",

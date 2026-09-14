@@ -1,5 +1,6 @@
 package com.kagebi.screen;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -95,6 +96,19 @@ public class HubScreen extends SimScreen {
     /** Villagers turn to face the player inside this range. */
     private static final float NOTICE_RANGE = 56f;
 
+    /**
+     * The kit badge: the ninja's own face, top right, opening the loadout.
+     *
+     * <p>Twenty-four square with the 32px idle frame drawn into it and
+     * trimmed - the portrait is the label, so there is no text to translate and
+     * nothing to run into the gold counter across the way. It mirrors the purse
+     * at the other corner: the two things the village is for are what it costs
+     * and what you are carrying.
+     */
+    private static final int BADGE = 24;
+    private static final int BADGE_X = Cfg.VIRT_W - BADGE - 4;
+    private static final int BADGE_Y = Cfg.VIRT_H - BADGE - 4;
+
     private final Kagebi game;
     private final CameraController camera = new CameraController();
     private final CameraController ui = new CameraController();
@@ -105,6 +119,7 @@ public class HubScreen extends SimScreen {
     private int[] above;
     private int mapW;
     private int mapH;
+    private CollisionGrid grid;
 
     private World world;
     private RunState run;
@@ -121,6 +136,13 @@ public class HubScreen extends SimScreen {
 
     /** A villager to be already talking to on arrival, or -1. */
     private int talkOnShow = -1;
+
+    /** The badge portrait, rebuilt when the player changes who they are. */
+    private Anim badgeIdle;
+    private String badgeCharacter;
+
+    /** Set when the loadout closes, so the world picks the new kit up. */
+    private boolean loadoutOpen;
 
     /** Set while the herbalist is speaking; her last page opens her stall. */
     private boolean openShopAfterTalk;
@@ -149,6 +171,16 @@ public class HubScreen extends SimScreen {
     public void show() {
         game.input().clear();
         if (map != null) {
+            if (loadoutOpen) {
+                loadoutOpen = false;
+                // Walk back into the village, which is how the world is told
+                // anything about the run: entering a room re-reads the ninja
+                // and both weapons. Without this a player who changes ninja
+                // stands in the village still wearing the old one until
+                // something else happens to move them between rooms.
+                world.enterRoom(villageRoom(), grid, null);
+                card = 0;
+            }
             game.audio().playMusic(Assets.MUSIC_VILLAGE);
             return;
         }
@@ -160,7 +192,7 @@ public class HubScreen extends SimScreen {
         below = TiledRooms.layerIndices(map, TiledRooms.BELOW);
         above = TiledRooms.layerIndices(map, TiledRooms.ABOVE);
 
-        CollisionGrid grid = collision(map);
+        grid = collision(map);
         mapW = grid.width() * CollisionGrid.TILE;
         mapH = grid.height() * CollisionGrid.TILE;
 
@@ -290,6 +322,10 @@ public class HubScreen extends SimScreen {
             stack().push(new PauseScreen(game, false));
             return;
         }
+        if (input().justPressed(GameAction.INVENTORY) || badgeClicked()) {
+            openLoadout();
+            return;
+        }
 
         world.step(input());
         findInteraction();
@@ -335,6 +371,34 @@ public class HubScreen extends SimScreen {
         dialog.show(t.get(prefix + "name"), v.face, first,
                     t.get(prefix + (broke ? "broke" : "2")));
         game.audio().playSfx(Assets.SFX_ACCEPT);
+    }
+
+    /**
+     * Whether the mouse was clicked on the kit badge this step.
+     *
+     * <p>Polled here rather than routed through {@link com.kagebi.input.InputService},
+     * which is a key-to-action map and has no notion of a pointer. {@link SimScreen}
+     * asks that input be read in {@code step} and nowhere else, and this obeys
+     * that; one clickable rectangle on one screen is not worth a second input
+     * model. The badge is drawn in UI space, so the click is tested there.
+     */
+    private boolean badgeClicked() {
+        if (!Gdx.input.justTouched()) {
+            return false;
+        }
+        float scaleX = Gdx.graphics.getWidth() / (float) Cfg.VIRT_W;
+        float scaleY = Gdx.graphics.getHeight() / (float) Cfg.VIRT_H;
+        float x = Gdx.input.getX() / scaleX;
+        // Screen y runs down from the top; the virtual one runs up.
+        float y = Cfg.VIRT_H - Gdx.input.getY() / scaleY;
+        return x >= BADGE_X && x <= BADGE_X + BADGE
+            && y >= BADGE_Y && y <= BADGE_Y + BADGE;
+    }
+
+    private void openLoadout() {
+        game.audio().playSfx(Assets.SFX_ACCEPT);
+        loadoutOpen = true;
+        stack().push(new CharacterSelectScreen(game, 0).asLoadout());
     }
 
     private void openMap() {
@@ -414,6 +478,7 @@ public class HubScreen extends SimScreen {
         Hud.shadowed(batch, font, String.valueOf(game.profile().gold), 17, Cfg.VIRT_H - 5,
                      Align.left);
         batch.setColor(Color.WHITE);
+        drawBadge(batch);
         // The village's name as an arrival card, not a permanent label: in the
         // first screenshot it sat across a roof, unreadable, saying something
         // the player already knew.
@@ -431,6 +496,30 @@ public class HubScreen extends SimScreen {
                        game.input().map().primary(GameAction.INTERACT),
                        t.get(key), Cfg.VIRT_W / 2f, 10);
         }
+    }
+
+    /**
+     * The kit badge, with the ninja currently in it.
+     *
+     * <p>Rebuilt only when the character changes, because building one means
+     * slicing a sheet. The 32px idle frame is drawn into a 24px cell and
+     * clipped by four pixels a side, which cuts empty sheet rather than the
+     * ninja: the sprite sits in the middle of its cell with air round it.
+     */
+    private void drawBadge(SpriteBatch batch) {
+        String id = run == null ? Assets.Actor.DEFAULT_CHARACTER : run.characterId;
+        if (badgeIdle == null || !id.equals(badgeCharacter)) {
+            badgeCharacter = id;
+            badgeIdle = Anim.directional(Preload.actors(),
+                Assets.Actor.player(id, Assets.Actor.PlayerAnim.IDLE), 32,
+                Anim.DEFAULT_STEPS_PER_FRAME, true);
+        }
+        game.skin().getDrawable(Assets.Ui.CELL).draw(batch, BADGE_X, BADGE_Y, BADGE, BADGE);
+        TextureRegion frame = badgeIdle.frame(Dir.DOWN, steps());
+        batch.draw(frame, BADGE_X + (BADGE - 32) / 2f, BADGE_Y + (BADGE - 32) / 2f);
+        Hud.prompt(batch, game.skin(), font,
+                   game.input().map().primary(GameAction.INVENTORY), "",
+                   BADGE_X + BADGE / 2f, BADGE_Y - Hud.LINE + 4);
     }
 
     @Override

@@ -22,7 +22,15 @@ import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
 
 /**
- * Six ninjas, one weapon, and the start of a run.
+ * Six ninjas, one weapon, and either the start of a run or a change of clothes.
+ *
+ * <p><b>Two modes, one screen.</b> It opened the game for most of this
+ * project's life: New Game showed it, you picked, and it built the run. That
+ * was a wall in front of a fresh profile, which owns exactly one ninja and one
+ * sword and therefore has nothing to choose - and it was the only way to change
+ * an off hand, so buying a kunai meant quitting to the menu and starting over.
+ * {@link #asLoadout()} is the same screen editing the run the player already
+ * has, reached from the village whenever they want it.
  *
  * <p>Every portrait runs its own idle animation rather than showing frame zero.
  * A still sprite sheet frame is the character; a breathing one is a character
@@ -40,8 +48,16 @@ public class CharacterSelectScreen extends SimScreen {
     private static final int GAP = 6;
     private static final int WEAPON_CELL = 20;
     private static final int WEAPON_GAP = 4;
-    /** Extra space before the off-hand cell, so it reads as its own slot. */
-    private static final int OFF_HAND_GAP = 8;
+    /**
+     * Space before the off-hand cell, so it reads as its own slot - and wide
+     * enough for the key cap that cycles it to sit in the gap.
+     *
+     * <p>The cap used to float above the cell, where it landed on the second
+     * wrapped line of the perk description and covered a word of it. Invisible
+     * for as long as this screen was something a player saw once at the start
+     * of a run; the village badge opens it whenever they like now.
+     */
+    private static final int OFF_HAND_GAP = 24;
 
     // The column, top to bottom. Line tops include the four rows above cap
     // height that a stacked Vietnamese tone mark needs; see Hud.line.
@@ -92,10 +108,26 @@ public class CharacterSelectScreen extends SimScreen {
     private int character;
     private int weapon;
 
+    /** Editing the run that exists, rather than building a new one. */
+    private boolean loadout;
+
     public CharacterSelectScreen(Kagebi game, int startIndex) {
         super(game.input());
         this.game = game;
         this.character = Math.max(0, Math.min(startIndex, Assets.Actor.CHARACTERS.length - 1));
+    }
+
+    /**
+     * Opens on what the player is currently carrying, and saves back into it.
+     *
+     * <p>The distinction that matters is {@link Screens#freshRun}: starting a
+     * run builds a new {@link RunState}, and doing that from the village would
+     * throw away the seed, the health and anything else the run is holding for
+     * a reason that amounts to the player looking at their own sword.
+     */
+    CharacterSelectScreen asLoadout() {
+        loadout = true;
+        return this;
     }
 
     @Override
@@ -118,7 +150,11 @@ public class CharacterSelectScreen extends SimScreen {
         }
         collectWeapons();
         camera.snapTo(Cfg.VIRT_W / 2f, Cfg.VIRT_H / 2f);
-        game.audio().playMusic(Assets.MUSIC_INTRO);
+        if (!loadout) {
+            // The village's own music keeps playing underneath a loadout: this
+            // is a glance at a rack, not a place the player has travelled to.
+            game.audio().playMusic(Assets.MUSIC_INTRO);
+        }
     }
 
     /**
@@ -152,6 +188,29 @@ public class CharacterSelectScreen extends SimScreen {
         // kunai may still choose to run without one.
         throwables.insert(0, null);
         throwable = 0;
+        if (loadout) {
+            startFromWhatIsWorn();
+        }
+    }
+
+    /** A loadout opens on the current kit, not on the first thing in each list. */
+    private void startFromWhatIsWorn() {
+        RunState run = game.run();
+        if (run == null) {
+            return;
+        }
+        int worn = Assets.Actor.indexOf(run.characterId);
+        if (worn >= 0) {
+            character = worn;
+        }
+        int held = weapons.indexOf(run.weaponId, false);
+        if (held >= 0) {
+            weapon = held;
+        }
+        int off = throwables.indexOf(run.throwWeaponId, false);
+        if (off >= 0) {
+            throwable = off;
+        }
     }
 
     private String currentUnlockedWeapon() {
@@ -195,9 +254,14 @@ public class CharacterSelectScreen extends SimScreen {
             game.audio().playSfx(Assets.SFX_MOVE);
         }
 
-        if (input().justPressed(GameAction.PAUSE)) {
+        if (input().justPressed(GameAction.PAUSE)
+                || (loadout && input().justPressed(GameAction.INVENTORY))) {
             game.audio().playSfx(Assets.SFX_CANCEL);
-            stack().set(new MainMenuScreen(game));
+            if (loadout) {
+                stack().pop();
+            } else {
+                stack().set(new MainMenuScreen(game));
+            }
             return;
         }
         if (input().justPressed(GameAction.INTERACT) || input().justPressed(GameAction.ATTACK)) {
@@ -211,6 +275,14 @@ public class CharacterSelectScreen extends SimScreen {
             return;
         }
         game.audio().playSfx(Assets.SFX_ACCEPT);
+        if (loadout && game.run() != null) {
+            RunState run = game.run();
+            run.characterId = Assets.Actor.CHARACTERS[character];
+            run.weaponId = weapons.get(weapon);
+            run.throwWeaponId = throwables.get(throwable);
+            stack().pop();
+            return;
+        }
         RunState run = Screens.freshRun(game, Assets.Actor.CHARACTERS[character],
                                         weapons.get(weapon), Screens.DEFAULT_MAX_HP);
         run.throwWeaponId = throwables.get(throwable);
@@ -239,7 +311,8 @@ public class CharacterSelectScreen extends SimScreen {
         I18n t = game.i18n();
 
         batch.setColor(INK);
-        Hud.centred(batch, font, t.get("select.title"), Cfg.VIRT_W / 2f, TITLE_TOP);
+        Hud.centred(batch, font, t.get(loadout ? "select.loadout" : "select.title"),
+                    Cfg.VIRT_W / 2f, TITLE_TOP);
         batch.setColor(Color.WHITE);
 
         drawPortraits(batch);
@@ -329,7 +402,7 @@ public class CharacterSelectScreen extends SimScreen {
             // The off hand is named even when it is empty. An unexplained empty
             // cell on the end of the row is a question; "Throwing weapon: none"
             // is an answer, and it is the one that sends a player to the shop.
-            String line = t.get("select.weapon") + ": "
+            String line = t.get(loadout ? "select.mainhand" : "select.weapon") + ": "
                 + t.get("select.weapon." + weapons.get(weapon))
                 + "   " + t.get("select.throw") + ": " + (offHand == null
                     ? t.get("select.throw.none") : t.get("select.weapon." + offHand));
@@ -360,7 +433,7 @@ public class CharacterSelectScreen extends SimScreen {
         if (throwables.size > 1) {
             Hud.prompt(batch, game.skin(), font,
                 game.input().map().primary(GameAction.THROW), "",
-                x + WEAPON_CELL / 2f, WEAPON_BOTTOM + WEAPON_CELL + 2);
+                x - OFF_HAND_GAP / 2f, WEAPON_BOTTOM + 4);
         }
     }
 
@@ -374,7 +447,8 @@ public class CharacterSelectScreen extends SimScreen {
         }
         Hud.prompt(batch, game.skin(), font,
                    game.input().map().primary(GameAction.INTERACT),
-                   t.get("select.start"), Cfg.VIRT_W / 2f, FOOTER_BOTTOM);
+                   t.get(loadout ? "select.done" : "select.start"),
+                   Cfg.VIRT_W / 2f, FOOTER_BOTTOM);
     }
 
     @Override

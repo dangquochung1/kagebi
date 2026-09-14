@@ -66,8 +66,11 @@
   "floor.hub": "Làng Kagemura",
 
   "select.title": "Chọn ninja",
+  "select.loadout": "Trang bị",
   "select.weapon": "Vũ khí khởi đầu",
+  "select.mainhand": "Vũ khí chính",
   "select.start": "Lên đường",
+  "select.done": "Xong",
   "select.weapon.katana": "Katana",
   "select.weapon.axe": "Rìu",
   "select.weapon.hammer": "Búa",
@@ -101,8 +104,11 @@
   "shop.need.runs": "Cần chơi {0} lượt",
   "shop.need.bestiary": "Cần gặp {0} loài quái",
   "shop.bought": "Đã mua",
+  "shop.equip": "Trang bị",
+  "shop.equipped": "Đang dùng",
 
   "prompt.talk": "Nói chuyện",
+  "prompt.loadout": "Trang bị",
   "prompt.descend": "Xuống hầm",
   "prompt.escape": "Thoát khỏi hầm",
   "prompt.open_chest": "Mở rương",

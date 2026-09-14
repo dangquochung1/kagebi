@@ -12,8 +12,10 @@ import com.kagebi.Cfg;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.ShopCatalog;
+import com.kagebi.data.def.WeaponDef;
 import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
+import com.kagebi.run.RunState;
 import com.kagebi.save.Profile;
 import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
@@ -35,6 +37,15 @@ import com.kagebi.ui.I18n;
  * Stage}; this screen is a grid with a focus ring driven by the movement keys,
  * which is InventoryScreen's shape, not SettingsScreen's. Two labels and a
  * highlight are cheaper than reconciling a Stage's focus with this one's.
+ *
+ * <p><b>An owned unlock is equipped, not refused.</b> The button used to say
+ * "Buy" over a ninja the player already had and then decline to do anything
+ * with it, which meant a kunai bought here could only be put in the off hand by
+ * quitting to the title screen and starting again. The shelf is the only place
+ * a player is thinking about a weapon, so it is the right place to put one on.
+ * It is a shortcut rather than the whole feature: the free katana and the
+ * starting ninja are not entries here, so switching BACK to them is the
+ * village badge's job. See {@code CharacterSelectScreen.asLoadout}.
  *
  * <p><b>It writes the save itself.</b> Buying is the only thing outside a
  * finished run that changes the profile, and a player who buys an upgrade and
@@ -145,6 +156,7 @@ public class ShopScreen extends SimScreen {
 
     @Override
     protected void step() {
+        syncWorn();
         if (flash > 0) {
             flash--;
         }
@@ -154,7 +166,12 @@ public class ShopScreen extends SimScreen {
             return;
         }
         if (input().justPressed(GameAction.INTERACT) || input().justPressed(GameAction.ATTACK)) {
-            buy();
+            Entry e = selected();
+            if (e != null && e.equippable(game.profile())) {
+                equip(e);
+            } else {
+                buy();
+            }
             return;
         }
         move();
@@ -219,6 +236,69 @@ public class ShopScreen extends SimScreen {
         }
     }
 
+    /**
+     * Puts an owned unlock on, into whichever hand it belongs in.
+     *
+     * <p>Writes into the run rather than the profile, which is the difference
+     * between owning something and carrying it: the profile remembers that the
+     * hammer was bought, the run remembers that it is in your hands today. It
+     * takes effect when the world next enters a room, which the village does on
+     * the way back out of this screen.
+     */
+    private void equip(Entry e) {
+        RunState run = game.run();
+        if (run == null) {
+            game.audio().playSfx(Assets.SFX_CANCEL);
+            return;
+        }
+        ShopCatalog.Unlock u = e.unlock;
+        if (u.kind == ShopCatalog.UnlockKind.CHARACTER) {
+            run.characterId = u.id;
+        } else if (thrown(u.id)) {
+            run.throwWeaponId = u.id;
+        } else {
+            run.weaponId = u.id;
+        }
+        flash = FLASH_STEPS;
+        game.audio().playSfx(Assets.SFX_ACCEPT);
+    }
+
+    /** Whether a weapon id goes in the off hand. Unknown ids stay in the main one. */
+    private boolean thrown(String weaponId) {
+        for (WeaponDef w : game.content().allWeapons()) {
+            if (w.id.equals(weaponId)) {
+                return w.thrown();
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Tells each unlock whether the run is carrying it.
+     *
+     * <p>Pushed onto the entries rather than pulled by them: an {@link Entry}
+     * is a row on a shelf and knows about the profile, which is what is owned.
+     * What is in the player's hands right now is the run's business, and this
+     * screen is the only thing holding both.
+     */
+    private void syncWorn() {
+        for (Entry e : unlocks) {
+            e.worn = e.unlock != null && isWorn(e.unlock);
+        }
+    }
+
+    /** What the run is carrying in the slot this entry would fill. */
+    private boolean isWorn(ShopCatalog.Unlock u) {
+        RunState run = game.run();
+        if (run == null) {
+            return false;
+        }
+        if (u.kind == ShopCatalog.UnlockKind.CHARACTER) {
+            return u.id.equals(run.characterId);
+        }
+        return u.id.equals(thrown(u.id) ? run.throwWeaponId : run.weaponId);
+    }
+
     private Entry selected() {
         Array<Entry> shelf = shelf();
         return focus >= 0 && focus < shelf.size ? shelf.get(focus) : null;
@@ -228,6 +308,7 @@ public class ShopScreen extends SimScreen {
 
     @Override
     public void render(float delta) {
+        syncWorn();
         camera.apply();
         SpriteBatch batch = game.batch();
         batch.setProjectionMatrix(camera.camera().combined);
@@ -243,9 +324,12 @@ public class ShopScreen extends SimScreen {
         drawGrid(batch);
         drawDetail(batch, t);
 
+        Entry focused = selected();
+        boolean equipping = focused != null && focused.equippable(game.profile());
         Hud.prompt(batch, game.skin(), font,
                    game.input().map().primary(GameAction.INTERACT),
-                   t.get("shop.buy"), PANEL_X + 8, PROMPT_BOTTOM, Align.left);
+                   t.get(equipping ? "shop.equip" : "shop.buy"),
+                   PANEL_X + 8, PROMPT_BOTTOM, Align.left);
         Hud.prompt(batch, game.skin(), font,
                    game.input().map().primary(GameAction.PAUSE),
                    t.get("common.back"), PANEL_X + PANEL_W - 8, PROMPT_BOTTOM, Align.right);
@@ -401,6 +485,18 @@ public class ShopScreen extends SimScreen {
             }
         }
 
+        /**
+         * Whether pressing the button would put this on rather than buy it: an
+         * unlock, owned, and not already in the hand it belongs in. An upgrade
+         * is never equippable - a level of vigor is not a thing you hold.
+         */
+        boolean equippable(Profile p) {
+            return unlock != null && ShopCatalog.owned(unlock, p) && !worn;
+        }
+
+        /** Set by the screen each frame; the entry cannot see the run. */
+        boolean worn;
+
         /** Finished with: a maxed track, or something already owned. */
         boolean done(Profile p) {
             return upgrade != null ? p.upgrade(upgrade.id) >= upgrade.maxLevel
@@ -441,7 +537,7 @@ public class ShopScreen extends SimScreen {
                 return p.gold >= price ? price + "g" : t.get("shop.poor");
             }
             if (ShopCatalog.owned(unlock, p)) {
-                return t.get("shop.owned");
+                return t.get(worn ? "shop.equipped" : "shop.owned");
             }
             if (!ShopCatalog.requirementMet(unlock, p)) {
                 return t.format("shop.need." + unlock.requirement, unlock.requirementValue);

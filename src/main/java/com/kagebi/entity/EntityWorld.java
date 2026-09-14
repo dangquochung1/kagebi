@@ -434,6 +434,16 @@ public final class EntityWorld implements World, AiContext {
         WeaponDef held = resolveWeapon(run.weaponId);
         player.setWeapon(held, heldArt(held));
         player.setThrowWeapon(resolveThrowWeapon(run.throwWeaponId));
+        // And who is holding them. The ninja was read once, in the constructor,
+        // back when it could not change after the run started; the village's
+        // loadout screen changes it, and a player who swaps ninja and then
+        // watches the old one walk away has been told the swap did not work.
+        if (actors != null) {
+            ActorSprites worn = ActorSprites.player(actors, run.characterId);
+            if (worn != null) {
+                player.sprites = worn;
+            }
+        }
 
         placePlayer(room, enteredFrom);
         spawn(room);

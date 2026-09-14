@@ -68,6 +68,7 @@ boot                   the loading bar, then the menu
 menu                   (default)
 settings  --page 1-3   audio, controls, video
 select    --page 1-6   character select, with that ninja highlighted
+loadout   --page 1-6   the same screen changing the run's kit, over the village
 hub       --page N     the village, dimmed by N-1 failed descents
 world     --page 1-5   the world map, open to that stage and focused on it
 stage     --page 1-5   the same, with that stage's panel and its difficulty row

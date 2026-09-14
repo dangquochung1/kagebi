@@ -317,6 +317,22 @@ public final class Assets {
 
         public static final String DEFAULT_CHARACTER = CHARACTERS[0];
 
+        /**
+         * Where a character id sits in {@link #CHARACTERS}, or -1.
+         *
+         * <p>Here rather than in the one screen that needs it, because
+         * {@code CHARACTERS} is here: a loop written beside the array it walks
+         * cannot disagree with it about the order.
+         */
+        public static int indexOf(String characterId) {
+            for (int i = 0; i < CHARACTERS.length; i++) {
+                if (CHARACTERS[i].equals(characterId)) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         public static final String WEAPON_KATANA = "player/weapons/katana";
         public static final String WEAPON_AXE = "player/weapons/axe";
         public static final String WEAPON_HAMMER = "player/weapons/hammer";

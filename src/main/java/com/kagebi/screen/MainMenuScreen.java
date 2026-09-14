@@ -110,8 +110,17 @@ public class MainMenuScreen extends GameScreen {
         addMenuButton(panel, t.get("menu.continue"), true, null);
         // set() rather than push(): a new run should not leave a title screen,
         // its map and its fog texture alive underneath it for the whole run.
-        addMenuButton(panel, t.get("menu.newgame"), false,
-            () -> stack().set(new CharacterSelectScreen(game, 0)));
+        //
+        // Straight to the village, not to the character select. That screen was
+        // the first thing a new player met and it had nothing to offer them: a
+        // fresh profile owns one ninja and one sword, so it was a choice
+        // between one option and a locked row. It is still reachable, from the
+        // badge in the village, at the point where there is something to choose.
+        addMenuButton(panel, t.get("menu.newgame"), false, () -> {
+            game.setRun(Screens.freshRun(game, Assets.Actor.DEFAULT_CHARACTER, "katana",
+                                         Screens.DEFAULT_MAX_HP));
+            stack().set(new HubScreen(game));
+        });
         addMenuButton(panel, t.get("menu.settings"), false,
             () -> stack().push(new SettingsScreen(game)));
         addMenuButton(panel, t.get("menu.credits"), false,
