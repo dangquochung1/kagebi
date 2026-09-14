@@ -72,6 +72,8 @@ public final class RunState {
     public final int baseMaxHp;
 
     public int gold;
+    /** Gems found this run, banked whole when it ends. See Profile.diamonds. */
+    public int diamonds;
     public int keys;
 
     public final Array<String> relics = new Array<>();
@@ -131,6 +133,6 @@ public final class RunState {
     }
 
     public RunSummary summary() {
-        return new RunSummary(deepestFloor, kills, gold, elapsedSeconds, victory);
+        return new RunSummary(deepestFloor, kills, gold, diamonds, elapsedSeconds, victory);
     }
 }

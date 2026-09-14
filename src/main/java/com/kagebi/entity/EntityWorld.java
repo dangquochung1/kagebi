@@ -112,6 +112,19 @@ public final class EntityWorld implements World, AiContext {
      */
     static final int OPEN_HELD = 4096;
 
+    /**
+     * A sought-out chest's chance of opening a locked weapon, and a locked
+     * ninja.
+     *
+     * <p>Two and a half in a hundred together, and only on the chests worth
+     * walking to - treasure, locked, secret and boss. Over a full descent that
+     * is roughly one unlock every three or four runs, which is slow enough
+     * that the village shop is still how a player gets a hammer and fast
+     * enough that opening a chest is never only gold.
+     */
+    public static final float CHARACTER_FROM_CHEST = 0.005f;
+    public static final float WEAPON_FROM_CHEST = 0.02f;
+
     /** Sideways nudge per extra projectile, as a fraction of forward speed. */
     public static final float FAN_SPREAD = 0.16f;
 
@@ -163,6 +176,8 @@ public final class EntityWorld implements World, AiContext {
 
     private ShopCatalog shop;
     private Profile profile;
+    /** What a chest just opened permanently, until the screen takes it. */
+    private ShopCatalog.Unlock unlocked;
     private AudioService audio;
 
     /** Guards the once-per-run grants, which useVillage would otherwise repeat. */
@@ -193,6 +208,7 @@ public final class EntityWorld implements World, AiContext {
     private TextureRegion goldRegion;
     private TextureRegion heartRegion;
     private TextureRegion keyRegion;
+    private TextureRegion gemRegion;
 
     /**
      * A chest, the stairs, or a shopkeeper: something the player walks up to.
@@ -750,6 +766,101 @@ public final class EntityWorld implements World, AiContext {
                 || room.kind == RoomKind.LOCKED || room.kind == RoomKind.SECRET)) {
             grantRelic();
         }
+        if (room != null && room.kind != RoomKind.SHOP && room.kind != RoomKind.NORMAL) {
+            ShopCatalog.Unlock won = rollUnlock(m.x, m.y);
+            if (won != null) {
+                unlocked = won;
+                sfx(Assets.Sfx.UNLOCK);
+            } else {
+                // The shelf was empty, or the roll missed. Only the first of
+                // those pays out; a miss is a miss.
+                if (shop != null && profile != null && nothingLeftToUnlock()) {
+                    dropPickup(Pickup.Kind.DIAMOND, 2, null, m.x, m.y);
+                }
+            }
+        }
+    }
+
+    private boolean nothingLeftToUnlock() {
+        for (ShopCatalog.Unlock u : shop.unlocks()) {
+            if (!ShopCatalog.owned(u, profile) && ShopCatalog.requirementMet(u, profile)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * What a chest opened permanently, taken once.
+     *
+     * <p>Polled rather than pushed, like {@link #shopRequested}: writing the
+     * profile to disk and putting a card on the screen are both the screen's
+     * business, and the world has neither a save manager nor a font for it.
+     */
+    public ShopCatalog.Unlock takeUnlock() {
+        ShopCatalog.Unlock won = unlocked;
+        unlocked = null;
+        return won;
+    }
+
+    /**
+     * Rolls a chest's chance of opening something permanently: a weapon, or a
+     * ninja.
+     *
+     * <p>Not a loot table entry, and it cannot be one. A table hands back an
+     * item id which becomes a pickup and then a line in {@code RunState}; an
+     * unlock is written into {@code Profile} and outlives the run entirely.
+     * Those are different places and different lifetimes, so this is its own
+     * roll beside {@link #grantRelic}.
+     *
+     * <p><b>Only what the player could already have earned.</b> The roll draws
+     * from the unlocks that are unowned <em>and</em> whose requirement is
+     * already met, because a hammer falling out of a chest for a player who
+     * has not reached floor five is a reward that arrives without its story -
+     * and it quietly deletes the milestone the requirement was there to mark.
+     * A player who has met the requirement and not saved the gold is exactly
+     * who this is for.
+     *
+     * <p>Nothing to give is not nothing to gain: a chest that rolls a hit with
+     * the shelf empty pays in gems instead, so the roll is never wasted.
+     *
+     * @return what was opened, or null
+     */
+    private ShopCatalog.Unlock rollUnlock(float x, float y) {
+        if (shop == null || profile == null) {
+            return null;
+        }
+        Array<ShopCatalog.Unlock> weapons = new Array<>();
+        Array<ShopCatalog.Unlock> characters = new Array<>();
+        for (ShopCatalog.Unlock u : shop.unlocks()) {
+            if (ShopCatalog.owned(u, profile) || !ShopCatalog.requirementMet(u, profile)) {
+                continue;
+            }
+            (u.kind == ShopCatalog.UnlockKind.CHARACTER ? characters : weapons).add(u);
+        }
+        if (weapons.isEmpty() && characters.isEmpty()) {
+            return null;
+        }
+        // Characters first and at a quarter of the chance: there are five of
+        // them against six weapons, they cost two to four times as much, and
+        // one arriving is the rarer thing to have happen.
+        float roll = rng.nextFloat();
+        Array<ShopCatalog.Unlock> from = null;
+        if (roll < CHARACTER_FROM_CHEST && !characters.isEmpty()) {
+            from = characters;
+        } else if (roll < CHARACTER_FROM_CHEST + WEAPON_FROM_CHEST && !weapons.isEmpty()) {
+            from = weapons;
+        }
+        if (from == null) {
+            return null;
+        }
+        ShopCatalog.Unlock won = from.get(rng.nextInt(from.size));
+        if (won.kind == ShopCatalog.UnlockKind.CHARACTER) {
+            profile.unlockedCharacters.add(won.id);
+        } else {
+            profile.unlockedWeapons.add(won.id);
+        }
+        return won;
     }
 
     /**
@@ -1410,6 +1521,7 @@ public final class EntityWorld implements World, AiContext {
         TextureRegion region;
         switch (kind) {
             case GOLD: region = goldRegion; break;
+            case DIAMOND: region = gemRegion; break;
             case HEART: region = heartRegion; break;
             case KEY: region = keyRegion; break;
             default: region = null; break;
@@ -1440,6 +1552,7 @@ public final class EntityWorld implements World, AiContext {
             Pickup.Kind kind;
             switch (item.kind) {
                 case GOLD: kind = Pickup.Kind.GOLD; break;
+                case DIAMOND: kind = Pickup.Kind.DIAMOND; break;
                 case KEY: kind = Pickup.Kind.KEY; break;
                 case INSTANT: kind = Pickup.Kind.HEART; break;
                 default: kind = Pickup.Kind.ITEM; break;
@@ -1459,6 +1572,14 @@ public final class EntityWorld implements World, AiContext {
             case GOLD:
                 run.gold += Math.max(1, Math.round(p.amount * player.mods().goldMult()));
                 sfx(Assets.Sfx.COIN);
+                break;
+            case DIAMOND:
+                // Not multiplied by goldMult. The fortune track is priced
+                // against gold income, and letting it compound the scarce
+                // currency as well would make it the only upgrade worth
+                // buying twice.
+                run.diamonds += p.amount;
+                sfx(Assets.Sfx.KEY_GET);
                 break;
             case KEY:
                 run.keys += p.amount;
@@ -1521,6 +1642,12 @@ public final class EntityWorld implements World, AiContext {
                 break;
             case "gold":
                 run.gold += Math.max(1, Math.round(magnitude * player.mods().goldMult()));
+                break;
+            case "diamond":
+                // No goldMult, for the reason collect() gives: the fortune
+                // track is priced against gold income and must not compound
+                // the scarce currency as well.
+                run.diamonds += magnitude;
                 break;
             case "key":
                 run.keys += magnitude;
@@ -1685,6 +1812,7 @@ public final class EntityWorld implements World, AiContext {
         goldRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.COIN);
         heartRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.PICKUP_HEART);
         keyRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.KEY);
+        gemRegion = uiAtlas == null ? null : uiAtlas.findRegion(Assets.Ui.GEM);
     }
 
     /**

@@ -53,7 +53,7 @@ public final class ContentValidator {
 
     /** Every pickup effect the inventory and pickup code must interpret. */
     public static final Set<String> ITEM_EFFECTS = Set.of(
-        "heal", "cure_poison", "max_hp_add", "gold", "key",
+        "heal", "cure_poison", "max_hp_add", "gold", "diamond", "key",
         "speed_buff", "damage_buff", "shield_buff", "drop_aggro", "reveal_map");
 
     /** Every village-upgrade and character-perk effect run start must apply. */
@@ -345,15 +345,25 @@ public final class ContentValidator {
             c.fail(w, "effect '" + i.effect + "' is not one the pickup code implements."
                 + " Known: " + new java.util.TreeSet<>(ITEM_EFFECTS));
         }
-        // Gold and keys are routed by kind, not by effect: a GOLD item with a
-        // "heal" effect would add to the purse and never heal.
+        // Currencies and keys are routed by kind, not by effect: a GOLD item
+        // with a "heal" effect would add to the purse and never heal.
         boolean goldKind = i.kind == ItemDef.Kind.GOLD;
+        boolean gemKind = i.kind == ItemDef.Kind.DIAMOND;
         boolean keyKind = i.kind == ItemDef.Kind.KEY;
         if (goldKind != "gold".equals(i.effect)) {
             c.fail(w, "kind " + i.kind + " and effect '" + i.effect + "' disagree about gold");
         }
+        if (gemKind != "diamond".equals(i.effect)) {
+            c.fail(w, "kind " + i.kind + " and effect '" + i.effect + "' disagree about gems");
+        }
         if (keyKind != "key".equals(i.effect)) {
             c.fail(w, "kind " + i.kind + " and effect '" + i.effect + "' disagree about keys");
+        }
+        // A gem is not for sale. The trader takes gold, and an item the player
+        // could buy with gold and bank as a gem would be an exchange rate
+        // nobody designed.
+        if (gemKind && i.price > 0) {
+            c.fail(w, "is a gem and has a price; the trader deals in gold only");
         }
         c.positive(w, "stackSize", i.stackSize);
         c.atLeast(w, "magnitude", i.magnitude, 0);

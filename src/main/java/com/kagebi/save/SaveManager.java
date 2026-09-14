@@ -185,6 +185,7 @@ public final class SaveManager {
         JsonValue root = new JsonValue(JsonValue.ValueType.object);
         root.addChild("version", new JsonValue(Profile.CURRENT_VERSION));
         root.addChild("gold", new JsonValue(p.gold));
+        root.addChild("diamonds", new JsonValue(p.diamonds));
         root.addChild("runs", new JsonValue(p.runs));
         root.addChild("wins", new JsonValue(p.wins));
         root.addChild("deepestFloor", new JsonValue(p.deepestFloor));
@@ -242,6 +243,7 @@ public final class SaveManager {
         Profile p = new Profile();
         p.version = Profile.CURRENT_VERSION;
         p.gold = root.getInt("gold", p.gold);
+        p.diamonds = root.getInt("diamonds", p.diamonds);
         p.runs = root.getInt("runs", p.runs);
         p.wins = root.getInt("wins", p.wins);
         p.deepestFloor = root.getInt("deepestFloor", p.deepestFloor);

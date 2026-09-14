@@ -55,6 +55,7 @@
   "game.stats.floor": "Deepest floor",
   "game.stats.kills": "Enemies slain",
   "game.stats.gold": "Gold earned",
+  "game.stats.gems": "Gems found",
   "game.stats.time": "Time",
 
   "floor.1": "The Old Well",
@@ -136,6 +137,7 @@
 
   "dungeon.no_rooms": "No room templates to build a floor from",
   "dungeon.locked": "The door wants an iron key",
+  "dungeon.unlocked": "Yours from now on",
 
   "credits.note": "A non-commercial project built on free assets",
   "credits.art": "ART",

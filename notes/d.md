@@ -47,8 +47,15 @@ places, and `ContentValidatorTest` will tell you if you forget.
 
 Used by `ItemDef.effect`. Pickup and inventory code interprets these.
 
-`heal`, `cure_poison`, `max_hp_add`, `gold`, `key`,
+`heal`, `cure_poison`, `max_hp_add`, `gold`, `diamond`, `key`,
 `speed_buff`, `damage_buff`, `shield_buff`, `drop_aggro`, `reveal_map`.
+
+`gold`, `diamond` and `key` are routed by `ItemDef.kind` as well as by effect,
+and `ContentValidator` fails an item whose kind and effect disagree - a GOLD
+item with a `heal` effect would pay into the purse and never heal. `diamond` is
+the second currency: banked into `Profile.diamonds` like gold, found only in
+chests, and deliberately **not** multiplied by `gold_mult`, because the fortune
+upgrade track is priced against gold income.
 
 `speed_buff`, `damage_buff` and `shield_buff` all last 600 steps (10s) so the
 player only has to learn one duration. `shield_buff`'s magnitude is a flat

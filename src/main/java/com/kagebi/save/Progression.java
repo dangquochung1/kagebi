@@ -38,6 +38,7 @@ public final class Progression {
      */
     public static void bank(Profile p, RunSummary run, float darknessResist) {
         p.gold += Math.max(0, run.gold);
+        p.diamonds += Math.max(0, run.diamonds);
         p.runs++;
         p.deepestFloor = Math.max(p.deepestFloor, run.deepestFloor);
         if (run.victory) {

@@ -128,26 +128,36 @@
     // strictly better item, so the progression is in reliability.
 
     {
-      "id": "chest_common", "rolls": 2, "nothingWeight": 10,
+      "id": "chest_common", "rolls": 2, "nothingWeight": 8,
       "entries": [
-        { "itemId": "gold_pouch",    "weight": 30, "min": 1, "max": 2 },
-        { "itemId": "potion_small",  "weight": 22, "min": 1, "max": 1 },
-        { "itemId": "heart_large",   "weight": 14, "min": 1, "max": 1 },
-        { "itemId": "key_iron",      "weight": 12, "min": 1, "max": 1 },
-        { "itemId": "antidote",      "weight": 7,  "min": 1, "max": 1 },
-        { "itemId": "draught_swift", "weight": 5,  "min": 1, "max": 1 }
+        { "itemId": "gold_pouch",     "weight": 22, "min": 1, "max": 2 },
+        { "itemId": "potion_small",   "weight": 20, "min": 1, "max": 1 },
+        { "itemId": "heart_large",    "weight": 14, "min": 1, "max": 1 },
+        { "itemId": "key_iron",       "weight": 12, "min": 1, "max": 1 },
+        { "itemId": "antidote",       "weight": 7,  "min": 1, "max": 1 },
+        { "itemId": "draught_swift",  "weight": 5,  "min": 1, "max": 1 },
+        // The shelf, in a chest. Four in a hundred each, twice, so an
+        // ordinary chest hands over something the trader would charge ninety
+        // to a hundred and ten for about one time in seven. Rare enough that
+        // it is a moment; common enough that a player meets one before they
+        // have the gold to buy one.
+        { "itemId": "elixir_ward",    "weight": 4,  "min": 1, "max": 1 },
+        { "itemId": "draught_shadow", "weight": 4,  "min": 1, "max": 1 },
+        { "itemId": "gem_shard",      "weight": 4,  "min": 1, "max": 1 }
       ]
     },
     {
       "id": "chest_treasure", "rolls": 2, "nothingWeight": 0,
       "entries": [
-        { "itemId": "gold_pouch",     "weight": 26, "min": 2, "max": 3 },
+        { "itemId": "gold_pouch",     "weight": 22, "min": 2, "max": 3 },
         { "itemId": "potion_large",   "weight": 20, "min": 1, "max": 1 },
-        { "itemId": "key_iron",       "weight": 16, "min": 1, "max": 2 },
+        { "itemId": "key_iron",       "weight": 13, "min": 1, "max": 2 },
         { "itemId": "draught_swift",  "weight": 12, "min": 1, "max": 1 },
         { "itemId": "draught_shadow", "weight": 10, "min": 1, "max": 1 },
         { "itemId": "soul_ember",     "weight": 9,  "min": 1, "max": 1 },
-        { "itemId": "gold_cache",     "weight": 7,  "min": 1, "max": 1 }
+        { "itemId": "gold_cache",     "weight": 7,  "min": 1, "max": 1 },
+        { "itemId": "gem_shard",      "weight": 5,  "min": 1, "max": 1 },
+        { "itemId": "gem_cluster",    "weight": 2,  "min": 1, "max": 1 }
       ]
     },
     {
@@ -155,13 +165,15 @@
       // rolls and no nothing weight is what buys that.
       "id": "chest_locked", "rolls": 3, "nothingWeight": 0,
       "entries": [
-        { "itemId": "gold_cache",     "weight": 24, "min": 1, "max": 2 },
-        { "itemId": "potion_large",   "weight": 20, "min": 1, "max": 1 },
+        { "itemId": "gold_cache",     "weight": 20, "min": 1, "max": 2 },
+        { "itemId": "potion_large",   "weight": 16, "min": 1, "max": 1 },
         { "itemId": "soul_ember",     "weight": 16, "min": 1, "max": 1 },
         { "itemId": "elixir_ward",    "weight": 14, "min": 1, "max": 1 },
         { "itemId": "draught_shadow", "weight": 12, "min": 1, "max": 1 },
         { "itemId": "smoke_bomb",     "weight": 8,  "min": 1, "max": 1 },
-        { "itemId": "map_scrap",      "weight": 6,  "min": 1, "max": 1 }
+        { "itemId": "map_scrap",      "weight": 6,  "min": 1, "max": 1 },
+        { "itemId": "gem_shard",      "weight": 5,  "min": 1, "max": 1 },
+        { "itemId": "gem_cluster",    "weight": 3,  "min": 1, "max": 1 }
       ]
     },
     {
@@ -169,22 +181,28 @@
       // remembered for what it did to the run, not for what it paid.
       "id": "chest_secret", "rolls": 2, "nothingWeight": 0,
       "entries": [
-        { "itemId": "soul_ember",  "weight": 26, "min": 1, "max": 2 },
-        { "itemId": "gold_cache",  "weight": 22, "min": 1, "max": 2 },
+        { "itemId": "soul_ember",  "weight": 22, "min": 1, "max": 2 },
+        { "itemId": "gold_cache",  "weight": 18, "min": 1, "max": 2 },
         { "itemId": "elixir_ward", "weight": 18, "min": 1, "max": 1 },
         { "itemId": "map_scrap",   "weight": 14, "min": 1, "max": 1 },
         { "itemId": "key_ring",    "weight": 12, "min": 1, "max": 1 },
-        { "itemId": "smoke_bomb",  "weight": 8,  "min": 1, "max": 1 }
+        { "itemId": "smoke_bomb",  "weight": 8,  "min": 1, "max": 1 },
+        // The richest gem weights in the game, because a secret room is the
+        // one the player had to look for.
+        { "itemId": "gem_shard",   "weight": 4,  "min": 1, "max": 2 },
+        { "itemId": "gem_cluster", "weight": 4,  "min": 1, "max": 1 }
       ]
     },
     {
       "id": "chest_boss", "rolls": 3, "nothingWeight": 0,
       "entries": [
-        { "itemId": "gold_cache",   "weight": 30, "min": 2, "max": 4 },
-        { "itemId": "potion_large", "weight": 24, "min": 1, "max": 2 },
+        { "itemId": "gold_cache",   "weight": 26, "min": 2, "max": 4 },
+        { "itemId": "potion_large", "weight": 20, "min": 1, "max": 2 },
         { "itemId": "soul_ember",   "weight": 20, "min": 1, "max": 2 },
         { "itemId": "elixir_ward",  "weight": 14, "min": 1, "max": 1 },
-        { "itemId": "key_ring",     "weight": 12, "min": 1, "max": 1 }
+        { "itemId": "key_ring",     "weight": 12, "min": 1, "max": 1 },
+        { "itemId": "gem_shard",    "weight": 4,  "min": 1, "max": 2 },
+        { "itemId": "gem_cluster",  "weight": 4,  "min": 1, "max": 1 }
       ]
     },
 

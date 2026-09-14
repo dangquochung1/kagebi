@@ -10,6 +10,12 @@ public final class ItemDef {
         KEY,
         /** Adds to the run purse, and survives death as meta-currency. */
         GOLD,
+        /**
+         * The other purse. Rarer than gold by an order of magnitude, banked
+         * the same way, and deliberately not multiplied by the fortune
+         * upgrade - that track is priced against gold income.
+         */
+        DIAMOND,
         /** Takes effect the moment it is walked over. */
         INSTANT
     }

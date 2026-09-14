@@ -32,6 +32,7 @@ class SaveManagerTest {
     private static Profile rich() {
         Profile p = new Profile();
         p.gold = 1234;
+        p.diamonds = 46;
         p.runs = 7;
         p.wins = 1;
         p.deepestFloor = 5;
@@ -47,6 +48,7 @@ class SaveManagerTest {
 
     private static void assertSameProfile(Profile a, Profile b) {
         assertEquals(a.gold, b.gold, "gold");
+        assertEquals(a.diamonds, b.diamonds, "diamonds");
         assertEquals(a.runs, b.runs, "runs");
         assertEquals(a.wins, b.wins, "wins");
         assertEquals(a.deepestFloor, b.deepestFloor, "deepestFloor");

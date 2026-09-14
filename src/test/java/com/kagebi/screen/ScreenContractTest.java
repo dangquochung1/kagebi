@@ -139,8 +139,9 @@ class ScreenContractTest {
             "pause.title", "pause.resume", "pause.abandon", "pause.confirm", "pause.to_menu",
             "inv.title", "inv.relics", "inv.items", "inv.empty", "inv.slot_empty",
             "end.banked", "end.to_village", "dungeon.no_rooms", "dungeon.locked",
+            "dungeon.unlocked",
             "game.title", "game.floor", "game.victory", "game.gameover",
-            "game.stats.floor", "game.stats.kills", "game.stats.gold", "game.stats.time",
+            "game.stats.floor", "game.stats.kills", "game.stats.gold", "game.stats.gems", "game.stats.time",
             "common.back", "common.locked", "floor.hub"}) {
             keys.add(k);
         }

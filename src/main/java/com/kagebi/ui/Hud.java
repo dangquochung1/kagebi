@@ -38,6 +38,8 @@ public final class Hud {
     private static final int MAP_H = 42;
 
     private static final Color GOLD = new Color(0xffad55ff);
+    /** The gem's own violet, so the number reads as the same currency. */
+    private static final Color GEM = new Color(0xc08ce0ff);
     private static final Color SOFT = new Color(0xe8cfa9ff);
     private static final Color SHADOW = new Color(0x0c0a10c0);
     private static final Color CHIP_TEXT = new Color(0xffe6c4ff);
@@ -49,6 +51,7 @@ public final class Hud {
     private final TextureRegion[] hearts;
     private final TextureRegion coin;
     private final TextureRegion key;
+    private final TextureRegion gem;
     private final TextureRegion pixel;
 
     /** Whether the floor map is expanded over the whole screen. */
@@ -69,6 +72,7 @@ public final class Hud {
         }
         coin = skin.getRegion(Assets.Ui.COIN);
         key = skin.getRegion(Assets.Ui.KEY);
+        gem = skin.getRegion(Assets.Ui.GEM);
         pixel = skin.getRegion(Assets.Ui.PIXEL);
     }
 
@@ -146,13 +150,22 @@ public final class Hud {
         batch.setColor(GOLD);
         shadowed(batch, font, gold, x + 11, top, Align.left);
         batch.setColor(Color.WHITE);
+        // Keys and gems earn their pixels only while the player holds one. A
+        // permanent "0" is a line of HUD that never says anything - and at
+        // 320x180 the top-left corner is shared with five hearts.
+        int next = x + 11 + Math.round(width(font, gold)) + 7;
         if (run.keys > 0) {
-            // Keys earn their pixels only while the player holds one. A
-            // permanent "0" is a line of HUD that never says anything.
-            int kx = x + 11 + Math.round(width(font, gold)) + 7;
-            batch.draw(key, kx, top - 10);
+            batch.draw(key, next, top - 10);
             batch.setColor(SOFT);
-            shadowed(batch, font, String.valueOf(run.keys), kx + 15, top, Align.left);
+            String keys = String.valueOf(run.keys);
+            shadowed(batch, font, keys, next + 15, top, Align.left);
+            batch.setColor(Color.WHITE);
+            next += 15 + Math.round(width(font, keys)) + 7;
+        }
+        if (run.diamonds > 0) {
+            batch.draw(gem, next, top - 10);
+            batch.setColor(GEM);
+            shadowed(batch, font, String.valueOf(run.diamonds), next + 11, top, Align.left);
             batch.setColor(Color.WHITE);
         }
     }

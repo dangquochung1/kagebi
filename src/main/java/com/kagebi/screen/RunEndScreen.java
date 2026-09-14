@@ -126,6 +126,12 @@ abstract class RunEndScreen extends SimScreen {
         stat(panel, t.get("game.stats.floor"), String.valueOf(summary.deepestFloor));
         stat(panel, t.get("game.stats.kills"), String.valueOf(summary.kills));
         stat(panel, t.get("game.stats.gold"), String.valueOf(summary.gold));
+        // Gems only when there were some. Most runs find none, and a row of
+        // zero on the screen that sums up a run says the run was worse than
+        // it was.
+        if (summary.diamonds > 0) {
+            stat(panel, t.get("game.stats.gems"), String.valueOf(summary.diamonds));
+        }
         stat(panel, t.get("game.stats.time"), summary.time());
 
         panel.add(new Label(t.format("end.banked", banked), game.skin(), "dim"))

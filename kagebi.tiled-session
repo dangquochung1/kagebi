@@ -1,11 +1,11 @@
 {
     "activeFile": "assets/maps/village.tmx",
     "expandedProjectPaths": [
-        "assets/maps/rooms",
-        "assets/maps",
         "assets/maps/rooms/ruins_orange",
+        "assets/maps/rooms/depths",
+        "assets/maps/rooms",
         "assets/maps/rooms/ruins_green",
-        "assets/maps/rooms/depths"
+        "assets/maps"
     ],
     "fileStates": {
         "assets/maps/rooms/depths/normal_01.tmx": {
@@ -13,7 +13,7 @@
             "selectedLayer": 2,
             "viewCenter": {
                 "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "y": 87.57894736842105
             }
         },
         "assets/maps/rooms/depths/normal_01.tmx#dungeon": {

@@ -98,6 +98,24 @@
       "kind": "GOLD", "effect": "gold", "magnitude": 45, "stackSize": 999
     },
 
+    // ---------------- gems ------------------------------------------------
+    // The second purse. Deliberately about a hundredth of the gold income:
+    // a shard is worth one, a cluster five, and only chests carry them - no
+    // enemy pays in gems and the trader will not take them. What they buy is
+    // not decided yet, which is exactly why they bank rather than being spent
+    // where they are found, and why neither is priced.
+
+    {
+      "id": "gem_shard", "nameKey": "item.gem_shard.name", "descKey": "item.gem_shard.desc",
+      "sprite": "items/resource/gempurple", "icon": "gem_blue",
+      "kind": "DIAMOND", "effect": "diamond", "magnitude": 1, "stackSize": 999
+    },
+    {
+      "id": "gem_cluster", "nameKey": "item.gem_cluster.name", "descKey": "item.gem_cluster.desc",
+      "sprite": "items/resource/gempurple", "icon": "crystal_purple",
+      "kind": "DIAMOND", "effect": "diamond", "magnitude": 5, "stackSize": 999
+    },
+
     // ---------------- instants -------------------------------------------
     // Taken the moment they are stepped on. No inventory slot, no decision.
 

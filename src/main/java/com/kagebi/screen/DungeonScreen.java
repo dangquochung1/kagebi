@@ -17,6 +17,7 @@ import com.kagebi.Cfg;
 import com.kagebi.Dir;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.ShopCatalog;
 import com.kagebi.data.def.FloorDef;
 import com.kagebi.entity.DemoInput;
 import com.kagebi.entity.EntityWorld;
@@ -121,6 +122,9 @@ public class DungeonScreen extends SimScreen {
     private int title;
     /** Steps left on the "you need a key" card at a locked door. */
     private int locked;
+    /** Steps left on the card announcing what a chest opened, and its name. */
+    private int unlocked;
+    private String unlockCard;
 
     private boolean nearExit;
     private boolean ended;
@@ -410,6 +414,9 @@ public class DungeonScreen extends SimScreen {
         if (locked > 0) {
             locked--;
         }
+        if (unlocked > 0) {
+            unlocked--;
+        }
         if (fade > 0) {
             fade--;
             if (fade == FADE_STEPS && fadeAction != null) {
@@ -483,8 +490,12 @@ public class DungeonScreen extends SimScreen {
                 // The shopkeeper's answer. Until this line the world raised the
                 // flag and nothing ever looked at it, so the "Trade" prompt over
                 // his head was a promise the game could not keep.
-                if (world instanceof EntityWorld && ((EntityWorld) world).shopRequested()) {
-                    stack().push(new TraderScreen(game));
+                if (world instanceof EntityWorld) {
+                    EntityWorld w = (EntityWorld) world;
+                    if (w.shopRequested()) {
+                        stack().push(new TraderScreen(game));
+                    }
+                    announceUnlock(w.takeUnlock());
                 }
             }
         }
@@ -517,6 +528,28 @@ public class DungeonScreen extends SimScreen {
         }
         game.audio().playSfx(Assets.SFX_ACCEPT);
         return true;
+    }
+
+    /**
+     * Writes down what a chest just opened, and says so.
+     *
+     * <p>Saved here and immediately, the way the village shop saves on every
+     * purchase: this is the only thing outside a finished run that changes the
+     * profile, and a player who finds a hammer on floor four and then closes
+     * the game has every right to still have it. The world does the rolling
+     * and owns neither a save manager nor a font, so the two halves that touch
+     * the disk and the screen are here.
+     */
+    private void announceUnlock(ShopCatalog.Unlock won) {
+        if (won == null) {
+            return;
+        }
+        if (!game.saves().save(game.profile())) {
+            Gdx.app.error("save", "profile not written; " + won.id + " may not survive a restart");
+        }
+        I18n t = game.i18n();
+        unlockCard = t.get(won.nameKey);
+        unlocked = Hud.CARD_STEPS;
     }
 
     private void startSlide(Dir door, Room next) {
@@ -664,9 +697,13 @@ public class DungeonScreen extends SimScreen {
             return;         // still going dark on the floor above, or covered
         }
         I18n t = game.i18n();
-        // The locked door speaks over the floor name rather than beside it.
-        // They cannot both be on screen and mean anything, and the one the
-        // player has just walked into is the one they are asking about.
+        // One card at a time, newest first. They cannot both be on screen and
+        // mean anything, and the one the player has just caused is the one
+        // they are looking for.
+        if (unlocked > 0) {
+            Hud.card(batch, game.skin(), font, unlocked, t.get("dungeon.unlocked"), unlockCard);
+            return;
+        }
         if (locked > 0) {
             Hud.card(batch, game.skin(), font, locked, t.get("dungeon.locked"), null);
             return;

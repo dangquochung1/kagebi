@@ -134,7 +134,7 @@ class ShopCatalogTest {
     void bankingAppliesTheFlamekeeperUpgrade() {
         p.upgrades.put("flamekeeper", 2);
         for (int i = 0; i < 5; i++) {
-            shop.bank(p, new RunSummary(2, 30, 100, 400f, false));
+            shop.bank(p, new RunSummary(2, 30, 100, 0, 400f, false));
         }
         assertEquals(0, p.villageDarkness, "two levels of flamekeeper hold the dark off entirely");
         assertEquals(500, p.gold);

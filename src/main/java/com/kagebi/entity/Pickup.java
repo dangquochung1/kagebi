@@ -19,7 +19,7 @@ import com.kagebi.run.RunState;
  */
 public final class Pickup extends Entity {
 
-    public enum Kind { GOLD, HEART, KEY, ITEM }
+    public enum Kind { GOLD, DIAMOND, HEART, KEY, ITEM }
 
     /** Virtual pixels. Roughly two tiles: generous, but not across the room. */
     public static final float MAGNET = 34f;

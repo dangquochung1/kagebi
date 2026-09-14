@@ -5,10 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+
 import org.junit.jupiter.api.Test;
 
+import com.badlogic.gdx.files.FileHandle;
 import com.kagebi.Dir;
 import com.kagebi.ai.AiState;
+import com.kagebi.assets.Assets;
 import com.kagebi.combat.Faction;
 import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
@@ -476,6 +480,103 @@ class EntityWorldTest {
 
         w.player().placeAt(100f, 88f, Dir.DOWN);
         assertEquals(EntityWorld.PROMPT_CHEST, w.promptKey(), "which is still openable");
+    }
+
+    // ---- what a chest can open permanently --------------------------------------
+
+    /**
+     * The shipped shop, so the rules under test are the ones players meet.
+     * Read off plain files, the way every headless test here reads content:
+     * there is no Gdx.files without a window.
+     */
+    private static ShopCatalog shippedShop() {
+        return ShopCatalog.parse(new FileHandle(new File(Assets.DATA_DIR)));
+    }
+
+    /**
+     * Opens one chest in a treasure room, on its own world and its own seed,
+     * and returns what it unlocked. Its own world each time because enterRoom
+     * re-seeds from the run seed and the room's coordinates, so re-entering
+     * one room would roll the identical number for ever.
+     */
+    private static ShopCatalog.Unlock openOneChest(ShopCatalog shop, Profile profile,
+                                                   long seed) {
+        RunState run = new RunState(seed, "ninjagreen", "katana", 100);
+        run.floor = 1;
+        EntityWorld w = world(registry(), run);
+        w.useVillage(shop, profile);
+        w.enterRoom(TestDefs.room(RoomKind.TREASURE, TestDefs.at(CHEST, 160, 88, null)),
+            TestDefs.walled(), null);
+        w.player().placeAt(160f, 88f, Dir.DOWN);
+        w.interact();
+        return w.takeUnlock();
+    }
+
+    /**
+     * The rule that keeps the milestone meaning something. A hammer falling
+     * out of a chest for a player who has not reached floor five is a reward
+     * that arrives without its story, and it quietly deletes the requirement
+     * the shop put on it.
+     */
+    @Test
+    void aChestNeverOpensSomethingTheProfileHasNotEarned() {
+        ShopCatalog shop = shippedShop();
+        Profile fresh = new Profile();
+        for (long seed = 1; seed <= 3000; seed++) {
+            ShopCatalog.Unlock won = openOneChest(shop, fresh, seed);
+            if (won != null) {
+                assertTrue(ShopCatalog.requirementMet(won, fresh),
+                    won.id + " came out of a chest with its requirement unmet");
+            }
+        }
+    }
+
+    /** Nor something already owned: an unlock that changes nothing is a miss. */
+    @Test
+    void aChestNeverOpensSomethingAlreadyOwned() {
+        ShopCatalog shop = shippedShop();
+        Profile p = new Profile();
+        // Everything earnable, and everything earned.
+        p.deepestFloor = 5;
+        p.wins = 1;
+        p.runs = 20;
+        for (ShopCatalog.Unlock u : shop.unlocks()) {
+            if (u.kind == ShopCatalog.UnlockKind.CHARACTER) {
+                p.unlockedCharacters.add(u.id);
+            } else {
+                p.unlockedWeapons.add(u.id);
+            }
+        }
+        for (long seed = 1; seed <= 500; seed++) {
+            assertNull(openOneChest(shop, p, seed),
+                "there was nothing left to open");
+        }
+    }
+
+    /**
+     * And it does actually happen. A rule about what a roll may not produce is
+     * worth nothing if the roll never produces anything.
+     */
+    @Test
+    void aChestSometimesOpensAWeaponForAProfileThatHasEarnedOne() {
+        ShopCatalog shop = shippedShop();
+        int opened = 0;
+        for (long seed = 1; seed <= 3000; seed++) {
+            Profile p = new Profile();
+            p.deepestFloor = 5;
+            p.wins = 1;
+            p.runs = 20;
+            p.bestiary.add("slime");
+            if (openOneChest(shop, p, seed) != null) {
+                opened++;
+            }
+        }
+        // 2.5% of 3000 is 75. The band is wide because this is asserting that
+        // the roll is wired up at roughly the intended rate, not pinning the
+        // rate itself - that is a constant in EntityWorld, and it is the one
+        // place it should be changed.
+        assertTrue(opened > 20 && opened < 160,
+            "expected roughly 75 unlocks in 3000 chests, got " + opened);
     }
 
     // ---- the village ------------------------------------------------------------

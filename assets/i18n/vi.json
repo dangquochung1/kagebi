@@ -55,6 +55,7 @@
   "game.stats.floor": "Tầng sâu nhất",
   "game.stats.kills": "Quái đã hạ",
   "game.stats.gold": "Vàng thu được",
+  "game.stats.gems": "Ngọc nhặt được",
   "game.stats.time": "Thời gian",
 
   "floor.1": "Giếng Cổ",
@@ -136,6 +137,7 @@
 
   "dungeon.no_rooms": "Không có phòng nào để dựng tầng",
   "dungeon.locked": "Cửa này cần một chìa sắt",
+  "dungeon.unlocked": "Từ nay là của bạn",
 
   "credits.note": "Dự án phi thương mại, dựng từ tài nguyên miễn phí",
   "credits.art": "MỸ THUẬT",

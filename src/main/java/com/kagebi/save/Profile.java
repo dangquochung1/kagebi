@@ -20,6 +20,20 @@ public final class Profile {
 
     /** Banked gold, spent in the village between runs. */
     public int gold;
+
+    /**
+     * Banked gems: the second purse, and the scarce one.
+     *
+     * <p>Gold is what a run produces by the hundred and the village shop is
+     * priced in it. Gems come out of chests a few at a time and are meant to
+     * buy a different kind of thing - what, exactly, is not decided yet, which
+     * is the reason they bank rather than being spent as they are found.
+     *
+     * <p>Kept whole through death for the same reason gold is: a currency that
+     * is taxed on death teaches the player to stop playing while they are
+     * ahead, and this one is far too slow to earn to risk that.
+     */
+    public int diamonds;
     /** Permanent upgrade id to level. */
     public final ObjectIntMap<String> upgrades = new ObjectIntMap<>();
 

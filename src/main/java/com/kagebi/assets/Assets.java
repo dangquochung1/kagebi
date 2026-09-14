@@ -126,6 +126,16 @@ public final class Assets {
         public static final String PICKUP = S + "bonus/bonus.wav";
         public static final String HEAL = S + "bonus/bonus2.wav";
         public static final String KEY_GET = S + "bonus/bonus3.wav";
+        /**
+         * A chest opening something permanently.
+         *
+         * <p>The one pickup sound that is not in the bonus folder, because it
+         * is not a pickup: what it announces outlives the run. The secret
+         * jingle is short enough to fire in the world rather than over a
+         * screen, and it is the only cue in the pack that already means "you
+         * have found something that was hidden".
+         */
+        public static final String UNLOCK = JINGLE_DIR + "secret1.wav";
         /** A boss noticing the player, or changing phase. */
         public static final String ALERT = S + "alert/alert.wav";
 
@@ -189,6 +199,17 @@ public final class Assets {
 
         public static final String COIN = "items/treasure/goldcoin";
         public static final String KEY = "items/treasure/goldkey";
+
+        /**
+         * The gem, on the floor and on the HUD.
+         *
+         * <p>The pack ships four colourways - green, purple, red and yellow -
+         * and no blue one, so this is the whole choice. Purple reads as the
+         * precious one against a floor that is brown on three biomes and
+         * grey-violet on the other two, and does not collide with the red a
+         * heart is or the yellow a coin is.
+         */
+        public static final String GEM = "items/resource/gempurple";
 
         /**
          * The heart a dead enemy drops. A potion rather than the HUD's
