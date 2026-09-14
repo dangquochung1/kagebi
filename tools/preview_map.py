@@ -14,8 +14,13 @@ inside an obstacle - is obvious beside its neighbours and invisible alone.
 that never shows up in a plain render, and a chest buried in a wall looks
 exactly like a correct room until someone plays it.
 
+`--collision` tints everything that stops the player red: whole tiles in the
+walls and props layers, and the rectangles of a `collision` layer. What blocks
+is the other half that never draws, and in the village it is cut to the pixel.
+
 Usage:  python tools/preview_map.py assets/maps/village.tmx [out.png] [--zoom 2]
         python tools/preview_map.py assets/maps/rooms/ruins review/ruins.png --spawns
+        python tools/preview_map.py assets/maps/home.tmx review/home.png --collision
 """
 import os
 import sys
@@ -68,12 +73,18 @@ def load(tmx_path):
 
     out = Image.new("RGBA", (mw * tw, mh * th), (0, 0, 0, 255))
     layers = root.findall("layer")
+    shapes = []
     for layer in layers:
         data = layer.find("data").text.replace("\n", "")
         gids = [int(v) for v in data.split(",") if v.strip()]
+        name = layer.get("name", "")
+        blocking = any(name == role or name.startswith(role + "_")
+                       for role in ("walls", "props"))
         for i, raw in enumerate(gids):
             if raw == 0:
                 continue
+            if blocking:
+                shapes.append(((i % mw) * tw, (i // mw) * th, tw, th))
             # Tiled keeps horizontal, vertical and diagonal flips in the top
             # three bits. Without masking them off, lookup() is handed a gid of
             # two billion and Pillow is asked to crop past the end of the
@@ -96,10 +107,24 @@ def load(tmx_path):
     objects = []
     for group in root.findall("objectgroup"):
         for obj in group.findall("object"):
+            if group.get("name") == "collision":
+                shapes.append((float(obj.get("x", 0)), float(obj.get("y", 0)),
+                               float(obj.get("width", 0)), float(obj.get("height", 0))))
+                continue
             objects.append((obj.get("type", ""),
                             float(obj.get("x", 0)), float(obj.get("y", 0)),
                             obj.get("name", "")))
-    return out, [l.get("name") for l in layers], objects, (mw, mh)
+    return out, [l.get("name") for l in layers], objects, shapes, (mw, mh)
+
+
+def draw_shapes(image, shapes, zoom):
+    """What blocks, as a translucent red over the art it belongs to."""
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    for x, y, w, h in shapes:
+        d.rectangle([x * zoom, y * zoom, (x + w) * zoom - 1, (y + h) * zoom - 1],
+                    fill=(255, 40, 40, 115))
+    image.alpha_composite(overlay)
 
 
 # Wall dressing is a spawn marker rather than a tile - see WALL_TORCHES in
@@ -157,12 +182,14 @@ def draw_objects(image, objects, zoom, width, letters):
         d.text((cx - 2, cy - 5), letter, fill=(0, 0, 0, 255))
 
 
-def render(tmx_path, out_path, zoom=2, spawns=False):
-    image, layer_names, objects, (mw, mh) = load(tmx_path)
+def render(tmx_path, out_path, zoom=2, spawns=False, collision=False):
+    image, layer_names, objects, shapes, (mw, mh) = load(tmx_path)
     width = image.width
     if zoom != 1:
         image = image.resize((image.width * zoom, image.height * zoom),
                              Image.NEAREST)
+    if collision:
+        draw_shapes(image, shapes, zoom)
     draw_objects(image, objects, zoom, width, spawns)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     image.convert("RGB").save(out_path)
@@ -179,7 +206,7 @@ def contact(folder, out_path, zoom=2, spawns=False, columns=3):
 
     shots = []
     for f in files:
-        image, _, objects, _ = load(os.path.join(folder, f))
+        image, _, objects, _, _ = load(os.path.join(folder, f))
         width = image.width
         image = image.resize((image.width * zoom, image.height * zoom),
                              Image.NEAREST)
@@ -217,7 +244,8 @@ if __name__ == "__main__":
     if "--zoom" in sys.argv:
         zoom = int(sys.argv[sys.argv.index("--zoom") + 1])
     spawns = "--spawns" in sys.argv
+    collision = "--collision" in sys.argv
     if os.path.isdir(src):
         contact(src, dst, zoom, spawns)
     else:
-        render(src, dst, zoom, spawns)
+        render(src, dst, zoom, spawns, collision)

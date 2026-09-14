@@ -199,7 +199,13 @@ def carry_decor(path, tilesets, layers, tiles_rel):
 
 
 def write_tmx(path, width, height, tilesets, layers,
-              tiles_rel="../gfx/tiles/overworld/", objects=None):
+              tiles_rel="../gfx/tiles/overworld/", objects=None, shapes=None):
+    """Write a finite, CSV-encoded map.
+
+    `objects` become the `spawns` layer, as (type, x, y, name). `shapes` become
+    the `collision` layer, as (x, y, width, height) rectangles in pixels with y
+    running down - what gen/TiledRooms.java treats as solid to the pixel.
+    """
     extra = carry_decor(path, tilesets, layers, tiles_rel)
     m = ET.Element("map", {
         "version": "1.10", "tiledversion": "1.10.2",
@@ -237,14 +243,31 @@ def write_tmx(path, width, height, tilesets, layers,
                                  layer.data[y * width:(y + 1) * width]))
         data.text = "\n" + ",\n".join(rows) + "\n"
 
+    next_object = 1
+    next_layer = len(layers) + 1
     if objects:
         group = ET.SubElement(m, "objectgroup",
-                              {"id": str(len(layers) + 1), "name": "spawns"})
-        for i, (kind, ox, oy, tag) in enumerate(objects, start=1):
-            attrs = {"id": str(i), "name": tag or "", "type": kind,
+                              {"id": str(next_layer), "name": "spawns"})
+        next_layer += 1
+        for kind, ox, oy, tag in objects:
+            attrs = {"id": str(next_object), "name": tag or "", "type": kind,
                      "x": str(ox), "y": str(oy)}
             ET.SubElement(group, "object", attrs)
-        m.set("nextobjectid", str(len(objects) + 1))
+            next_object += 1
+    if shapes:
+        # Hidden in Tiled until someone asks for it: it lies over every solid
+        # pixel of the map, and a person decorating wants to see the art.
+        group = ET.SubElement(m, "objectgroup", {
+            "id": str(next_layer), "name": "collision",
+            "color": "#ff3c3c", "visible": "0"})
+        next_layer += 1
+        for sx, sy, sw, sh in shapes:
+            ET.SubElement(group, "object", {
+                "id": str(next_object), "x": str(sx), "y": str(sy),
+                "width": str(sw), "height": str(sh)})
+            next_object += 1
+    m.set("nextobjectid", str(next_object))
+    m.set("nextlayerid", str(next_layer))
 
     ET.indent(m, space=" ")
     os.makedirs(os.path.dirname(path), exist_ok=True)

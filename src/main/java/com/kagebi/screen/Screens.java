@@ -27,8 +27,8 @@ import com.kagebi.settings.Difficulty;
  *   style     --page 1-2   widget sheet, surface sheet
  *   select    --page 1-6   character select, with that ninja highlighted
  *   loadout   --page 1-6   the same screen editing the run, over the village
- *   hub                    the village, arriving home
- *   home                   inside the player's house
+ *   hub       --page 1-2   the village: arriving home, or in the garden gateway
+ *   home      --page 1-2   inside the house: on the doormat, or on the rug by the table
  *   world     --page 1-5   the world map, open to that stage and focused on it
  *   stage     --page 1-5   the same, with that stage's panel and difficulty row
  *   cleared   --page 1-5   the stage-clear screen, for that stage
@@ -102,9 +102,11 @@ public final class Screens {
                 sampleRun(game, page);
                 return new GameScreen[] {new StageClearScreen(game)};
             case "hub":
-                return new GameScreen[] {new HubScreen(game)};
+                return new GameScreen[] {
+                    page >= 2 ? new HubScreen(game).arriveAt("gateway") : new HubScreen(game)};
             case "home":
-                return new GameScreen[] {new HubScreen(game), new HomeScreen(game)};
+                return new GameScreen[] {new HubScreen(game),
+                    page >= 2 ? new HomeScreen(game).arriveAt("rug") : new HomeScreen(game)};
             case "talk":
                 return new GameScreen[] {new HubScreen(game).talkingTo(page - 1)};
             case "store":

@@ -70,8 +70,8 @@ menu                   (default)
 settings  --page 1-3   audio, controls, video
 select    --page 1-6   character select, with that ninja highlighted
 loadout   --page 1-6   the same screen changing the run's kit, over the village
-hub                    the village, arriving home
-home                   inside the player's house
+hub       --page 1-2   the village: arriving home, or in the garden gateway
+home      --page 1-2   inside the house: on the doormat, or on the rug by the table
 world     --page 1-5   the world map, open to that stage and focused on it
 stage     --page 1-5   the same, with that stage's panel and its difficulty row
 cleared   --page 1-5   the stage-clear screen, for that stage
@@ -145,7 +145,7 @@ python tools/make_village.py   # rebuild the village and the house from the art 
 python tools/make_world.py     # lay out the world map again, keeping its decor layer
 python tools/pack_atlas.py     # repack the texture atlases
 python tools/make_font.py      # rebuild the bitmap font, Vietnamese marks included
-python tools/preview_map.py    # render a .tmx to a PNG, for looking at a room
+python tools/preview_map.py    # render a .tmx to a PNG; --collision tints what blocks red
 python tools/preview_tiles.py  # render a tileset with its grid, for measuring
 ```
 

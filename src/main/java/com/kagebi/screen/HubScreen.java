@@ -73,7 +73,7 @@ public class HubScreen extends SimScreen {
     private static final int DOOR_X = 400;
     private static final int DOOR_Y = 192;
 
-    private static final float GATE_RANGE = 24f;
+    static final float GATE_RANGE = 24f;
     /**
      * Wide enough that the prompt is up where the player lands.
      *
@@ -82,8 +82,8 @@ public class HubScreen extends SimScreen {
      * about it. The marker sits on the doormat and the player arrives two
      * tiles off it, so this is just over that.
      */
-    private static final float DOOR_RANGE = 26f;
-    private static final float TALK_RANGE = 22f;
+    static final float DOOR_RANGE = 26f;
+    static final float TALK_RANGE = 22f;
     /** The object layer the village's own markers live in. */
     static final String SPAWNS = "spawns";
     /** Villagers turn to face the player inside this range. */
@@ -140,6 +140,11 @@ public class HubScreen extends SimScreen {
     /** A villager to be already talking to on arrival, or -1. */
     private int talkOnShow = -1;
 
+    /** A marker to arrive at instead of the front door, or null. */
+    private String arriveAt;
+    /** Every marker the map names, y-up, for {@link #arriveAt}. */
+    private final java.util.Map<String, int[]> markers = new java.util.HashMap<>();
+
     /** The badge portrait, rebuilt when the player changes who they are. */
     private Anim badgeIdle;
     private String badgeCharacter;
@@ -162,6 +167,17 @@ public class HubScreen extends SimScreen {
      */
     HubScreen talkingTo(int villager) {
         talkOnShow = villager;
+        return this;
+    }
+
+    /**
+     * Opens with the player standing at a named marker rather than at their
+     * own door. For {@code --screen hub --page 2}, which stands them in the
+     * garden gateway: the one way out of the garden, which a player once could
+     * not get through, and so the first thing worth photographing.
+     */
+    HubScreen arriveAt(String marker) {
+        arriveAt = marker;
         return this;
     }
 
@@ -244,7 +260,8 @@ public class HubScreen extends SimScreen {
             world.enterRoom(villageRoom(v.x, v.y - 20), grid, null);
             talk(v);
         } else {
-            world.enterRoom(villageRoom(), grid, null);
+            int[] at = arriveAt == null ? null : markers.get(arriveAt);
+            world.enterRoom(at == null ? villageRoom() : villageRoom(at[0], at[1]), grid, null);
         }
         game.audio().playMusic(Assets.MUSIC_VILLAGE);
     }
@@ -294,6 +311,7 @@ public class HubScreen extends SimScreen {
             }
             int px = Math.round(x);
             int py = Math.round(y);
+            markers.put(name, new int[] {px, py});
             if (name.equals("gate")) {
                 gateX = px;
                 gateY = py;

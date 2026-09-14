@@ -1,5 +1,8 @@
 package com.kagebi.screen;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -62,12 +65,28 @@ public class HomeScreen extends SimScreen {
     private int doorY;
     private boolean nearDoor;
 
+    /** Every marker the map names, y-up. */
+    private final Map<String, int[]> markers = new HashMap<>();
+    /** A marker to arrive at instead of the doormat, or null. */
+    private String arriveAt;
+
     /** Steps left on the arrival card. */
     private int card = Hud.CARD_STEPS;
 
     public HomeScreen(Kagebi game) {
         super(game.input());
         this.game = game;
+    }
+
+    /**
+     * Opens with the player standing at a named marker rather than on the
+     * doormat. For {@code --screen home --page 2}, which stands them on the rug
+     * beside the table - the rug a player once walked underneath, next to the
+     * table they once walked through.
+     */
+    HomeScreen arriveAt(String marker) {
+        arriveAt = marker;
+        return this;
     }
 
     @Override
@@ -92,7 +111,7 @@ public class HomeScreen extends SimScreen {
         CollisionGrid grid = TiledRooms.collision(map);
         mapW = grid.width() * CollisionGrid.TILE;
         mapH = grid.height() * CollisionGrid.TILE;
-        readDoor(map);
+        readMarkers(map);
 
         RunState run = game.run();
         if (run == null) {
@@ -110,12 +129,12 @@ public class HomeScreen extends SimScreen {
     }
 
     /**
-     * The door, off the map's object layer. It is both the way in and the way
-     * out, so the player arrives standing on the mat and leaves from it -
-     * which also means the fallback, the middle of the map, is somewhere they
+     * The markers, off the map's object layer. The door is both the way in and
+     * the way out, so the player arrives standing on the mat and leaves from it
+     * - which also means the fallback, the middle of the map, is somewhere they
      * can be rather than somewhere they might be buried.
      */
-    private void readDoor(TiledMap map) {
+    private void readMarkers(TiledMap map) {
         doorX = mapW / 2;
         doorY = mapH / 2;
         MapLayer layer = map.getLayers().get(HubScreen.SPAWNS);
@@ -125,18 +144,25 @@ public class HomeScreen extends SimScreen {
         for (MapObject object : layer.getObjects()) {
             Float x = object.getProperties().get("x", Float.class);
             Float y = object.getProperties().get("y", Float.class);
-            if ("door".equals(object.getName()) && x != null && y != null) {
-                doorX = Math.round(x);
-                doorY = Math.round(y);
+            if (object.getName() == null || x == null || y == null) {
+                continue;
             }
+            markers.put(object.getName(), new int[] {Math.round(x), Math.round(y)});
+        }
+        int[] door = markers.get("door");
+        if (door != null) {
+            doorX = door[0];
+            doorY = door[1];
         }
     }
 
     private Room room() {
+        int[] at = arriveAt == null ? null : markers.get(arriveAt);
         Array<RoomKind> kinds = new Array<>();
         kinds.add(RoomKind.START);
         Array<SpawnPoint> spawns = new Array<>();
-        spawns.add(new SpawnPoint(SpawnPoint.Kind.ENTRY, doorX, doorY, null));
+        spawns.add(new SpawnPoint(SpawnPoint.Kind.ENTRY,
+                                  at == null ? doorX : at[0], at == null ? doorY : at[1], null));
         RoomTemplate template = new RoomTemplate("home", "home", kinds,
                                                  Assets.MAP_HOME, spawns);
         return new Room(0, 0, RoomKind.START, template);
