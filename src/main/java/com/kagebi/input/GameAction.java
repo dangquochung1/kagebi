@@ -18,7 +18,9 @@ public enum GameAction {
 
     ATTACK("action.attack", Keys.J, Keys.Z),
     THROW("action.throw", Keys.K, Keys.X),
-    ROLL("action.roll", Keys.SPACE, Keys.SHIFT_LEFT),
+    // Not Shift, though Shift is where many games put a dodge: see
+    // InputService.reserved. L sits beside attack and throw.
+    ROLL("action.roll", Keys.SPACE, Keys.L),
     INTERACT("action.interact", Keys.E, Keys.ENTER),
     USE_ITEM("action.use_item", Keys.Q, Keys.C),
 

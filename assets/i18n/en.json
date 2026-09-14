@@ -25,6 +25,7 @@
   "settings.language": "Language",
   "settings.press_key": "Press a key… (Esc to cancel)",
   "settings.taken_from": "Taken from: {0}",
+  "settings.key_reserved": "That key belongs to Windows",
   "settings.reset": "Reset to defaults",
 
   "action.move_up": "Up",

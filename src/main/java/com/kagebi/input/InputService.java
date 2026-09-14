@@ -21,12 +21,18 @@ import com.badlogic.gdx.InputAdapter;
  * game "eats inputs", and the player is right.
  *
  * <p><b>A press made while an operating-system modifier is held is not a
- * press.</b> {@code Win+Shift+S} is how Windows takes a screenshot, and this
- * game binds Shift to roll and S to walking down - so asking Windows for a
- * screenshot made the ninja roll downwards first. Neither binding can simply be
- * moved: S is the W-A-S-D key every player expects. What is actually wrong is
- * reading a chord aimed at the window manager as if it were aimed at the game,
- * and that is one rule rather than a search for safe keys.
+ * press.</b> {@code Win+Shift+S} is how Windows takes a screenshot, and S is
+ * walking down - so asking Windows for a screenshot used to walk the ninja
+ * downwards first. S cannot simply be moved: it is the W-A-S-D key every
+ * player expects. What is wrong is reading a chord aimed at the window manager
+ * as if it were aimed at the game, and that is one rule rather than a search
+ * for safe keys.
+ *
+ * <p><b>Shift is not a game key at all.</b> The rule above needs the modifier
+ * to arrive first, and Shift is the one key of that chord that is as often
+ * pressed first as last. Shift used to roll, and a player who reached for
+ * Shift, then Win, then S had rolled before Windows said a word. See
+ * {@link #reserved}.
  */
 public final class InputService extends InputAdapter {
 
@@ -36,13 +42,38 @@ public final class InputService extends InputAdapter {
     /**
      * Keys that mean "this chord belongs to the desktop, not the game".
      *
-     * <p>None of them is bindable, and every common Windows gesture built from
-     * them - Win+Shift+S, Alt+Tab, Alt+F4, Ctrl+anything - would otherwise
-     * arrive here as whatever the other keys in the chord happen to be bound to.
+     * <p>Every common Windows gesture built from them - Win+Shift+S, Alt+Tab,
+     * Alt+F4, Ctrl+anything - would otherwise arrive here as whatever the other
+     * keys in the chord happen to be bound to.
      */
     private static final int[] SYSTEM_MODIFIERS = {
         Keys.SYM, Keys.ALT_LEFT, Keys.ALT_RIGHT, Keys.CONTROL_LEFT, Keys.CONTROL_RIGHT,
     };
+
+    /**
+     * Keys that may never be bound: the system modifiers, and Shift.
+     *
+     * <p>Shift is here but not above, and the difference is deliberate. It does
+     * not silence the game while held - holding Shift and pressing attack still
+     * attacks, and there is no reason it should not - but it cannot mean
+     * anything on its own, because it is the key a desktop chord most often
+     * starts with. A roll has to begin on the press, and by the time the
+     * Windows key arrives to say "that was a screenshot", it already has.
+     */
+    private static final int[] RESERVED = {
+        Keys.SYM, Keys.ALT_LEFT, Keys.ALT_RIGHT, Keys.CONTROL_LEFT, Keys.CONTROL_RIGHT,
+        Keys.SHIFT_LEFT, Keys.SHIFT_RIGHT,
+    };
+
+    /** Whether a key belongs to the desktop, and so may never be bound to an action. */
+    public static boolean reserved(int keycode) {
+        for (int key : RESERVED) {
+            if (key == keycode) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private final InputMap map;
     private final int count = GameAction.values().length;

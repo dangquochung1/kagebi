@@ -24,6 +24,7 @@ import com.kagebi.assets.Assets;
 import com.kagebi.gfx.PixelViewport;
 import com.kagebi.input.GameAction;
 import com.kagebi.input.InputMap;
+import com.kagebi.input.InputService;
 import com.kagebi.settings.Difficulty;
 import com.kagebi.ui.I18n;
 import com.kagebi.ui.KeyPrompts;
@@ -328,6 +329,12 @@ public class SettingsScreen extends GameScreen {
             if (keycode == Keys.ESCAPE) {
                 listening = null;
                 hint.setText("");
+                return true;
+            }
+            if (InputService.reserved(keycode)) {
+                // Still listening. The player set out to bind something, and a
+                // key the desktop owns is not an answer to that.
+                hint.setText(game.i18n().get("settings.key_reserved"));
                 return true;
             }
             GameAction stolenFrom =

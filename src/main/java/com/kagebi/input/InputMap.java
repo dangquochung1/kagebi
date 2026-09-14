@@ -10,6 +10,12 @@ import com.badlogic.gdx.utils.IntMap;
  * <p>Both directions matter: the game loop needs keycode to action sixty times
  * a second, and the controls screen needs action to keycode so it can draw the
  * right key icon.
+ *
+ * <p>A {@linkplain InputService#reserved reserved} key is never held here: not
+ * by default, not through {@link #bind}, and not out of a saved file that
+ * predates the rule. The last one matters most, because the key that became
+ * reserved - Shift - was a shipped default, so every bindings file written
+ * before then carries it.
  */
 public final class InputMap {
 
@@ -77,11 +83,16 @@ public final class InputMap {
     }
 
     /**
-     * Binds a key, clearing it from whatever held it before.
+     * Binds a key, clearing it from whatever held it before. A reserved key is
+     * refused, and nothing changes.
      *
-     * @return the action the key was taken from, or null if it was unbound.
+     * @return the action the key was taken from, or null if it was unbound or
+     *         the binding was refused.
      */
     public GameAction bind(GameAction action, int keycode, boolean isSecondary) {
+        if (InputService.reserved(keycode)) {
+            return null;
+        }
         GameAction previousOwner = keyToAction.get(keycode);
         if (previousOwner != null && previousOwner != action) {
             if (primary[previousOwner.ordinal()] == keycode) {
@@ -126,8 +137,10 @@ public final class InputMap {
     public void load() {
         Preferences prefs = Gdx.app.getPreferences(FILE);
         for (GameAction a : GameAction.values()) {
-            primary[a.ordinal()] = prefs.getInteger("primary." + a.name(), a.defaultPrimary);
-            secondary[a.ordinal()] = prefs.getInteger("secondary." + a.name(), a.defaultSecondary);
+            primary[a.ordinal()] =
+                usable(prefs.getInteger("primary." + a.name(), a.defaultPrimary));
+            secondary[a.ordinal()] =
+                usable(prefs.getInteger("secondary." + a.name(), a.defaultSecondary));
         }
         // A saved file that leaves something unreachable is worse than no saved
         // file, so fall back rather than boot into an unplayable state.
@@ -136,5 +149,18 @@ public final class InputMap {
             resetToDefaults();
         }
         rebuildReverse();
+    }
+
+    /**
+     * A saved key as this build will honour it: the key itself, or -1 for one
+     * that may no longer be bound.
+     *
+     * <p>Unbound rather than put back to the default, so that whatever else the
+     * player chose survives: a file that said roll is L and Shift becomes roll
+     * is L. An action left with no key at all is caught by {@link #load}, which
+     * falls back to the defaults.
+     */
+    static int usable(int keycode) {
+        return InputService.reserved(keycode) ? -1 : keycode;
     }
 }

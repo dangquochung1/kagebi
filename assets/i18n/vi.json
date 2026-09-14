@@ -25,6 +25,7 @@
   "settings.language": "Ngôn ngữ",
   "settings.press_key": "Nhấn phím mới… (Esc để huỷ)",
   "settings.taken_from": "Đã lấy phím từ: {0}",
+  "settings.key_reserved": "Phím đó dành cho Windows",
   "settings.reset": "Khôi phục mặc định",
 
   "action.move_up": "Lên",
