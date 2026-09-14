@@ -46,6 +46,59 @@ class ProgressionTest {
         assertEquals(17, p.diamonds, "and they accumulate across runs");
     }
 
+    // ---- clearing a stage, which is not winning the game -----------------------
+
+    private static RunSummary cleared(int stage, int gold) {
+        return new RunSummary(stage, 60, gold, 2, 480f, true);
+    }
+
+    @Test
+    void aClearedStageBanksItsGoldAndOpensTheNextOne() {
+        Profile p = new Profile();
+        Progression.bankStage(p, cleared(1, 320));
+        assertEquals(320, p.gold);
+        assertEquals(2, p.diamonds);
+        assertEquals(1, p.runs);
+        assertEquals(1, p.clearedStages);
+        assertEquals(1, p.deepestFloor);
+    }
+
+    /**
+     * The distinction the second method exists for. {@code wins} is what the
+     * shop's unlock requirements count and the flame comes home only when the
+     * last stage falls; folding stage clears into {@link Progression#bank}
+     * would relight the village after stage one and buy a character with it.
+     */
+    @Test
+    void aClearedStageIsNotAWinAndDoesNotRelightTheVillage() {
+        Profile p = new Profile();
+        Progression.bank(p, died(1, 0), 0f);
+        assertEquals(1, p.villageDarkness);
+
+        Progression.bankStage(p, cleared(1, 100));
+        assertEquals(0, p.wins, "clearing stage one has not won the game");
+        assertEquals(1, p.villageDarkness, "and has not brought the flame home");
+    }
+
+    @Test
+    void clearingTheLastStageBothWinsAndRecordsTheStage() {
+        Profile p = new Profile();
+        p.clearedStages = 4;
+        Progression.bank(p, won(2000), 0f);
+        assertEquals(1, p.wins);
+        assertEquals(5, p.clearedStages, "the final stage records itself too");
+        assertEquals(0, p.villageDarkness);
+    }
+
+    @Test
+    void replayingAClearedStageOpensNothingFurther() {
+        Profile p = new Profile();
+        p.clearedStages = 3;
+        Progression.bankStage(p, cleared(1, 90));
+        assertEquals(3, p.clearedStages, "a record is a maximum, not the last run");
+        assertEquals(90, p.gold, "but the gold is still earned");
+    }
+
     @Test
     void eachFailureDimsTheVillageUpToTheCap() {
         Profile p = new Profile();

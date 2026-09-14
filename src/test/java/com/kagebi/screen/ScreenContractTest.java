@@ -138,8 +138,9 @@ class ScreenContractTest {
             "prompt.open_chest", "prompt.shop",
             "pause.title", "pause.resume", "pause.abandon", "pause.confirm", "pause.to_menu",
             "inv.title", "inv.relics", "inv.items", "inv.empty", "inv.slot_empty",
-            "end.banked", "end.to_village", "dungeon.no_rooms", "dungeon.locked",
-            "dungeon.unlocked",
+            "end.banked", "end.to_village", "end.to_map",
+            "dungeon.no_rooms", "dungeon.locked", "dungeon.unlocked",
+            "map.title", "map.play", "stage.cleared", "prompt.leave",
             "game.title", "game.floor", "game.victory", "game.gameover",
             "game.stats.floor", "game.stats.kills", "game.stats.gold", "game.stats.gems", "game.stats.time",
             "common.back", "common.locked", "floor.hub"}) {
@@ -147,6 +148,10 @@ class ScreenContractTest {
         }
         for (int floor = 1; floor <= 5; floor++) {
             keys.add("floor." + floor);
+            // The world map reads this before the stage is entered, so a
+            // missing one is a blank panel rather than a crash - which is
+            // exactly the kind of hole a contract test is for.
+            keys.add("floor." + floor + ".desc");
         }
         for (String id : Assets.Actor.CHARACTERS) {
             // One name and one perk line each, and each in one file. There used

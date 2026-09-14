@@ -47,6 +47,21 @@ public final class Profile {
     public int deepestFloor;
 
     /**
+     * The highest stage finished, which is what opens the next one on the map.
+     *
+     * <p>Deliberately not {@link #deepestFloor}. That counts the deepest floor
+     * <em>reached</em>, and the dungeon sets it on arrival - so a player who
+     * walks into stage two and dies there has reached it without clearing it.
+     * Keying the map on that would open stage three as a reward for dying.
+     *
+     * <p>It also could not be borrowed even if the timing were right:
+     * {@code deepestFloor} is what the shop's {@code deepest_floor} unlock
+     * requirement counts, and changing what it means would quietly re-price
+     * every character on that shelf.
+     */
+    public int clearedStages;
+
+    /**
      * How far the village has dimmed. The story says the flame weakens with
      * every failed descent, and the hub renders one step darker per point - the
      * one place the narrative is stated by the art rather than by text.

@@ -138,6 +138,11 @@
   "dungeon.no_rooms": "No room templates to build a floor from",
   "dungeon.locked": "The door wants an iron key",
   "dungeon.unlocked": "Yours from now on",
+  "map.title": "Choose a path",
+  "map.play": "Set out",
+  "stage.cleared": "Stage cleared",
+  "end.to_map": "To the map",
+  "prompt.leave": "Leave the floor",
 
   "credits.note": "A non-commercial project built on free assets",
   "credits.art": "ART",

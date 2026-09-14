@@ -138,6 +138,11 @@
   "dungeon.no_rooms": "Không có phòng nào để dựng tầng",
   "dungeon.locked": "Cửa này cần một chìa sắt",
   "dungeon.unlocked": "Từ nay là của bạn",
+  "map.title": "Chọn đường đi",
+  "map.play": "Lên đường",
+  "stage.cleared": "Qua ải",
+  "end.to_map": "Về bản đồ",
+  "prompt.leave": "Rời tầng",
 
   "credits.note": "Dự án phi thương mại, dựng từ tài nguyên miễn phí",
   "credits.art": "MỸ THUẬT",

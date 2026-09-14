@@ -361,7 +361,8 @@ class ContentValidatorTest {
         f.enemies = d.enemies;
         f.enemyWeights = d.enemyWeights;
         change.accept(f);
-        return new FloorDef(d.number, d.nameKey, f.biome, d.music, d.ambient, d.bossMusic,
+        return new FloorDef(d.number, d.nameKey, d.descKey, f.biome, d.music, d.ambient,
+            d.bossMusic,
             d.roomsMin, d.roomsMax, d.treasureRooms, d.shopRooms, f.enemies, f.enemyWeights,
             d.packMin, d.packMax, d.boss);
     }

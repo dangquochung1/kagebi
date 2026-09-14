@@ -251,6 +251,10 @@ HOUSES = [(0, 0), (4, 0), (8, 0)]    # 4x3 each
 TORII = (0, 5)                       # 3x2 shrine gate
 
 
+# world.tmx is NOT generated here. It has its own script, tools/make_world.py,
+# which is run by hand rather than as part of a regenerate. This one writes
+# exactly two paths - OUT/village.tmx and OUT/rooms/<biome>/<name>.tmx - and
+# never enumerates assets/maps/, so the world map is safe from it.
 def village(width=30, height=18, seed=7):
     """The menu backdrop and, later, the hub: a clearing with houses and a gate."""
     rng = random.Random(seed)

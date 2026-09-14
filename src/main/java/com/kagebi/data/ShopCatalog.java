@@ -285,4 +285,14 @@ public final class ShopCatalog {
     public void bank(Profile p, RunSummary summary) {
         Progression.bank(p, summary, upgradeValue("darkness_resist", p));
     }
+
+    /**
+     * As {@link #bank}, for a stage cleared that is not the last one. Nothing
+     * dims, so the flamekeeper has nothing to say and no resist is read - but
+     * it comes through here anyway so that the end screens keep having exactly
+     * one way to write a run into a profile.
+     */
+    public void bankStage(Profile p, RunSummary summary) {
+        Progression.bankStage(p, summary);
+    }
 }

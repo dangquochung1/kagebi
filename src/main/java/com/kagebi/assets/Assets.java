@@ -69,6 +69,8 @@ public final class Assets {
      * template under {@link #ROOMS_DIR}.
      */
     public static final String MAP_VILLAGE = MAPS_DIR + "village.tmx";
+    /** The world map the stages are chosen from. Hand-editable; see tools/make_world.py. */
+    public static final String MAP_WORLD = MAPS_DIR + "world.tmx";
 
     /**
      * Stings, not music: short enough to decode into memory, which is what lets
@@ -146,6 +148,8 @@ public final class Assets {
     public static final class Ui {
         public static final String PANEL = "ui/panel";
         public static final String PANEL_2 = "ui/panel_2";
+        /** The third panel. Packed since the atlas was built, and unused until the map. */
+        public static final String PANEL_3 = "ui/panel_3";
         public static final String PANEL_INTERIOR = "ui/panel_interior";
         public static final String BG = "ui/bg";
         public static final String BG_2 = "ui/bg_2";

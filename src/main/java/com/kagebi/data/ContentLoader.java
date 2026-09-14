@@ -212,7 +212,7 @@ public final class ContentLoader {
         int number = f.integer("number");
         f.label(String.valueOf(number));
         FloorDef d = new FloorDef(
-            number, f.string("nameKey"), f.string("biome"),
+            number, f.string("nameKey"), f.string("descKey"), f.string("biome"),
             sound(f, "music", Assets.MUSIC_DIR, true),
             sound(f, "ambient", Assets.SFX_DIR, false),
             sound(f, "bossMusic", Assets.MUSIC_DIR, false),

@@ -242,6 +242,7 @@ public final class ContentValidator {
     private static void floor(Check c, ContentRegistry reg, FloorDef f) {
         String w = "floor " + f.number;
         c.key(w, "nameKey", f.nameKey);
+        c.key(w, "descKey", f.descKey);
         if (!BIOMES.contains(f.biome)) {
             c.fail(w, "biome '" + f.biome + "' is not one of " + new java.util.TreeSet<>(BIOMES));
         }

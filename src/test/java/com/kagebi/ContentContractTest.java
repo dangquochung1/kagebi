@@ -140,6 +140,80 @@ class ContentContractTest {
     /** {@code CharacterSelectScreen.PERK_WIDTH}: 320 less a 14px margin a side. */
     private static final int PERK_WIDTH = 320 - 2 * 14;
 
+    /** {@code WorldMapScreen}: DESC_W, and the DESC_LINES the panel budgets. */
+    private static final int BLURB_WIDTH = 180;
+    private static final int BLURB_LINES = 3;
+
+    /**
+     * The world map's panel gives a stage three wrapped lines to introduce
+     * itself in, and a fourth runs into the difficulty row underneath.
+     *
+     * <p>Written after exactly that: three of the five English blurbs and one
+     * Vietnamese one wrapped to four lines and printed the word "Normal" over
+     * the last of them, in a build where every other test was green. Counting
+     * characters would not have caught it - Vietnamese and English run to
+     * different lengths for the same sentence, and the wrap is by pixel.
+     *
+     * <p>The wrap here is greedy on spaces, which is what {@code
+     * BitmapFont.draw} with wrapping does, so this measures the same break
+     * points the screen will.
+     */
+    @Test
+    void everyStageBlurbFitsTheWorldMapPanel() {
+        Map<Integer, Integer> advance = glyphAdvances();
+        List<String> tooTall = new ArrayList<>();
+        for (String lang : new String[] {"vi", "en"}) {
+            for (Map.Entry<String, String> e : readStrings(lang).entrySet()) {
+                if (!e.getKey().startsWith("floor.") || !e.getKey().endsWith(".desc")) {
+                    continue;
+                }
+                int lines = wrappedLines(advance, e.getValue(), BLURB_WIDTH);
+                if (lines > BLURB_LINES) {
+                    tooTall.add(e.getKey() + " (" + lang + ") wraps to " + lines
+                        + " lines, over " + BLURB_LINES);
+                }
+            }
+        }
+        assertTrue(tooTall.isEmpty(), "stage blurbs that will not fit: " + tooTall);
+    }
+
+    /**
+     * The three difficulty labels sit in one row inside the same panel, with
+     * {@code WorldMapScreen.CHIP_PAD} around each. They are the longest labels
+     * in the interface in both languages, so this row is the tightest thing on
+     * the screen.
+     */
+    @Test
+    void theThreeDifficultyLabelsFitOneRow() {
+        Map<Integer, Integer> advance = glyphAdvances();
+        for (String lang : new String[] {"vi", "en"}) {
+            Map<String, String> strings = readStrings(lang);
+            int total = 0;
+            for (String level : new String[] {"hard", "normal", "weak"}) {
+                total += textWidth(advance, strings.get("settings.difficulty." + level)) + 12;
+            }
+            assertTrue(total <= BLURB_WIDTH + 12,
+                lang + " difficulty row is " + total + "px, over " + (BLURB_WIDTH + 12));
+        }
+    }
+
+    /** Greedy word wrap on spaces, as BitmapFont does it. */
+    private static int wrappedLines(Map<Integer, Integer> advance, String text, int width) {
+        int lines = 1;
+        int used = 0;
+        for (String word : text.split(" ")) {
+            int w = textWidth(advance, word);
+            int space = used == 0 ? 0 : textWidth(advance, " ");
+            if (used != 0 && used + space + w > width) {
+                lines++;
+                used = w;
+            } else {
+                used += space + w;
+            }
+        }
+        return lines;
+    }
+
     private static int textWidth(Map<Integer, Integer> advance, String text) {
         int total = 0;
         for (int cp : text.codePoints().toArray()) {

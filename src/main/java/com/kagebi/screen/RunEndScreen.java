@@ -60,6 +60,33 @@ abstract class RunEndScreen extends SimScreen {
     /** The skin label style for the title. */
     protected abstract String titleStyle();
 
+    /**
+     * How this run is written into the profile.
+     *
+     * <p>A hook rather than a branch because there are now three endings and
+     * they bank differently, but the thing that must not vary is <em>when</em>:
+     * once, on first show, before any button is pressed. That guarantee is
+     * what {@link #bank} exists to hold, and it is held for every subclass by
+     * there being no second copy of it.
+     */
+    protected void bankInto(Profile profile, RunSummary summary) {
+        game.shop().bank(profile, summary);
+    }
+
+    /** The headline. */
+    protected String titleKey() {
+        return victory ? "game.victory" : "game.gameover";
+    }
+
+    /**
+     * The ways onward. The map first, because that is where the next stage is,
+     * and the village second, because that is where the gold is spent.
+     */
+    protected void addButtons(MenuColumn menu, I18n t) {
+        menu.add(t.get("end.to_map"), () -> stack().set(new WorldMapScreen(game)));
+        menu.add(t.get("end.to_village"), () -> stack().set(new HubScreen(game)));
+    }
+
     @Override
     public InputProcessor inputProcessor() {
         return inputs;
@@ -98,7 +125,7 @@ abstract class RunEndScreen extends SimScreen {
         // decisions with a test behind them; keeping them out of this screen is
         // what stops the two drifting apart.
         Profile profile = game.profile();
-        game.shop().bank(profile, summary);
+        bankInto(profile, summary);
         if (!game.saves().save(profile)) {
             Gdx.app.error("save", "profile not written; the previous save stands");
         }
@@ -120,8 +147,8 @@ abstract class RunEndScreen extends SimScreen {
         panel.setBackground(game.skin().getDrawable(Assets.Ui.PANEL_2));
         panel.defaults().padLeft(2).padRight(2);
 
-        panel.add(new Label(t.get(victory ? "game.victory" : "game.gameover"),
-                            game.skin(), titleStyle())).colspan(2).padBottom(6).row();
+        panel.add(new Label(t.get(titleKey()), game.skin(), titleStyle()))
+             .colspan(2).padBottom(6).row();
 
         stat(panel, t.get("game.stats.floor"), String.valueOf(summary.deepestFloor));
         stat(panel, t.get("game.stats.kills"), String.valueOf(summary.kills));
@@ -138,7 +165,7 @@ abstract class RunEndScreen extends SimScreen {
              .colspan(2).padTop(6).padBottom(5).row();
 
         menu = new MenuColumn(game.skin(), game.audio());
-        menu.add(t.get("end.to_village"), () -> stack().set(new HubScreen(game)));
+        addButtons(menu, t);
         panel.add(menu.table(112)).colspan(2).row();
 
         root.add(panel).width(200);

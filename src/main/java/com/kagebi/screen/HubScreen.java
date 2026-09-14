@@ -298,7 +298,7 @@ public class HubScreen extends SimScreen {
             if (nearVillager != null) {
                 talk(nearVillager);
             } else if (nearGate) {
-                descend();
+                openMap();
             } else if (world.promptKey() != null) {
                 world.interact();
             }
@@ -337,10 +337,12 @@ public class HubScreen extends SimScreen {
         game.audio().playSfx(Assets.SFX_ACCEPT);
     }
 
-    private void descend() {
+    private void openMap() {
         game.audio().playSfx(Assets.SFX_ACCEPT);
-        run.floor = 1;
-        stack().set(new DungeonScreen(game));
+        // The gate opens onto the map now, not onto floor one. Which stage is
+        // being descended to, and how hard it will be, are the map's questions;
+        // the run itself is built there, by Screens.stageRun.
+        stack().set(new WorldMapScreen(game));
     }
 
     private static float dist(float ax, float ay, float bx, float by) {

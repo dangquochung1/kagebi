@@ -43,6 +43,7 @@ public final class Progression {
         p.deepestFloor = Math.max(p.deepestFloor, run.deepestFloor);
         if (run.victory) {
             p.wins++;
+            p.clearedStages = Math.max(p.clearedStages, run.deepestFloor);
             p.villageDarkness = 0;
             return;
         }
@@ -51,6 +52,28 @@ public final class Progression {
         int before = (int) Math.floor((failures - 1) * keep);
         int after = (int) Math.floor(failures * keep);
         p.villageDarkness = Math.min(MAX_DARKNESS, p.villageDarkness + (after - before));
+    }
+
+    /**
+     * Banks a cleared stage, and opens the next one.
+     *
+     * <p>Its own method rather than a flag on {@link #bank}, because clearing
+     * a stage is not winning the game and the difference is four fields.
+     * {@code wins} is what the shop's unlock requirements count and the flame
+     * comes home only when the last stage falls, so folding the two together
+     * would relight the village after stage one and pay for a character with
+     * it.
+     *
+     * <p>Nothing dims here, which is why no {@code darknessResist} is asked
+     * for: the village darkens when a descent does not come back, and this one
+     * did.
+     */
+    public static void bankStage(Profile p, RunSummary run) {
+        p.gold += Math.max(0, run.gold);
+        p.diamonds += Math.max(0, run.diamonds);
+        p.runs++;
+        p.deepestFloor = Math.max(p.deepestFloor, run.deepestFloor);
+        p.clearedStages = Math.max(p.clearedStages, run.deepestFloor);
     }
 
     private Progression() {}

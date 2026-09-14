@@ -189,6 +189,7 @@ public final class SaveManager {
         root.addChild("runs", new JsonValue(p.runs));
         root.addChild("wins", new JsonValue(p.wins));
         root.addChild("deepestFloor", new JsonValue(p.deepestFloor));
+        root.addChild("clearedStages", new JsonValue(p.clearedStages));
         root.addChild("villageDarkness", new JsonValue(p.villageDarkness));
 
         JsonValue upgrades = new JsonValue(JsonValue.ValueType.object);
@@ -247,6 +248,12 @@ public final class SaveManager {
         p.runs = root.getInt("runs", p.runs);
         p.wins = root.getInt("wins", p.wins);
         p.deepestFloor = root.getInt("deepestFloor", p.deepestFloor);
+        // A save written before the game had stages has no such field, and the
+        // rules it was written under make the answer knowable: a continuous
+        // descent that reached floor N had cleared the N-1 floors above it.
+        // Inferring beats defaulting to zero, which would shut a returning
+        // player out of stages they have already finished.
+        p.clearedStages = root.getInt("clearedStages", Math.max(0, p.deepestFloor - 1));
         p.villageDarkness = root.getInt("villageDarkness", p.villageDarkness);
 
         JsonValue upgrades = root.get("upgrades");

@@ -2,7 +2,9 @@
 // that took the master.
 //
 // nameKey points at floor.1 .. floor.5, which already exist in the interface
-// strings and are not mine to move.
+// strings and are not mine to move. descKey is the world map's blurb - the
+// sentence the player reads before choosing the stage, so it says what the
+// place is rather than what fights there.
 //
 // MUSIC IS NAMED, NOT PATHED. A value that matches a constant on
 // assets/Assets.java (MUSIC_DUNGEON, MUSIC_FIGHT, ...) resolves to that
@@ -39,7 +41,7 @@
 {
   "floors": [
     {
-      "number": 1, "nameKey": "floor.1", "biome": "ruins",
+      "number": 1, "nameKey": "floor.1", "descKey": "floor.1.desc", "biome": "ruins",
       // The Old Well. Dripping water under a dungeon bed - the story starts
       // with the player climbing down a hole behind their own village.
       "music": "MUSIC_DUNGEON", "ambient": "ambient/river.wav",
@@ -52,7 +54,7 @@
       "packMin": 3, "packMax": 5
     },
     {
-      "number": 2, "nameKey": "floor.2", "biome": "ruins_green",
+      "number": 2, "nameKey": "floor.2", "descKey": "floor.2.desc", "biome": "ruins_green",
       // Flooded Catacombs. 18_aquatic is the only track in the set with the
       // right amount of water in it.
       "music": "18_aquatic.ogg", "ambient": "ambient/wave.wav",
@@ -65,7 +67,7 @@
       "packMin": 3, "packMax": 5
     },
     {
-      "number": 3, "nameKey": "floor.3", "biome": "ruins_orange",
+      "number": 3, "nameKey": "floor.3", "descKey": "floor.3.desc", "biome": "ruins_orange",
       // Broken Shrine, and the first boss. 12_temple for the floor,
       // MUSIC_FIGHT for the frog.
       "music": "12_temple.ogg", "ambient": "ambient/wind.wav",
@@ -80,7 +82,7 @@
       "boss": "giantfrog2"
     },
     {
-      "number": 4, "nameKey": "floor.4", "biome": "depths",
+      "number": 4, "nameKey": "floor.4", "descKey": "floor.4.desc", "biome": "depths",
       // The Cursed Depths. The pack changes here and so does the palette -
       // the outlines go to #25131A and the Ninja Adventure monsters stop.
       // No boss: floor 4's job is to be long and grim, and putting a fight at
@@ -94,7 +96,7 @@
       "packMin": 4, "packMax": 6
     },
     {
-      "number": 5, "nameKey": "floor.5", "biome": "depths",
+      "number": 5, "nameKey": "floor.5", "descKey": "floor.5.desc", "biome": "depths",
       // The Flame Core. MUSIC_FINAL for the floor and the boss both - the
       // track already escalates, and cutting away from it at the door would
       // throw away the only build-up the audio does on its own.

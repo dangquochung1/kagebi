@@ -323,7 +323,8 @@ public class DungeonScreen extends SimScreen {
             }
         }
         String biome = biomes.isEmpty() ? "" : biomes.get((number - 1) % biomes.size);
-        return new FloorDef(number, "floor." + number, biome, null, null, null,
+        return new FloorDef(number, "floor." + number, "floor." + number + ".desc",
+                            biome, null, null, null,
                             5, 7, 0, 0, new String[0], new int[0], 0, 0, null);
     }
 
@@ -562,17 +563,26 @@ public class DungeonScreen extends SimScreen {
         game.audio().playSfx(Assets.SFX_DOOR);
     }
 
+    /**
+     * The stairs, which now end the stage rather than leading to the next one.
+     *
+     * <p>The descent used to run floor one to floor five in a sitting, and the
+     * only way to see floor four was to survive the three above it first. A
+     * stage is its own outing: it is chosen on the map, played from full
+     * health, banked on its own, and handed back to the map when it is done.
+     *
+     * <p>The last stage keeps the victory screen, because that one is the end
+     * of the game - it is what counts a win and relights the village, and
+     * neither belongs to clearing stage two.
+     */
     private void descend() {
         game.audio().playSfx(Assets.SFX_ACCEPT);
-        if (run.floor >= floorCount()) {
-            ended = true;
-            run.victory = true;
-            stack().push(new VictoryScreen(game));
-            return;
-        }
-        int next = run.floor + 1;
+        ended = true;
+        run.victory = true;
+        final boolean last = run.floor >= floorCount();
         fade = FADE_STEPS * 2;
-        fadeAction = () -> startFloor(next);
+        fadeAction = () -> stack().push(last ? new VictoryScreen(game)
+                                             : new StageClearScreen(game));
     }
 
     /** Where the stairs are: the template's EXIT marker, or the room centre. */
@@ -681,8 +691,10 @@ public class DungeonScreen extends SimScreen {
         if (slide > 0 || fade > 0 || hud.mapOpen()) {
             return;
         }
+        // "Descend" was true when the stairs led one floor further down. They
+        // lead back to the map now, so on every stage but the last they say so.
         String key = nearExit
-            ? (run.floor >= floorCount() ? "prompt.escape" : "prompt.descend")
+            ? (run.floor >= floorCount() ? "prompt.escape" : "prompt.leave")
             : world.promptKey();
         if (key == null) {
             return;

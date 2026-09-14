@@ -50,7 +50,8 @@ class FloorGeneratorTest {
 
     private static FloorDef floor(int number, String biome, int min, int max,
                                   int treasure, int shops, String boss) {
-        return new FloorDef(number, "floor." + number, biome, "music", null, null,
+        return new FloorDef(number, "floor." + number, "floor." + number + ".desc",
+            biome, "music", null, null,
                             min, max, treasure, shops, new String[] {"slime"},
                             new int[] {1}, 2, 4, boss);
     }

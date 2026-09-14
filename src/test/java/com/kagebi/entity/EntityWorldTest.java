@@ -89,7 +89,7 @@ class EntityWorldTest {
     @Test
     void untaggedSpawnsRollFromTheFloorPool() {
         ContentRegistry r = registry();
-        r.put(new FloorDef(1, "floor.1.name", "well", null, null, null, 6, 8, 1, 1,
+        r.put(new FloorDef(1, "floor.1.name", "floor.1.desc", "well", null, null, null, 6, 8, 1, 1,
             new String[] {"slime", "not_written_yet"}, new int[] {5, 5}, 3, 5, null));
         EntityWorld w = world(r, TestDefs.run());
         w.enterRoom(TestDefs.room(RoomKind.NORMAL,
@@ -317,7 +317,7 @@ class EntityWorldTest {
     @Test
     void theBossArrivesInABossRoomAndTransformsAtHalfHealth() {
         ContentRegistry r = registry();
-        r.put(new FloorDef(5, "floor.5.name", "core", null, null, null, 6, 8, 1, 1,
+        r.put(new FloorDef(5, "floor.5.name", "floor.5.desc", "core", null, null, null, 6, 8, 1, 1,
             new String[] {"slime"}, new int[] {1}, 3, 5, "tengured"));
         RunState run = TestDefs.run();
         run.floor = 5;

@@ -16,6 +16,15 @@ public final class FloorDef {
     /** 1 to 5. Floor 0 is the village hub, which is not procedural. */
     public final int number;
     public final String nameKey;
+    /**
+     * A sentence or two for the world map's panel, where a stage is chosen
+     * before it is seen.
+     *
+     * <p>In the content rather than built as {@code nameKey + ".desc"} so that
+     * ContentValidator checks it exists in every language at boot, instead of
+     * a missing one showing up as an empty panel on a screen nobody opened.
+     */
+    public final String descKey;
 
     /** Which room templates to draw on; also picks the tileset. */
     public final String biome;
@@ -41,12 +50,14 @@ public final class FloorDef {
     /** Boss enemy id, or null on a floor with no boss. */
     public final String boss;
 
-    public FloorDef(int number, String nameKey, String biome, String music,
-                    String ambient, String bossMusic, int roomsMin, int roomsMax,
+    public FloorDef(int number, String nameKey, String descKey, String biome,
+                    String music, String ambient, String bossMusic,
+                    int roomsMin, int roomsMax,
                     int treasureRooms, int shopRooms, String[] enemies,
                     int[] enemyWeights, int packMin, int packMax, String boss) {
         this.number = number;
         this.nameKey = nameKey;
+        this.descKey = descKey;
         this.biome = biome;
         this.music = music;
         this.ambient = ambient;

@@ -66,7 +66,7 @@ public class MainMenuScreen extends GameScreen {
             rebuild();      // language may have changed while this was covered
             return;
         }
-        map = new TmxMapLoader().load(Assets.MAPS_DIR + "village.tmx");
+        map = new TmxMapLoader().load(Assets.MAP_VILLAGE);
         mapRenderer = new OrthogonalTiledMapRenderer(map, game.batch());
 
         mapCamera = new OrthographicCamera();

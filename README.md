@@ -1,6 +1,12 @@
 # KAGEBI (影火)
 
 A pixel-art roguelite dungeon crawler in Java, built on libGDX 1.14.2.
+
+Five stages, chosen from a world map and played one at a time. A stage starts
+at full health, banks its own gold, and opens the next one when it is cleared;
+the difficulty is picked per stage, beside the button that starts it. The
+village between them is where that gold is spent.
+
 Non-commercial; see [CREDITS.md](CREDITS.md) for the asset packs and their
 licences.
 
@@ -63,10 +69,13 @@ menu                   (default)
 settings  --page 1-3   audio, controls, video
 select    --page 1-6   character select, with that ninja highlighted
 hub       --page N     the village, dimmed by N-1 failed descents
+world     --page 1-5   the world map, open to that stage and focused on it
+stage     --page 1-5   the same, with that stage's panel and its difficulty row
+cleared   --page 1-5   the stage-clear screen, for that stage
 talk      --page 1-3   the village, mid-conversation with that villager
 store     --page 1-4   the herbalist's stall, over a profile N runs deep
 unlocks   --page 1-4   the same, on its second tab
-dungeon   --page 1-5   the start room of that floor
+dungeon   --page 1-5   the start room of that stage
 map       --page 1-5   the same, with the floor map expanded
 fight     --page 1-5   the first room of that floor that has enemies in it
 swing     --page 1-5   the same, swinging on a timer so a blade is visible
@@ -128,7 +137,8 @@ All of these regenerate things that are already committed, so none is needed to
 play or to build.
 
 ```powershell
-python tools/make_maps.py      # regenerate the 104 room .tmx files
+python tools/make_maps.py      # regenerate the 104 room .tmx files and the village
+python tools/make_world.py     # lay out the world map again, keeping its decor layer
 python tools/pack_atlas.py     # repack the texture atlases
 python tools/make_font.py      # rebuild the bitmap font, Vietnamese marks included
 python tools/preview_map.py    # render a .tmx to a PNG, for looking at a room

@@ -6,6 +6,7 @@ import com.kagebi.assets.Assets;
 import com.kagebi.gen.RoomKind;
 import com.kagebi.run.RunState;
 import com.kagebi.save.Profile;
+import com.kagebi.settings.Difficulty;
 
 /**
  * Builds the screen a {@code --screen} launch flag asks for.
@@ -26,6 +27,9 @@ import com.kagebi.save.Profile;
  *   style     --page 1-2   widget sheet, surface sheet
  *   select    --page 1-6   character select, with that ninja highlighted
  *   hub       --page N     the village, dimmed by N-1 failed descents
+ *   world     --page 1-5   the world map, open to that stage and focused on it
+ *   stage     --page 1-5   the same, with that stage's panel and difficulty row
+ *   cleared   --page 1-5   the stage-clear screen, for that stage
  *   talk      --page 1-3   the village, mid-conversation with that villager
  *   store     --page 1-4   the herbalist's stall, over a profile N runs deep
  *   unlocks   --page 1-4   the same, on its second tab
@@ -82,6 +86,16 @@ public final class Screens {
                                          new SettingsScreen(game, page - 1)};
             case "select":
                 return new GameScreen[] {new CharacterSelectScreen(game, page - 1)};
+            case "world":
+                stockStages(game, page);
+                return new GameScreen[] {new WorldMapScreen(game).focusOn(page)};
+            case "stage":
+                stockStages(game, page);
+                return new GameScreen[] {
+                    new WorldMapScreen(game).focusOn(page).withPanelOpen()};
+            case "cleared":
+                sampleRun(game, page);
+                return new GameScreen[] {new StageClearScreen(game)};
             case "hub":
                 game.profile().villageDarkness = Math.max(0, page - 1);
                 return new GameScreen[] {new HubScreen(game)};
@@ -194,12 +208,55 @@ public final class Screens {
         }
     }
 
+    /**
+     * A profile that has cleared up to {@code stage - 1}, so the map has open
+     * nodes to photograph.
+     *
+     * <p>Guarded the way {@link #stockProfile} is, and for the same reason:
+     * this writes into the live profile, so without the guard a screenshot run
+     * would hand a real player stages they have not finished.
+     */
+    private static void stockStages(Kagebi game, int stage) {
+        Profile p = game.profile();
+        if (p.runs > 0 || p.gold > 0) {
+            return;
+        }
+        p.clearedStages = Math.max(0, Math.min(5, stage - 1));
+        p.deepestFloor = Math.max(p.deepestFloor, p.clearedStages);
+    }
+
     private static void sampleRun(Kagebi game, int deepest) {
         RunState run = startRun(game, deepest);
         run.deepestFloor = deepest;
         run.kills = 1284;
         run.gold = 2371;
         run.elapsedSeconds = 3725f;
+    }
+
+    /**
+     * A run for one stage, at the difficulty chosen on the world map.
+     *
+     * <p>The ninja, the weapon and the off hand carry over from whatever the
+     * player last played; nothing else does. Health starts full every time,
+     * because a stage is a sitting and not a leg of a descent - which is also
+     * how the "heal on arriving at a new floor" this game wanted turns out to
+     * need no code at all.
+     *
+     * <p>The second and last place a difficulty is fixed onto a run. The dial
+     * on the video tab is now the default the map opens on; this is what the
+     * run is actually played at.
+     */
+    public static RunState stageRun(Kagebi game, int stage, Difficulty difficulty) {
+        RunState previous = game.run();
+        RunState run = freshRun(
+            previous != null ? previous.characterId : Assets.Actor.DEFAULT_CHARACTER,
+            previous != null ? previous.weaponId : "katana",
+            DEFAULT_MAX_HP);
+        run.throwWeaponId = previous == null ? null : previous.throwWeaponId;
+        run.difficulty = difficulty != null ? difficulty : Difficulty.DEFAULT;
+        run.floor = Math.max(1, stage);
+        game.setRun(run);
+        return run;
     }
 
     private static Long fixedSeed;
