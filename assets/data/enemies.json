@@ -271,11 +271,12 @@
       // Bosses are horizontal strips, one region per animation. The brain
       // names the others: bosses/giantfrog2/{attack,charge,hit,jump}.
       "sprite": "bosses/giantfrog2/idle", "cell": 40,
-      // 900 hit points is about 43 seconds against the DPS a player reaching
-      // floor 3 is expected to have (21), and closer to 70 in practice once
-      // the hop-slam forces them to disengage. Long enough to be a fight,
-      // short enough that losing does not cost ten minutes.
-      "maxHp": 900, "contactDamage": 12, "attackDamage": 22, "moveSpeed": 46,
+      // 520 hit points. It was 900, which was right when the game was one
+      // descent and a player arrived at floor 3 carrying four floors' worth of
+      // relics; a stage starts from nothing, so the same 900 came to 117
+      // seconds of unbroken swinging on the starting katana. 520 is about a
+      // minute, which is a fight rather than a chore. See BalanceTest.stageDps.
+      "maxHp": 520, "contactDamage": 12, "attackDamage": 22, "moveSpeed": 46,
       "brain": "boss_frog", "aggroRange": 999, "attackRange": 72,
       "windupSteps": 30, "activeSteps": 18, "recoverSteps": 36, "cooldownSteps": 60,
       // Immovable. A boss that can be knocked back is a boss that can be
@@ -287,10 +288,15 @@
     {
       "id": "tengured", "nameKey": "enemy.tengured.name",
       "sprite": "bosses/tengured/idle", "cell": 82,
-      // The player's own master. 1800 across two phases of 900; at half hit
+      // The player's own master. 880 across two phases of 440; at half hit
       // points the fight stops and plays bosses/tengured/trans, which is the
       // only place the story is told without a line of text.
-      "maxHp": 1800, "contactDamage": 16, "attackDamage": 30, "moveSpeed": 64,
+      //
+      // It was 1800, and stages made that unplayable rather than hard: nearly
+      // four minutes of the same four attacks with the starting katana, since
+      // nobody arrives at stage 5 with stage 1-4's relics any more. Still the
+      // longest fight in the game at 880, which is what a last boss should be.
+      "maxHp": 880, "contactDamage": 16, "attackDamage": 30, "moveSpeed": 64,
       "brain": "boss_tengu", "aggroRange": 999, "attackRange": 90,
       "windupSteps": 26, "activeSteps": 14, "recoverSteps": 30, "cooldownSteps": 48,
       "knockbackResist": 1.0, "hurtInvulnSteps": 5,

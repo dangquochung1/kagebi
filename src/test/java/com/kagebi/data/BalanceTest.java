@@ -110,6 +110,33 @@ class BalanceTest {
             * Math.pow(PER_RELIC, RELICS_PER_FLOOR * (floor - 1));
     }
 
+    /**
+     * What a player actually swings for on stage N, now that stages are
+     * separate outings.
+     *
+     * <p>{@link #dps} compounds relics across the floors below - which was
+     * correct when reaching floor 5 meant surviving floors 1 to 4 in one
+     * sitting, and is how the floor pacing above is still modelled, because a
+     * stage's own trash is still met after that stage's own relics. It is
+     * wrong for the one moment where the mistake is expensive: nobody arrives
+     * at the stage-5 boss with stage 1-4's relics any more. They arrive with
+     * whatever this stage has handed them, which is one floor's worth.
+     *
+     * <p>Deliberately ignores the village shop, which does close some of that
+     * gap. A boss sized against a player who has bought upgrades is a boss that
+     * is unbeatable for the player who has not, and the first time anyone meets
+     * a boss is the run they have banked the least.
+     */
+    static double stageDps() {
+        return theoretical(reg.weapon("katana")) * EFFECTIVE
+            * Math.pow(PER_RELIC, RELICS_PER_FLOOR);
+    }
+
+    /** Wall-clock seconds of one boss fight, for a player who brought only a stage. */
+    static double bossSeconds(FloorDef f) {
+        return f.hasBoss() ? reg.enemy(f.boss).maxHp / stageDps() * OVERHEAD_BOSS : 0;
+    }
+
     static double theoretical(WeaponDef w) {
         return w.damage * 60.0 / (w.windupSteps + w.activeSteps + w.recoverSteps);
     }
@@ -318,6 +345,32 @@ class BalanceTest {
         for (FloorDef f : reg.allFloors()) {
             assertTrue(seconds(f) > previous, "floor " + f.number + " is shorter than the one above");
             previous = seconds(f);
+        }
+    }
+
+    /**
+     * A boss is a fight, not a chore.
+     *
+     * <p>The number this pins was found by a playtest saying "boss qua trau" -
+     * the boss is too beefy - and the arithmetic agreed: 900 and 1,800 hit
+     * points, sized for a descent, came to 117 and 234 seconds once the game
+     * became five separate stages. Nothing here noticed, because every promise
+     * in this file was about a whole floor, and a floor is mostly walking and
+     * trash. A four-minute boss hides inside a ten-minute stage.
+     *
+     * <p>Two minutes is the ceiling, and it is a ceiling rather than a target:
+     * the last boss should be allowed to be the longest fight in the game. The
+     * shipped table puts the final one at about 105 seconds.
+     */
+    @Test
+    void noBossFightOutstaysItsWelcome() {
+        for (FloorDef f : reg.allFloors()) {
+            if (!f.hasBoss()) {
+                continue;
+            }
+            assertTrue(bossSeconds(f) <= 120, "the stage " + f.number + " boss ("
+                + reg.enemy(f.boss).maxHp + " hp) is " + bossSeconds(f)
+                + " seconds for a player who brought only this stage's relics");
         }
     }
 

@@ -112,10 +112,10 @@ public class WorldMapScreen extends SimScreen {
     /**
      * Opens with that stage under the ring, for {@code --screen world --page N}.
      *
-     * <p>A stage of 1 leaves the ring where it would land on its own, which is
-     * the stage the player is working on. {@code --page} defaults to 1, so
-     * without this the debug flag would show every profile opening on stage
-     * one and hide the behaviour it exists to photograph.
+     * <p>Stage 1 is left alone rather than pinned, which is the same place
+     * {@link #openingFocus} puts it - so {@code --page 1}, the default, shows
+     * the map exactly as a player finds it rather than a state only the flag
+     * can reach.
      */
     WorldMapScreen focusOn(int stage) {
         if (stage <= 1) {
@@ -156,6 +156,23 @@ public class WorldMapScreen extends SimScreen {
         return Math.max(0, Math.min(count - 1, focus + delta));
     }
 
+    /**
+     * Which node the ring starts on: the first, always.
+     *
+     * <p>It used to be {@code clearedStages} - "open on the stage you are
+     * working on" - and the reasoning was sound and the result was not. A
+     * player who has finished the game opens the map on stage five every time,
+     * with the whole trail behind them and the ring at the far end, and has to
+     * walk it back to reach the early stage they came to farm. Reading left to
+     * right is what a map with a numbered trail promises.
+     *
+     * <p>The argument is kept rather than dropped so this reads as a decision
+     * at the call site instead of a constant somebody forgot to wire up.
+     */
+    static int openingFocus(int clearedStages) {
+        return 0;
+    }
+
     // ---- lifecycle -------------------------------------------------------------
 
     @Override
@@ -178,9 +195,7 @@ public class WorldMapScreen extends SimScreen {
         if (game.settings() != null) {
             chosen = game.settings().difficulty();
         }
-        // Opens on the stage the player is working on, which is what they are
-        // most likely to have come here for.
-        focus = Math.min(count() - 1, game.profile().clearedStages);
+        focus = openingFocus(game.profile().clearedStages);
         if (focusOnShow) {
             focus = Math.max(0, Math.min(count() - 1, focusWanted));
         }

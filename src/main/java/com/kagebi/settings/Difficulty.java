@@ -12,9 +12,9 @@ package com.kagebi.settings;
  * kill you faster, which is tension without any extra substance.
  *
  * <p><b>Bosses scale more gently than ordinary enemies.</b> The final boss is
- * 1,800 hit points, which is eighty-nine measured seconds of unbroken swinging
- * with the starting katana. At the ordinary 1.2 that is nearly two minutes of
- * the same four attacks, which is not harder, only longer - so bosses take 1.1.
+ * 880 hit points, which is about a hundred seconds of unbroken swinging with
+ * the starting katana. At the ordinary 1.2 that is two full minutes of the same
+ * four attacks, which is not harder, only longer - so bosses take 1.1.
  *
  * <p>NORMAL is exactly 1.0 in every direction on purpose: it is the content as
  * authored and as {@code BalanceTest} models it, so the balance work already

@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
+import com.kagebi.combat.Combatant;
 import com.kagebi.combat.Faction;
 import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
@@ -43,13 +44,23 @@ public final class Projectile extends Entity {
     private final TextureRegion still;
     /** Not consumed by a hit. I-frames, not removal, stop it hitting every step. */
     private final boolean pierce;
+    /**
+     * Whether the throw that launched this one crit. Carried rather than
+     * recomputed: the roll happened once, when the arm went back, and every
+     * shot of a fanned throw is that one roll - rolling again per projectile
+     * would let a bandolier throw crit three times out of one press.
+     */
+    private final boolean crit;
+
+    /** Whoever this lands on, this step, reused rather than allocated. */
+    private final java.util.List<Combatant> struck = new java.util.ArrayList<>();
 
     private int armSteps;
     private int life;
 
     public Projectile(Faction owner, float x, float y, float dirX, float dirY,
                       float speed, int damage, float knockback, int lifeSteps,
-                      Anim anim, TextureRegion still) {
+                      Anim anim, TextureRegion still, boolean crit) {
         this.owner = owner;
         this.x = x;
         this.y = y;
@@ -61,6 +72,7 @@ public final class Projectile extends Entity {
         this.anim = anim;
         this.still = still;
         this.pierce = false;
+        this.crit = crit;
         this.bodyW = BODY;
         this.bodyH = BODY;
         this.facing = Dir.of(dirX, dirY);
@@ -82,6 +94,7 @@ public final class Projectile extends Entity {
         this.anim = anim;
         this.still = null;
         this.pierce = true;
+        this.crit = false;
         this.bodyW = HAZARD_W;
         this.bodyH = HAZARD_H;
         this.hp = 1;
@@ -129,9 +142,21 @@ public final class Projectile extends Entity {
         }
 
         Hitbox box = Hitbox.body(x, y, bodyW, bodyH, damage, knockback, owner);
-        boolean landed = owner == Faction.PLAYER
-            ? HitResolver.resolve(box, world.hostiles(), null) > 0
-            : HitResolver.hit(box, world.player(), null);
+        boolean landed;
+        if (owner == Faction.PLAYER) {
+            // Collected, not counted. A thrown weapon used to pass null here
+            // and tell the world nothing, so a kunai that killed an enemy did
+            // it in silence: no damage number, no health bar, no hit sound,
+            // and no on-hit relic. The main hand has always reported itself;
+            // see Player.resolveSwing, which this now mirrors.
+            struck.clear();
+            landed = HitResolver.resolve(box, world.hostiles(), null, struck) > 0;
+            if (landed) {
+                world.onThrownHitLanded(struck, damage, crit);
+            }
+        } else {
+            landed = HitResolver.hit(box, world.player(), null);
+        }
         if (landed && !pierce) {
             removed = true;
         }

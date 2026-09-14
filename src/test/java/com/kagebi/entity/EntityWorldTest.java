@@ -222,6 +222,46 @@ class EntityWorldTest {
         assertFalse(w.player().attacking(), "and it does not start a swing either");
     }
 
+    /**
+     * A thrown weapon that lands reports itself, exactly as a swing does.
+     *
+     * <p>It did not. {@code Projectile.step} passed a null collector to
+     * {@link com.kagebi.combat.HitResolver} and told the world nothing, so a
+     * kunai took health off an enemy in complete silence: no damage number, no
+     * health bar, no hit sound, and no on-hit relic. The report that found it
+     * named the first two, because those are the two a player can see.
+     *
+     * <p>The bar is what this can assert headless. The damage number rides on
+     * the same {@link EntityWorld#popDamage} call and is gated only on a font,
+     * which a test with no GL context has no way to supply - so a raised bar is
+     * the observable half of one event, not a separate one.
+     */
+    @Test
+    void aThrownWeaponThatLandsRaisesTheHealthBarToo() {
+        ContentRegistry r = registry();
+        r.put(TestDefs.katana());
+        r.put(TestDefs.kunai());
+        RunState run = TestDefs.run();
+        run.throwWeaponId = "kunai";
+        EntityWorld w = world(r, run);
+        // The player lands in the middle of the room facing down with no ENTRY
+        // spawn, so the target goes straight below them and the throw needs no
+        // steering. See EntityWorld.placePlayer.
+        w.enterRoom(TestDefs.room(RoomKind.NORMAL, TestDefs.at(ENEMY, 160, 60, "larva")),
+                    TestDefs.walled(), null);
+        Enemy e = w.hostiles().get(0);
+        int before = e.hp;
+        assertEquals(0f, e.healthBarFade(), "nothing has touched it yet");
+
+        ScriptedInput in = new ScriptedInput();
+        in.tap(GameAction.THROW);
+        in.ticks(w, 30);
+
+        assertTrue(e.hp < before, "the kunai should have taken health off");
+        assertTrue(e.healthBarFade() > 0f,
+            "and a hit the player cannot see is a hit they will not trust");
+    }
+
     /** A melee id in the off-hand slot is refused rather than thrown. */
     @Test
     void aSwordCannotBePutInTheThrowingSlot() {

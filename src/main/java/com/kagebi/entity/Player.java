@@ -441,7 +441,7 @@ public final class Player extends Entity {
             // A thrown weapon leaves the hand once, on the first active step;
             // the rest of the window is follow-through with nothing attached.
             if (swing.stepsInPhase() == 0) {
-                world.throwFrom(this, using, swingDamage);
+                world.throwFrom(this, using, swingDamage, swingCrit);
             }
             return;
         }

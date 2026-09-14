@@ -67,6 +67,21 @@ class WorldMapLayoutTest {
 
     // ---- moving the ring -------------------------------------------------------
 
+    /**
+     * The map opens on stage one, whatever the profile has done.
+     *
+     * <p>It opened on {@code clearedStages} first, meaning a finished profile
+     * found the ring parked on stage five with the whole trail behind it, and
+     * had to walk it back to replay stage one. Worth a test rather than a
+     * comment because the discarded rule is the plausible-sounding one, and
+     * this is the kind of line somebody helpfully "fixes" back.
+     */
+    @Test
+    void theMapAlwaysOpensOnTheFirstStage() {
+        assertEquals(0, WorldMapScreen.openingFocus(0), "a profile that has done nothing");
+        assertEquals(0, WorldMapScreen.openingFocus(5), "and one that has finished the game");
+    }
+
     @Test
     void theFocusWalksTheStagesAndStopsAtBothEnds() {
         assertEquals(1, WorldMapScreen.stepFocus(0, 1, 5));

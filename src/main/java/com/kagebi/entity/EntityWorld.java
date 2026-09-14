@@ -948,7 +948,7 @@ public final class EntityWorld implements World, AiContext {
     public void fireProjectile(Enemy from, float dirX, float dirY, float speed,
                                int damage, int lifeSteps) {
         projectiles.add(new Projectile(Faction.ENEMY, from.x, from.y, dirX, dirY, speed,
-            damage, SHOT_KNOCKBACK, lifeSteps, orbAnim, null));
+            damage, SHOT_KNOCKBACK, lifeSteps, orbAnim, null, false));
     }
 
     @Override
@@ -1054,7 +1054,7 @@ public final class EntityWorld implements World, AiContext {
      * shots on the same line would land on the same target and read as one
      * shot doing more damage, which is what a damage relic is for.
      */
-    void throwFrom(Player p, WeaponDef w, int damage) {
+    void throwFrom(Player p, WeaponDef w, int damage, boolean crit) {
         int life = Math.max(1, Math.round(w.reach / THROW_SPEED / Cfg.STEP));
         int extra = Math.max(0, p.mods().throwExtra());
         sfx(Assets.Sfx.THROW);
@@ -1065,7 +1065,7 @@ public final class EntityWorld implements World, AiContext {
             float dx = p.facing.dx - p.facing.dy * spread;
             float dy = p.facing.dy + p.facing.dx * spread;
             projectiles.add(new Projectile(Faction.PLAYER, p.x, p.y, dx, dy,
-                THROW_SPEED, damage, w.knockback, life, null, kunaiRegion));
+                THROW_SPEED, damage, w.knockback, life, null, kunaiRegion, crit));
         }
     }
 
@@ -1299,8 +1299,8 @@ public final class EntityWorld implements World, AiContext {
      *
      * <p>Here rather than in {@link Enemy}: the def is the content as authored
      * and an enemy has no idea which run it belongs to. Bosses take a gentler
-     * factor - the final one is eighty-nine measured seconds of unbroken
-     * swinging already, and a fifth more of that is not harder, only longer.
+     * factor - the final one is already the longest fight in the game, and a
+     * fifth more of it is not harder, only longer.
      */
     private void scaleHealth(Enemy e, boolean boss) {
         if (run == null) {
@@ -1374,6 +1374,27 @@ public final class EntityWorld implements World, AiContext {
                 p.heal(healed);
             }
         }
+    }
+
+    /**
+     * A thrown weapon landed, which is the same event as a swing landing.
+     *
+     * <p>Routed through both of the callbacks the main hand uses rather than
+     * just the one that pops a number. The complaint that found this was "the
+     * off hand shows no damage and no enemy health", but the cause was that a
+     * projectile told the world nothing at all - so it was also silent, also
+     * did not lifesteal, and also did not carry poison, a slow or a chain. Half
+     * a fix would have left a weapon that hurts things without ever saying so.
+     *
+     * <p>One consequence worth naming: on-hit relics now work off the off hand.
+     * That is what the relics say they do, and the bandolier is a relic for the
+     * off hand in the first place - but it is a change in balance, not only in
+     * feedback.
+     */
+    public void onThrownHitLanded(java.util.List<com.kagebi.combat.Combatant> struck,
+                                  int damage, boolean crit) {
+        onPlayerHitLanded(player, damage, struck.size());
+        applyOnHit(player, struck, damage, crit);
     }
 
     /**
