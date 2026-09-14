@@ -21,10 +21,13 @@ import com.kagebi.gen.TiledRooms;
  * silently becomes a wall in one reader and not the other, and the bug would
  * show up as the bot getting stuck on a skull in a test while a person walks
  * straight over it in the game.
+ *
+ * <p>Public for the village's tests, which walk the same {@link TiledRooms#COLLISION}
+ * rectangles the game does.
  */
-final class RoomCollision {
+public final class RoomCollision {
 
-    static CollisionGrid of(String tmxPath) {
+    public static CollisionGrid of(String tmxPath) {
         XmlReader.Element map = new XmlReader().parse(new FileHandle(new File(tmxPath)));
         int width = map.getIntAttribute("width");
         int height = map.getIntAttribute("height");
@@ -46,6 +49,22 @@ final class RoomCollision {
                     // RoomCatalog does for objects, for the same reason.
                     grid.set(i % width, height - 1 - i / width, true);
                 }
+            }
+        }
+        float mapHeight = height * CollisionGrid.TILE;
+        for (XmlReader.Element group : map.getChildrenByName("objectgroup")) {
+            if (!TiledRooms.COLLISION.equals(group.getAttribute("name", ""))) {
+                continue;
+            }
+            for (XmlReader.Element shape : group.getChildrenByName("object")) {
+                float x = shape.getFloatAttribute("x", 0f);
+                float y = shape.getFloatAttribute("y", 0f);
+                float w = shape.getFloatAttribute("width", 0f);
+                float h = shape.getFloatAttribute("height", 0f);
+                // Tiled measures a rectangle's y down to its top edge; the grid
+                // wants its bottom edge, measured up. TmxMapLoader does this
+                // same flip for the game.
+                grid.fill(x, mapHeight - y - h, w, h);
             }
         }
         return grid;

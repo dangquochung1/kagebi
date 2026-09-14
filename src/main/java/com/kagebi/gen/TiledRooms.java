@@ -1,8 +1,11 @@
 package com.kagebi.gen;
 
 import com.badlogic.gdx.maps.MapLayer;
+import com.badlogic.gdx.maps.MapObject;
+import com.badlogic.gdx.maps.objects.RectangleMapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
+import com.badlogic.gdx.math.Rectangle;
 
 /**
  * Turns a loaded Tiled map into the plain grid collision works on.
@@ -36,6 +39,14 @@ import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
  * its own; making it blocking would mean a skull stops the player. Drawing
  * order follows ownership: {@code decor} is painted over {@code dressing}, so a
  * tile placed by hand always wins.
+ *
+ * <p><b>Or solid where the art is.</b> A map may also carry an object layer
+ * named {@link #COLLISION}, whose rectangles are solid to the pixel wherever
+ * they are - finer than any tile. The village and the house block this way and
+ * almost no other: their art pack draws a partition three pixels thick along
+ * the edge of a tile, and puts a rug and the table standing on it in the same
+ * layer, so what stops the player cannot be read off tiles or layer names at
+ * all. {@code tools/make_village.py} writes the rectangles from the art itself.
  */
 public final class TiledRooms {
 
@@ -46,6 +57,9 @@ public final class TiledRooms {
     public static final String WALLS = "walls";
     public static final String PROPS = "props";
     public static final String OVERHEAD = "overhead";
+
+    /** The object layer whose rectangles are solid. See the class comment. */
+    public static final String COLLISION = "collision";
 
     /** Layers drawn below the actors, in order. */
     public static final String[] BELOW = {GROUND, DRESSING, DECOR, WALLS, PROPS};
@@ -98,6 +112,17 @@ public final class TiledRooms {
                     if (tiles.getCell(x, y) != null) {
                         grid.set(x, y, true);
                     }
+                }
+            }
+        }
+        MapLayer shapes = map.getLayers().get(COLLISION);
+        if (shapes != null) {
+            for (MapObject object : shapes.getObjects()) {
+                if (object instanceof RectangleMapObject) {
+                    // Already y-up and measured from the bottom edge: the
+                    // loader flips object coordinates as it reads them.
+                    Rectangle r = ((RectangleMapObject) object).getRectangle();
+                    grid.fill(r.x, r.y, r.width, r.height);
                 }
             }
         }
