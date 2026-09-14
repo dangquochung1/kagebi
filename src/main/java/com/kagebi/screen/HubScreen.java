@@ -8,9 +8,8 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.maps.MapLayer;
+import com.badlogic.gdx.maps.MapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
-import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
-import com.badlogic.gdx.maps.tiled.TiledMapTileSet;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.utils.Align;
@@ -36,7 +35,15 @@ import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
 
 /**
- * Kagemura, between runs: three villagers, a torii, and the way down.
+ * Kagemura, between runs: three villagers, a torii, and a house of your own.
+ *
+ * <p><b>Where everything stands is read off the map.</b> It used to be eight
+ * pixel constants in this file, which {@code notes/a.md} recorded as a thing to
+ * fix and which made the village impossible to rearrange without editing Java.
+ * {@code village.tmx} carries a {@code spawns} object layer now - {@code entry},
+ * {@code gate}, {@code door}, {@code villager1..3} - so moving a house in Tiled
+ * moves the person standing at its door. The constants below are the fallback
+ * for a map that has lost the layer, and nothing more.
  *
  * <p>The only map in the game larger than the screen, so the only screen where
  * the camera scrolls. It follows the player and is clamped to the map; the
@@ -65,34 +72,28 @@ public class HubScreen extends SimScreen {
     private static final Color DUSK = new Color(0x0c0a1aff);
     private static final Color GOLD = new Color(0xffad55ff);
 
-    /**
-     * The village's props layer mixes structure and scenery in one layer: 42
-     * tiles of houses and torii from the {@code house} tileset, 237 tiles of
-     * grass tufts and bushes from {@code nature}. Measured, not guessed. Every
-     * props tile blocking - the rule rooms use - would leave the player unable
-     * to take a step, so here the scenery tileset is walkable and the rest is
-     * solid. See {@code notes/a.md}: the map should grow a {@code walls} layer.
-     */
-    private static final String SCENERY_TILESET = "nature";
+    /** Fallbacks, in map pixels y-up, for a map with no {@code spawns} layer. */
+    private static final int[][] VILLAGER_AT = {{64, 288}, {64, 192}, {64, 96}};
+    private static final int ENTRY_X = 400;
+    private static final int ENTRY_Y = 160;
+    private static final int GATE_X = 72;
+    private static final int GATE_Y = 48;
+    private static final int DOOR_X = 400;
+    private static final int DOOR_Y = 192;
 
-    // Positions are in map pixels, y-up. The village has no object layer yet,
-    // so they are written here; each was read off tools/preview_map.py output.
-
-    /** In front of the three houses, beside each door. */
-    private static final int[][] VILLAGER_AT = {{96, 208}, {238, 208}, {382, 208}};
+    private static final float GATE_RANGE = 24f;
     /**
-     * In the clearing below the middle house. The first thing a player should
-     * see is the village and the three people in it; framing the torii as well
-     * cut the houses to a sixteen-pixel sliver across the top edge. The gate is
-     * straight down from here, which is where anyone walks first anyway.
+     * Wide enough that the prompt is up where the player lands.
+     *
+     * <p>Arriving home and being told the door opens is the only way anyone
+     * finds out that it does - there is no sign on it and no line of dialogue
+     * about it. The marker sits on the doormat and the player arrives two
+     * tiles off it, so this is just over that.
      */
-    private static final int ENTRY_X = 240;
-    private static final int ENTRY_Y = 186;
-    /** The centre of the torii, which is the dungeon gate. */
-    private static final int GATE_X = 248;
-    private static final int GATE_Y = 80;
-    private static final float GATE_RANGE = 30f;
+    private static final float DOOR_RANGE = 26f;
     private static final float TALK_RANGE = 22f;
+    /** The object layer the village's own markers live in. */
+    static final String SPAWNS = "spawns";
     /** Villagers turn to face the player inside this range. */
     private static final float NOTICE_RANGE = 56f;
 
@@ -130,9 +131,19 @@ public class HubScreen extends SimScreen {
     /** Steps left on the arrival card. */
     private int card = Hud.CARD_STEPS;
 
-    /** What INTERACT would do this step: a villager, the gate, or nothing. */
+    /** Read off the map's object layer, or the constants above. */
+    private int[][] villagerAt = VILLAGER_AT;
+    private int gateX = GATE_X;
+    private int gateY = GATE_Y;
+    private int doorX = DOOR_X;
+    private int doorY = DOOR_Y;
+    private int entryX = ENTRY_X;
+    private int entryY = ENTRY_Y;
+
+    /** What INTERACT would do this step: a villager, the gate, the door, or nothing. */
     private Villager nearVillager;
     private boolean nearGate;
+    private boolean nearDoor;
 
     /** A villager to be already talking to on arrival, or -1. */
     private int talkOnShow = -1;
@@ -191,8 +202,9 @@ public class HubScreen extends SimScreen {
         renderer = new OrthogonalTiledMapRenderer(map, game.batch());
         below = TiledRooms.layerIndices(map, TiledRooms.BELOW);
         above = TiledRooms.layerIndices(map, TiledRooms.ABOVE);
+        readSpawns(map);
 
-        grid = collision(map);
+        grid = TiledRooms.collision(map);
         mapW = grid.width() * CollisionGrid.TILE;
         mapH = grid.height() * CollisionGrid.TILE;
 
@@ -211,7 +223,7 @@ public class HubScreen extends SimScreen {
         TextureAtlas npc = Preload.npc();
         for (int i = 0; i < Assets.Npc.VILLAGERS.length; i++) {
             String id = Assets.Npc.VILLAGERS[i];
-            Villager v = new Villager(id, VILLAGER_AT[i][0], VILLAGER_AT[i][1],
+            Villager v = new Villager(id, villagerAt[i][0], villagerAt[i][1],
                 Anim.directional(npc, Assets.Npc.idle(id), 16, Anim.DEFAULT_STEPS_PER_FRAME, true),
                 npc.findRegion(Assets.Npc.face(id)));
             villagers.add(v);
@@ -231,9 +243,16 @@ public class HubScreen extends SimScreen {
             ((EntityWorld) world).useVillage(game.shop(), game.profile());
             ((EntityWorld) world).useAudio(game.audio());
         }
-        world.enterRoom(villageRoom(), grid, null);
         if (talkOnShow >= 0 && talkOnShow < villagers.size) {
-            talk(villagers.get(talkOnShow));
+            // Standing in front of them, not across the village. The player
+            // arrives at their own house now, which is far enough from the
+            // villagers' row that --screen talk framed a dialogue box over an
+            // empty garden and photographed nobody.
+            Villager v = villagers.get(talkOnShow);
+            world.enterRoom(villageRoom(v.x, v.y - 20), grid, null);
+            talk(v);
+        } else {
+            world.enterRoom(villageRoom(), grid, null);
         }
         game.audio().playMusic(Assets.MUSIC_VILLAGE);
     }
@@ -244,49 +263,66 @@ public class HubScreen extends SimScreen {
      * gate, which this screen owns - and one ENTRY spawn, which is how the
      * contract says an arrival with no door is placed.
      */
-    private static Room villageRoom() {
+    private Room villageRoom() {
+        return villageRoom(entryX, entryY);
+    }
+
+    private static Room villageRoom(int x, int y) {
         Array<RoomKind> kinds = new Array<>();
         kinds.add(RoomKind.START);
         Array<SpawnPoint> spawns = new Array<>();
-        spawns.add(new SpawnPoint(SpawnPoint.Kind.ENTRY, ENTRY_X, ENTRY_Y, null));
+        spawns.add(new SpawnPoint(SpawnPoint.Kind.ENTRY, x, y, null));
         RoomTemplate template = new RoomTemplate("village", "village", kinds,
                                                  Assets.MAP_VILLAGE, spawns);
         return new Room(0, 0, RoomKind.START, template);
     }
 
     /**
-     * Blocking tiles, by the room rule where it can be trusted and by tileset
-     * where it cannot. A {@code walls} layer, if the village ever has one,
-     * blocks outright.
+     * Where the people, the gate and the door stand, off the map's own object
+     * layer. Anything the layer does not name keeps the constant above.
+     *
+     * <p>The same shape as {@code WorldMapScreen.readNodes}: a map is content
+     * and content can be wrong, so a missing marker leaves the village
+     * playable with a villager in an odd spot rather than crashing on the way
+     * in. What it must never do is silently move nothing, which is why the
+     * names are asserted in {@code VillageLayoutTest}.
      */
-    private static CollisionGrid collision(TiledMap map) {
-        CollisionGrid grid = TiledRooms.collision(map);
-        MapLayer props = map.getLayers().get(TiledRooms.PROPS);
-        TiledMapTileSet scenery = map.getTileSets().getTileSet(SCENERY_TILESET);
-        if (!(props instanceof TiledMapTileLayer) || scenery == null) {
-            return grid;
+    private void readSpawns(TiledMap map) {
+        MapLayer layer = map.getLayers().get(SPAWNS);
+        if (layer == null) {
+            return;
         }
-        TiledMapTileLayer layer = (TiledMapTileLayer) props;
-        MapLayer walls = map.getLayers().get(TiledRooms.WALLS);
-        for (int y = 0; y < layer.getHeight(); y++) {
-            for (int x = 0; x < layer.getWidth(); x++) {
-                TiledMapTileLayer.Cell cell = layer.getCell(x, y);
-                // A tile set stores its tiles by global id, so asking it for
-                // this cell's id answers "is this grass?" without arithmetic
-                // on first-gid ranges that the next map edit would break.
-                if (cell != null && cell.getTile() != null
-                        && scenery.getTile(cell.getTile().getId()) != null
-                        && !solidIn(walls, x, y)) {
-                    grid.set(x, y, false);
+        int[][] found = new int[villagerAt.length][];
+        for (MapObject object : layer.getObjects()) {
+            String name = object.getName();
+            Float x = object.getProperties().get("x", Float.class);
+            Float y = object.getProperties().get("y", Float.class);
+            if (name == null || x == null || y == null) {
+                continue;
+            }
+            int px = Math.round(x);
+            int py = Math.round(y);
+            if (name.equals("gate")) {
+                gateX = px;
+                gateY = py;
+            } else if (name.equals("door")) {
+                doorX = px;
+                doorY = py;
+            } else if (name.equals("entry")) {
+                entryX = px;
+                entryY = py;
+            } else if (name.startsWith("villager")) {
+                int index = name.charAt(name.length() - 1) - '1';
+                if (index >= 0 && index < found.length) {
+                    found[index] = new int[] {px, py};
                 }
             }
         }
-        return grid;
-    }
-
-    private static boolean solidIn(MapLayer layer, int x, int y) {
-        return layer instanceof TiledMapTileLayer
-            && ((TiledMapTileLayer) layer).getCell(x, y) != null;
+        for (int i = 0; i < found.length; i++) {
+            if (found[i] != null) {
+                villagerAt[i] = found[i];
+            }
+        }
     }
 
     // ---- simulation --------------------------------------------------------
@@ -335,6 +371,8 @@ public class HubScreen extends SimScreen {
                 talk(nearVillager);
             } else if (nearGate) {
                 openMap();
+            } else if (nearDoor) {
+                goInside();
             } else if (world.promptKey() != null) {
                 world.interact();
             }
@@ -353,7 +391,9 @@ public class HubScreen extends SimScreen {
                 nearVillager = v;
             }
         }
-        nearGate = nearVillager == null && dist(px, py, GATE_X, GATE_Y) < GATE_RANGE;
+        nearGate = nearVillager == null && dist(px, py, gateX, gateY) < GATE_RANGE;
+        nearDoor = nearVillager == null && !nearGate
+            && dist(px, py, doorX, doorY) < DOOR_RANGE;
     }
 
     private void talk(Villager v) {
@@ -399,6 +439,19 @@ public class HubScreen extends SimScreen {
         game.audio().playSfx(Assets.SFX_ACCEPT);
         loadoutOpen = true;
         stack().push(new CharacterSelectScreen(game, 0).asLoadout());
+    }
+
+    /**
+     * Through the front door.
+     *
+     * <p>A marker and a key press, the way the torii works, rather than a hole
+     * cut in the collision under the door. The wall is one object in the art
+     * and punching a gap in it means knowing which tile is the doorway, which
+     * is a guess that survives exactly until the house moves.
+     */
+    private void goInside() {
+        game.audio().playSfx(Assets.SFX_DOOR);
+        stack().push(new HomeScreen(game));
     }
 
     private void openMap() {
@@ -490,6 +543,7 @@ public class HubScreen extends SimScreen {
         }
         String key = nearVillager != null ? "prompt.talk"
             : nearGate ? "prompt.descend"
+            : nearDoor ? "prompt.enter_home"
             : world.promptKey();
         if (key != null) {
             Hud.prompt(batch, game.skin(), font,

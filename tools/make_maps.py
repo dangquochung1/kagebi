@@ -17,6 +17,10 @@ Every room is flood-filled before it is written (check_room): all four doors
 open, and every floor tile reachable from every door. A room that seals a door
 still looks open in a preview, so this is not left to the eye.
 
+This writes the room templates and nothing else. The village and the world map
+have their own scripts - make_village.py and make_world.py - so that running
+this one cannot destroy either.
+
 Usage:  python tools/make_maps.py
         python tools/preview_map.py assets/maps/rooms/ruins review/ruins.png --spawns
 """
@@ -36,16 +40,26 @@ TILE = 16
 class Tileset:
     """One tileset image, and where its ids start in the map's global space."""
 
-    def __init__(self, name, filename, firstgid, folder=None):
+    def __init__(self, name, filename, firstgid, folder=None, rel=None, tiles=None):
         self.name = name
         self.filename = filename
         self.firstgid = firstgid
+        # Where the .tmx should point at this image, when it is not in the
+        # folder every other tileset in that map came from. The village mixes
+        # two packs, which is what this exists for; see tools/make_village.py.
+        self.rel = rel
+        # <tile> nodes to write inside the tileset: animations, carried over
+        # from an art pack's own .tmx rather than authored here.
+        self.tiles = tiles or []
         from PIL import Image
         with Image.open(os.path.join(folder or TILES, filename)) as im:
             self.width, self.height = im.size
         self.columns = self.width // TILE
         self.rows = self.height // TILE
         self.count = self.columns * self.rows
+
+    def source(self, tiles_rel):
+        return self.rel if self.rel is not None else tiles_rel + self.filename
 
     def gid(self, tx, ty):
         """Global id for a tile at column tx, row ty."""
@@ -161,7 +175,7 @@ def carry_decor(path, tilesets, layers, tiles_rel):
             key = _tileset_key(tmx_dir, ts.find("image").get("source"))
         old_sets.append((int(ts.get("firstgid")), count, key, ts))
 
-    first = {_tileset_key(tmx_dir, tiles_rel + ts.filename): ts.firstgid
+    first = {_tileset_key(tmx_dir, ts.source(tiles_rel)): ts.firstgid
              for ts in tilesets}
     next_gid = max(ts.firstgid + ts.count for ts in tilesets)
     extra = []
@@ -203,9 +217,11 @@ def write_tmx(path, width, height, tilesets, layers,
         })
         # Tiled and libGDX both resolve this relative to the .tmx file.
         ET.SubElement(node, "image", {
-            "source": tiles_rel + ts.filename,
+            "source": ts.source(tiles_rel),
             "width": str(ts.width), "height": str(ts.height),
         })
+        for tile in ts.tiles:
+            node.append(tile)
     for ts in extra:
         ts.node.set("firstgid", str(ts.firstgid))
         m.append(ts.node)
@@ -251,88 +267,17 @@ HOUSES = [(0, 0), (4, 0), (8, 0)]    # 4x3 each
 TORII = (0, 5)                       # 3x2 shrine gate
 
 
-# world.tmx is NOT generated here. It has its own script, tools/make_world.py,
-# which is run by hand rather than as part of a regenerate. This one writes
-# exactly two paths - OUT/village.tmx and OUT/rooms/<biome>/<name>.tmx - and
-# never enumerates assets/maps/, so the world map is safe from it.
-def village(width=30, height=18, seed=7):
-    """The menu backdrop and, later, the hub: a clearing with houses and a gate."""
-    rng = random.Random(seed)
-    sets = build_tilesets()
-    floor, nature, house = sets["floor"], sets["nature"], sets["house"]
-
-    ground = Layer("ground", width, height)
-    decor = Layer("decor", width, height)       # left empty, for hand editing
-    props = Layer("props", width, height)
-    overhead = Layer("overhead", width, height)
-
-    for y in range(height):
-        for x in range(width):
-            ground.put(x, y, floor.gid(*GRASS))
-
-    # Houses along the top, spaced so the gate can sit between them.
-    for i, (hx, hy) in enumerate(HOUSES):
-        props.stamp(house, 3 + i * 9, 1, hx, hy, 4, 3)
-
-    # The shrine gate anchors the centre and gives the eye somewhere to land.
-    gate_x, gate_y = width // 2 - 1, height - 6
-    props.stamp(house, gate_x, gate_y, *TORII, 3, 2)
-
-    def in_clearing(x, y):
-        """Inside the open middle, where nothing tall may stand.
-
-        The menu panel sits here and a character walks through it later; a busy
-        backdrop directly behind text is unreadable either way.
-        """
-        nx = (x - width / 2.0) / (width * 0.30)
-        ny = (y - height / 2.0) / (height * 0.34)
-        return nx * nx + ny * ny < 1.0
-
-    # Trees ring the clearing and leave the middle open. The menu panel sits in
-    # that gap, and a busy backdrop directly behind text is unreadable.
-    cx, cy = width / 2.0, height / 2.0
-    for _ in range(220):
-        x = rng.randrange(0, width - 2)
-        y = rng.randrange(4, height - 3)
-        if in_clearing(x, y) or in_clearing(x + 1, y + 2):
-            continue
-        # Beyond the clearing, density still rises with distance so the treeline
-        # thickens towards the edges instead of stopping abruptly.
-        dist = max(abs(x - cx) / cx, abs(y - cy) / cy)
-        if rng.random() > dist ** 2:
-            continue
-        tx, ty = rng.choice(TREES + [PINE, PINE])
-        if props.free(x, y, 2, 3):
-            props.stamp(nature, x, y, tx, ty, 2, 3)
-            # Canopy top goes above the player, trunk below, so a character can
-            # walk behind a tree.
-            for dx in range(2):
-                overhead.put(x + dx, y, nature.gid(tx + dx, ty))
-                props.put(x + dx, y, 0)
-
-    # Dense tufts: the ground is a single flat colour, so this is the only thing
-    # breaking it up.
-    for _ in range(260):
-        x, y = rng.randrange(width), rng.randrange(4, height)
-        if props.free(x, y, 1, 1):
-            props.put(x, y, nature.gid(*rng.choice(TUFTS)))
-
-    for _ in range(30):
-        x, y = rng.randrange(width), rng.randrange(5, height)
-        if props.free(x, y, 1, 1):
-            props.put(x, y, nature.gid(*rng.choice(BUSHES + FLOWERS)))
-
-    for _ in range(8):
-        x, y = rng.randrange(1, width - 2), rng.randrange(6, height - 3)
-        if props.free(x, y, 2, 3):
-            props.stamp(nature, x, y, *ROCK, 2, 3)
-
-    path = os.path.join(OUT, "village.tmx")
-    write_tmx(path, width, height,
-              [floor, nature, house], [ground, decor, props, overhead])
-    print("  village.tmx  %dx%d tiles (%dx%d px), 3 tilesets, 4 layers"
-          % (width, height, width * TILE, height * TILE))
-    return path
+# NEITHER village.tmx NOR world.tmx IS GENERATED HERE. Each has its own script -
+# tools/make_village.py and tools/make_world.py - run by hand rather than as a
+# side effect of a regenerate, because both are finished by hand in Tiled
+# afterwards and this one runs often.
+#
+# village() used to live here and wrote OUT/village.tmx on every run. It is gone
+# because the village is now assembled from a second art pack and is far more
+# than a clearing with three houses in it; leaving a stub that wrote the old one
+# would mean `python tools/make_maps.py` quietly destroys the new village, with
+# a preview that still looks like a village. This script writes exactly one path
+# now - OUT/rooms/<biome>/<name>.tmx - and never enumerates assets/maps/.
 
 
 # --------------------------------------------------------------------------
@@ -1176,5 +1121,4 @@ def hash_seed(*parts):
 
 if __name__ == "__main__":
     print("generating maps")
-    village()
     rooms()

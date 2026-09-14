@@ -26,6 +26,11 @@ from PIL import Image, ImageDraw
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TILE = 16
 
+FLIP_HORIZONTAL = 0x80000000
+FLIP_VERTICAL = 0x40000000
+FLIP_DIAGONAL = 0x20000000
+FLIP_BITS = 0xF0000000
+
 # One letter per SpawnPoint.Kind, and a colour that survives being drawn over
 # both a cream floor and a near-black one.
 SPAWN_STYLE = {
@@ -66,13 +71,26 @@ def load(tmx_path):
     for layer in layers:
         data = layer.find("data").text.replace("\n", "")
         gids = [int(v) for v in data.split(",") if v.strip()]
-        for i, gid in enumerate(gids):
-            if gid == 0:
+        for i, raw in enumerate(gids):
+            if raw == 0:
                 continue
+            # Tiled keeps horizontal, vertical and diagonal flips in the top
+            # three bits. Without masking them off, lookup() is handed a gid of
+            # two billion and Pillow is asked to crop past the end of the
+            # world; half the village's bushes are mirrored, so this is not a
+            # rare case. The flips are then applied, or the render is a picture
+            # of a map nobody drew.
+            flags, gid = raw & FLIP_BITS, raw & ~FLIP_BITS
             image, sx, sy = lookup(gid)
             if image is None:
                 continue
             tile = image.crop((sx, sy, sx + tw, sy + th))
+            if flags & FLIP_DIAGONAL:
+                tile = tile.transpose(Image.TRANSPOSE)
+            if flags & FLIP_HORIZONTAL:
+                tile = tile.transpose(Image.FLIP_LEFT_RIGHT)
+            if flags & FLIP_VERTICAL:
+                tile = tile.transpose(Image.FLIP_TOP_BOTTOM)
             out.paste(tile, ((i % mw) * tw, (i // mw) * th), tile)
 
     objects = []

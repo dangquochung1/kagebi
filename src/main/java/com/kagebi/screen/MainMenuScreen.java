@@ -71,13 +71,15 @@ public class MainMenuScreen extends GameScreen {
 
         mapCamera = new OrthographicCamera();
         mapCamera.setToOrtho(false, Cfg.VIRT_W, Cfg.VIRT_H);
-        // Whole pixels only: half a pixel of camera offset makes every edge in
-        // the scene shimmer once it is magnified.
-        // Framed on the houses rather than the middle of the map: the middle is
-        // the deliberately-empty clearing, which on its own is just grass.
-        // Whole pixels only - half a pixel of offset makes every edge shimmer
-        // once the scene is magnified.
-        mapCamera.position.set(240, 196, 0);
+        // Framed on the player's own house and its garden, which is the best
+        // thing on the map and the one a title screen should be showing. The
+        // menu panel covers the middle of it, so what this is really choosing
+        // is what shows down both sides: the treeline on one, the well and the
+        // scarecrow on the other.
+        //
+        // Whole pixels only - half a pixel of offset makes every edge in the
+        // scene shimmer once it is magnified.
+        mapCamera.position.set(368, 248, 0);
         mapCamera.update();
 
         fog = new Texture(Gdx.files.internal(Assets.FOG));

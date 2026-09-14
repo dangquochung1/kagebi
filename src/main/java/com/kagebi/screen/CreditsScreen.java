@@ -64,6 +64,10 @@ public class CreditsScreen extends SimScreen {
         {Style.BY, "credits.raven.by"},
         {Style.FOR, "credits.raven.for"},
         {Style.GAP, null},
+        {Style.NAME, "credits.home.name"},
+        {Style.BY, "credits.home.by"},
+        {Style.FOR, "credits.home.for"},
+        {Style.GAP, null},
 
         {Style.HEAD, "credits.audio"},
         {Style.NAME, "credits.ninja.name"},

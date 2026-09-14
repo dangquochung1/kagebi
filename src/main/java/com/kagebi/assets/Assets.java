@@ -65,10 +65,13 @@ public final class Assets {
     public static final String MUSIC_SAD = MUSIC_DIR + "7_sad_theme.ogg";
 
     /**
-     * The one hand-drawn map in the game. Everything else is a generated room
-     * template under {@link #ROOMS_DIR}.
+     * The village and the player's own home, on one map: a fenced column of
+     * villagers' houses and the torii on the left, the house and its garden
+     * on the right. See {@code tools/make_village.py}, which assembles it.
      */
     public static final String MAP_VILLAGE = MAPS_DIR + "village.tmx";
+    /** Inside that house. Reached through its front door and nowhere else. */
+    public static final String MAP_HOME = MAPS_DIR + "home.tmx";
     /** The world map the stages are chosen from. Hand-editable; see tools/make_world.py. */
     public static final String MAP_WORLD = MAPS_DIR + "world.tmx";
 

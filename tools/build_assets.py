@@ -29,6 +29,11 @@ DUNGEON = os.path.join(RAW, "2D Pixel Dungeon Asset Pack")
 ENEMIES = os.path.join(RAW, "Enemy_Animations_Set")
 RAVEN = os.path.join(RAW, "Free - Raven Fantasy Icons")
 SUNNY = os.path.join(RAW, "SunnyLand Music")
+# The one pack that is not under _raw/. It arrived as a folder of its own in
+# the project root and its .tmx files are read directly by tools/make_village.py,
+# which is the only reason it is not moved: the paths inside those files are
+# relative to where they sit.
+HOME = os.path.join(ROOT, "homeassets", "Tiled_files")
 
 # Promo art, contact sheets and editor previews that ship alongside the real
 # assets. Matched case-insensitively against the bare filename.
@@ -245,6 +250,13 @@ def build_tiles():
             print("  fixed tilesetfloor.png %dx%d -> %dx%d"
                   % (im.width, im.height, fixed.width, fixed.height))
             stats["tilesets_fixed"] += 1
+
+    # The village and the house on it. Copied rather than packed into an atlas
+    # because .tmx files name a tileset by image path, the way every other
+    # tileset here works; the animation frames for the falling leaves, the
+    # chimney smoke, the birds and the cat are rows of these same sheets.
+    if os.path.isdir(HOME):
+        copy_tree(HOME, os.path.join(OUT, "gfx/tiles/home"), recurse=False)
 
     # The dark biome: a different pack, used exclusively on the deep floors.
     copy_file(os.path.join(DUNGEON, "character and tileset/Dungeon_Tileset.png"),

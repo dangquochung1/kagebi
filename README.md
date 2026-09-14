@@ -5,7 +5,8 @@ A pixel-art roguelite dungeon crawler in Java, built on libGDX 1.14.2.
 Five stages, chosen from a world map and played one at a time. A stage starts
 at full health, banks its own gold, and opens the next one when it is cleared;
 the difficulty is picked per stage, beside the button that starts it. The
-village between them is where that gold is spent.
+village between them is where that gold is spent, and where the player's own
+house is.
 
 Non-commercial; see [CREDITS.md](CREDITS.md) for the asset packs and their
 licences.
@@ -70,6 +71,7 @@ settings  --page 1-3   audio, controls, video
 select    --page 1-6   character select, with that ninja highlighted
 loadout   --page 1-6   the same screen changing the run's kit, over the village
 hub       --page N     the village, dimmed by N-1 failed descents
+home                   inside the player's house
 world     --page 1-5   the world map, open to that stage and focused on it
 stage     --page 1-5   the same, with that stage's panel and its difficulty row
 cleared   --page 1-5   the stage-clear screen, for that stage
@@ -138,7 +140,8 @@ All of these regenerate things that are already committed, so none is needed to
 play or to build.
 
 ```powershell
-python tools/make_maps.py      # regenerate the 104 room .tmx files and the village
+python tools/make_maps.py      # regenerate the 104 room .tmx files
+python tools/make_village.py   # rebuild the village and the house from the art pack
 python tools/make_world.py     # lay out the world map again, keeping its decor layer
 python tools/pack_atlas.py     # repack the texture atlases
 python tools/make_font.py      # rebuild the bitmap font, Vietnamese marks included
@@ -150,6 +153,7 @@ python tools/preview_tiles.py  # render a tileset with its grid, for measuring
 
 ```
 assets/          art, audio, fonts, maps, and the JSON the game is balanced in
+  maps/          village.tmx and home.tmx (make_village.py), world.tmx, rooms/
   data/          enemies, weapons, relics, items, floors, upgrades, loot tables
   i18n/          vi.json + en.json (interface), content.*.json (names and flavour)
 src/main/java/com/kagebi/

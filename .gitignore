@@ -44,3 +44,9 @@ tools/preview/
 
 # Regenerable review screenshots
 review/
+
+# The Top-Down Character Home pack: a source pack like the ones in _raw/, and
+# kept out of git for the same reason - it shipped no licence, so it must not be
+# redistributed. tools/make_village.py reads it to rebuild the village, and
+# tools/build_assets.py copies its sheets into assets/gfx/tiles/home/.
+homeassets/

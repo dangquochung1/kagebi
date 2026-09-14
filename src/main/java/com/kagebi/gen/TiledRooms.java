@@ -14,6 +14,20 @@ import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
  * layer is solid - there is no per-tile property to forget to set, which is the
  * failure mode this avoids.
  *
+ * <p><b>A role may be spread over several layers.</b> A layer counts as
+ * {@code props} if it is called {@code props} or {@code props_something}, and
+ * the same for every other name here. The generated rooms use one layer per
+ * role and always will; the village does not, because it is assembled from an
+ * art pack whose scene is twenty-two layers of grass over grass over road, and
+ * flattening those into one would have thrown away 256 tiles of the ground
+ * detail that is the whole look of it. Within a role the map's own order wins,
+ * so {@code props_fence} drawn after {@code props_trees} in Tiled is drawn
+ * after it here.
+ *
+ * <p>The underscore is required rather than a bare prefix: {@code groundwork}
+ * should not quietly join the ground pass because it starts with the right six
+ * letters.
+ *
  * <p><b>Why two non-blocking layers under the actors.</b> {@code dressing} is
  * the generator's and {@code decor} is the human's, and they exist separately
  * because the generator has scenery to place that is drawn with transparency -
@@ -40,6 +54,12 @@ public final class TiledRooms {
 
     private static final String[] BLOCKING = {WALLS, PROPS};
 
+    /** Whether a layer plays a role: named for it, or {@code role_something}. */
+    public static boolean plays(String layer, String role) {
+        return layer != null
+            && (layer.equals(role) || layer.startsWith(role + "_"));
+    }
+
     /**
      * Whether a tile in this layer stops the player.
      *
@@ -50,7 +70,7 @@ public final class TiledRooms {
      */
     public static boolean blocks(String layer) {
         for (String name : BLOCKING) {
-            if (name.equals(layer)) {
+            if (plays(layer, name)) {
                 return true;
             }
         }
@@ -68,9 +88,8 @@ public final class TiledRooms {
             }
         }
         CollisionGrid grid = new CollisionGrid(width, height);
-        for (String name : BLOCKING) {
-            MapLayer layer = map.getLayers().get(name);
-            if (!(layer instanceof TiledMapTileLayer)) {
+        for (MapLayer layer : map.getLayers()) {
+            if (!(layer instanceof TiledMapTileLayer) || !blocks(layer.getName())) {
                 continue;
             }
             TiledMapTileLayer tiles = (TiledMapTileLayer) layer;
@@ -85,19 +104,23 @@ public final class TiledRooms {
         return grid;
     }
 
-    /** Indices of the named layers that exist, for a two-pass render. */
-    public static int[] layerIndices(TiledMap map, String[] names) {
-        int[] found = new int[names.length];
-        int n = 0;
-        for (String name : names) {
-            int index = map.getLayers().getIndex(name);
-            if (index >= 0) {
-                found[n++] = index;
+    /**
+     * Indices of the layers playing these roles, for a two-pass render.
+     *
+     * <p>Roles in the order given, and within one role the order the map puts
+     * them in - which is the order a person stacked them in Tiled, and the only
+     * one that reproduces what they saw there.
+     */
+    public static int[] layerIndices(TiledMap map, String[] roles) {
+        com.badlogic.gdx.utils.IntArray found = new com.badlogic.gdx.utils.IntArray();
+        for (String role : roles) {
+            for (int i = 0; i < map.getLayers().size(); i++) {
+                if (plays(map.getLayers().get(i).getName(), role)) {
+                    found.add(i);
+                }
             }
         }
-        int[] out = new int[n];
-        System.arraycopy(found, 0, out, 0, n);
-        return out;
+        return found.toArray();
     }
 
     private TiledRooms() {}
