@@ -1,0 +1,109 @@
+// The village economy: what the island's goods sell for, the farm's crops and
+// levels, what each region's worker makes, the tools that speed them up, and
+// what the cook makes of it all. Read by com.kagebi.data.VillageCatalog,
+// checked by ContentValidator at boot like everything else here, and held to
+// its promises by BalanceTest.
+//
+// THE CLOCK. Every time here is seconds of the village clock, which runs while
+// the game is open - in the dungeon and the menus too - and never while it is
+// closed. A crop that takes twenty minutes takes twenty minutes of play.
+//
+// PRICING. An hour of the village at its best - every plot growing, every tool
+// at its top level, everything collected the moment it is ready - pays about
+// 390 gold. A cleared stage pays about 580 on average, in about six minutes, so
+// the dungeon stays where gold comes from; BalanceTest fails if an hour here
+// ever pays more than a stage. What the village gives that the dungeon does not
+// is food, and goods are priced so that a meal's ingredients are worth about
+// what the potion it stands in for costs.
+{
+  "goods": [
+    // The farm's crops, each harvested as the good of the same name.
+    {"id": "carrot", "nameKey": "good.carrot.name", "price": 6},
+    {"id": "radish", "nameKey": "good.radish.name", "price": 6},
+    {"id": "potato", "nameKey": "good.potato.name", "price": 7},
+    {"id": "parsnip", "nameKey": "good.parsnip.name", "price": 7},
+    {"id": "beetroot", "nameKey": "good.beetroot.name", "price": 9},
+    {"id": "kale", "nameKey": "good.kale.name", "price": 9},
+    {"id": "cauliflower", "nameKey": "good.cauliflower.name", "price": 10},
+    {"id": "cabbage", "nameKey": "good.cabbage.name", "price": 10},
+    {"id": "wheat", "nameKey": "good.wheat.name", "price": 13},
+    {"id": "sunflower", "nameKey": "good.sunflower.name", "price": 14},
+    {"id": "pumpkin", "nameKey": "good.pumpkin.name", "price": 16},
+
+    // What the workers make. The pack draws no meat, wool or coal, so the
+    // ranch keeps hens and cows and the mine digs stone with the odd nugget.
+    {"id": "wood", "nameKey": "good.wood.name", "price": 6},
+    {"id": "fish", "nameKey": "good.fish.name", "price": 15},
+    {"id": "egg", "nameKey": "good.egg.name", "price": 8},
+    {"id": "milk", "nameKey": "good.milk.name", "price": 12},
+    {"id": "stone", "nameKey": "good.stone.name", "price": 4},
+    {"id": "gold_ore", "nameKey": "good.gold_ore.name", "price": 40}
+  ],
+
+  // stageSeconds is the time from one of a crop's six pictures to the next:
+  // sown, four stages of growing, ripe. farmLevel is the farm level whose
+  // farmer sells the seed. Every crop earns its plot the same twelve gold an
+  // hour; one from a higher level is a bigger harvest less often, which is
+  // fewer trips to the field rather than more gold.
+  "crops": [
+    {"id": "carrot", "good": "carrot", "seedPrice": 2, "yield": 1, "stageSeconds": 240, "farmLevel": 1},
+    {"id": "radish", "good": "radish", "seedPrice": 2, "yield": 1, "stageSeconds": 240, "farmLevel": 1},
+    {"id": "potato", "good": "potato", "seedPrice": 2, "yield": 1, "stageSeconds": 300, "farmLevel": 1},
+    {"id": "parsnip", "good": "parsnip", "seedPrice": 2, "yield": 1, "stageSeconds": 300, "farmLevel": 1},
+    {"id": "beetroot", "good": "beetroot", "seedPrice": 3, "yield": 1, "stageSeconds": 360, "farmLevel": 2},
+    {"id": "kale", "good": "kale", "seedPrice": 3, "yield": 1, "stageSeconds": 360, "farmLevel": 2},
+    {"id": "cauliflower", "good": "cauliflower", "seedPrice": 3, "yield": 1, "stageSeconds": 420, "farmLevel": 2},
+    {"id": "cabbage", "good": "cabbage", "seedPrice": 3, "yield": 1, "stageSeconds": 420, "farmLevel": 2},
+    {"id": "wheat", "good": "wheat", "seedPrice": 4, "yield": 1, "stageSeconds": 540, "farmLevel": 3},
+    {"id": "sunflower", "good": "sunflower", "seedPrice": 4, "yield": 1, "stageSeconds": 600, "farmLevel": 3},
+    {"id": "pumpkin", "good": "pumpkin", "seedPrice": 4, "yield": 1, "stageSeconds": 720, "farmLevel": 3}
+  ],
+
+  // What each level of the farm asks for - harvests over the farm's whole
+  // life - and how many plots of the field it opens. A crop the scene already
+  // shows growing on a plot the farm has not opened can still be picked.
+  "farm": [
+    {"level": 1, "harvests": 0, "plots": 6},
+    {"level": 2, "harvests": 12, "plots": 9},
+    {"level": 3, "harvests": 36, "plots": 12}
+  ],
+
+  // One per region's worker. Every "seconds" a unit is made, as one of "goods"
+  // picked by "weights", until "capacity" units are waiting; then the worker
+  // stops until somebody collects. Each earns 36 gold an hour at the first
+  // tool, so no region is the one to neglect.
+  "workshops": [
+    {"id": "forest", "goods": ["wood"], "weights": [1], "seconds": 600, "capacity": 6, "tool": "axe"},
+    {"id": "fishing", "goods": ["fish"], "weights": [1], "seconds": 1500, "capacity": 4, "tool": "rod"},
+    {"id": "ranch", "goods": ["egg", "milk"], "weights": [3, 2], "seconds": 960, "capacity": 5, "tool": "pail"},
+    {"id": "mine", "goods": ["stone", "gold_ore"], "weights": [4, 1], "seconds": 1120, "capacity": 5, "tool": "pickaxe"}
+  ],
+
+  // Bought from the herbalist. Each level divides a workshop's seconds per
+  // unit by speedPerLevel and lets it hold capacityPerLevel more. A level pays
+  // for itself only over many hours: what a tool really buys is fewer visits,
+  // and more to cook with.
+  "tools": [
+    {"id": "axe", "nameKey": "tool.axe.name", "descKey": "tool.axe.desc",
+     "maxLevel": 3, "costs": [80, 220, 500], "speedPerLevel": 1.2, "capacityPerLevel": 2},
+    {"id": "rod", "nameKey": "tool.rod.name", "descKey": "tool.rod.desc",
+     "maxLevel": 3, "costs": [80, 220, 500], "speedPerLevel": 1.2, "capacityPerLevel": 2},
+    {"id": "pail", "nameKey": "tool.pail.name", "descKey": "tool.pail.desc",
+     "maxLevel": 3, "costs": [80, 220, 500], "speedPerLevel": 1.2, "capacityPerLevel": 2},
+    {"id": "pickaxe", "nameKey": "tool.pickaxe.name", "descKey": "tool.pickaxe.desc",
+     "maxLevel": 3, "costs": [80, 220, 500], "speedPerLevel": 1.2, "capacityPerLevel": 2}
+  ],
+
+  // What the cook makes, into the pantry the player carries down. Each item is
+  // a consumable in items.json with no price, so the kitchen is the only way to
+  // one. A healing meal's ingredients sell for at least what a small potion
+  // costs for the same healing; a buffing meal's for at least the draught it
+  // stands in for.
+  "recipes": [
+    {"id": "grilled_fish", "item": "food_grilled_fish", "inputs": ["fish", "wood"], "counts": [2, 1]},
+    {"id": "veggie_noodles", "item": "food_veggie_noodles", "inputs": ["carrot", "cabbage", "wheat"], "counts": [2, 1, 1]},
+    {"id": "onigiri", "item": "food_onigiri", "inputs": ["wheat", "egg"], "counts": [2, 1]},
+    {"id": "yakitori", "item": "food_yakitori", "inputs": ["egg", "pumpkin", "sunflower", "wood"], "counts": [3, 1, 1, 1]},
+    {"id": "sushi", "item": "food_sushi", "inputs": ["fish", "wheat", "kale"], "counts": [3, 2, 1]}
+  ]
+}

@@ -162,7 +162,14 @@ public final class ContentValidator {
 
     // ---- the checks --------------------------------------------------------------
 
+    /** Everything but the village economy, for callers that have no catalog of it. */
     public static List<String> check(ContentRegistry reg, ShopCatalog shop, AssetIndex assets) {
+        return check(reg, shop, null, assets);
+    }
+
+    /** Every check, the village's included unless {@code village} is null. */
+    public static List<String> check(ContentRegistry reg, ShopCatalog shop, VillageCatalog village,
+                                     AssetIndex assets) {
         Check c = new Check(assets);
 
         if (reg.allFloors().size == 0) {
@@ -188,6 +195,9 @@ public final class ContentValidator {
         }
         orphans(c, reg);
         shop(c, reg, shop);
+        if (village != null) {
+            village(c, reg, village);
+        }
         return c.problems;
     }
 
@@ -494,6 +504,153 @@ public final class ContentValidator {
         for (String starter : fresh.unlockedWeapons) {
             if (!weapons.contains(starter)) {
                 c.fail("Profile", "starts with weapon '" + starter + "', which does not exist");
+            }
+        }
+    }
+
+    /**
+     * The village economy. Everything its rules look up by id is looked up here
+     * first: a misspelt good in a recipe is a meal nobody can ever cook, and
+     * nothing on screen would say why.
+     */
+    private static void village(Check c, ContentRegistry reg, VillageCatalog v) {
+        for (VillageCatalog.Good g : v.goods()) {
+            String w = "good '" + g.id + "'";
+            c.key(w, "nameKey", g.nameKey);
+            c.positive(w, "price", g.price);
+        }
+
+        int levels = v.farmLevels().size;
+        if (levels == 0) {
+            c.fail("farm", "has no levels, so no plot is ever open");
+        }
+        for (int i = 0; i < levels; i++) {
+            VillageCatalog.FarmLevel l = v.farmLevels().get(i);
+            VillageCatalog.FarmLevel below = i == 0 ? null : v.farmLevels().get(i - 1);
+            String w = "farm level " + l.level;
+            if (l.level != i + 1) {
+                c.fail(w, "is listed in place " + (i + 1) + "; levels run 1, 2, 3 in order");
+            }
+            if (below == null && l.harvests != 0) {
+                c.fail(w, "asks for " + l.harvests + " harvests, but a new farm is level 1 with none");
+            }
+            if (below != null && l.harvests <= below.harvests) {
+                c.fail(w, "asks for no more harvests than level " + below.level);
+            }
+            if (l.plots <= (below == null ? 0 : below.plots)) {
+                c.fail(w, "opens " + l.plots + " plots, no more than the level below");
+            }
+        }
+
+        for (VillageCatalog.Crop crop : v.crops()) {
+            String w = "crop '" + crop.id + "'";
+            VillageCatalog.Good good = v.good(crop.good);
+            if (good == null) {
+                c.fail(w, "good '" + crop.good + "' does not exist");
+            }
+            c.positive(w, "seedPrice", crop.seedPrice);
+            c.positive(w, "yield", crop.yield);
+            c.positive(w, "stageSeconds", crop.stageSeconds);
+            if (crop.farmLevel < 1 || crop.farmLevel > levels) {
+                c.fail(w, "farmLevel " + crop.farmLevel + " is not a level the farm has");
+            }
+            // A crop that sells for less than its seed is a field of loss that
+            // looks, in the ground, exactly like a field of profit.
+            if (good != null && crop.yield * good.price <= crop.seedPrice) {
+                c.fail(w, "sells for " + crop.yield * good.price + " and its seed costs " + crop.seedPrice);
+            }
+        }
+
+        Set<String> regions = new HashSet<>();
+        Set<String> toolsUsed = new HashSet<>();
+        for (VillageCatalog.Workshop ws : v.workshops()) {
+            String w = "workshop '" + ws.id + "'";
+            regions.add(ws.id);
+            if (!VillageCatalog.WORKSHOPS.contains(ws.id)) {
+                c.fail(w, "is not a region with a worker: "
+                    + new java.util.TreeSet<>(VillageCatalog.WORKSHOPS));
+            }
+            if (ws.goods.length == 0) {
+                c.fail(w, "makes nothing");
+            }
+            if (ws.goods.length != ws.weights.length) {
+                c.fail(w, ws.goods.length + " goods but " + ws.weights.length + " weights");
+            }
+            for (int i = 0; i < ws.goods.length; i++) {
+                if (v.good(ws.goods[i]) == null) {
+                    c.fail(w, "good '" + ws.goods[i] + "' does not exist");
+                }
+                if (i < ws.weights.length && ws.weights[i] <= 0) {
+                    c.fail(w, "weight for '" + ws.goods[i] + "' is " + ws.weights[i] + ", must be positive");
+                }
+            }
+            c.positive(w, "seconds", ws.seconds);
+            c.positive(w, "capacity", ws.capacity);
+            if (v.tool(ws.tool) == null) {
+                c.fail(w, "tool '" + ws.tool + "' does not exist");
+            } else {
+                toolsUsed.add(ws.tool);
+            }
+        }
+        for (String region : VillageCatalog.WORKSHOPS) {
+            if (!regions.contains(region)) {
+                c.fail("region '" + region + "'", "has a worker and no workshop, so they would make nothing");
+            }
+        }
+
+        for (VillageCatalog.Tool t : v.tools()) {
+            String w = "tool '" + t.id + "'";
+            c.key(w, "nameKey", t.nameKey);
+            c.key(w, "descKey", t.descKey);
+            c.positive(w, "maxLevel", t.maxLevel);
+            if (t.costs.length != t.maxLevel) {
+                c.fail(w, t.maxLevel + " levels but " + t.costs.length + " costs");
+            }
+            for (int i = 0; i < t.costs.length; i++) {
+                if (t.costs[i] <= 0 || (i > 0 && t.costs[i] <= t.costs[i - 1])) {
+                    c.fail(w, "costs must be positive and rising, found " + java.util.Arrays.toString(t.costs));
+                    break;
+                }
+            }
+            c.atLeast(w, "speedPerLevel", t.speedPerLevel, 1);
+            c.atLeast(w, "capacityPerLevel", t.capacityPerLevel, 0);
+            if (!toolsUsed.contains(t.id)) {
+                c.fail(w, "belongs to no workshop, so buying it would do nothing");
+            }
+        }
+
+        Set<String> meals = new HashSet<>();
+        for (VillageCatalog.Recipe r : v.recipes()) {
+            String w = "recipe '" + r.id + "'";
+            if (!reg.hasItem(r.item)) {
+                c.fail(w, "item '" + r.item + "' does not exist");
+            } else {
+                ItemDef item = reg.item(r.item);
+                if (item.kind != ItemDef.Kind.CONSUMABLE) {
+                    c.fail(w, "makes '" + r.item + "', which is not a consumable");
+                }
+                // The kitchen is the only way to a meal. One with a price is one
+                // the dungeon's trader would stock beside the potions.
+                if (item.forSale()) {
+                    c.fail(w, "makes '" + r.item + "', which has a price; the trader would sell it");
+                }
+                if (!meals.add(r.item)) {
+                    c.fail(w, "makes '" + r.item + "', which another recipe makes too");
+                }
+            }
+            if (r.inputs.length == 0) {
+                c.fail(w, "needs no ingredients");
+            }
+            if (r.inputs.length != r.counts.length) {
+                c.fail(w, r.inputs.length + " ingredients but " + r.counts.length + " counts");
+            }
+            for (int i = 0; i < r.inputs.length; i++) {
+                if (v.good(r.inputs[i]) == null) {
+                    c.fail(w, "ingredient '" + r.inputs[i] + "' is not a good");
+                }
+                if (i < r.counts.length && r.counts[i] <= 0) {
+                    c.fail(w, "count for '" + r.inputs[i] + "' is " + r.counts[i] + ", must be positive");
+                }
             }
         }
     }

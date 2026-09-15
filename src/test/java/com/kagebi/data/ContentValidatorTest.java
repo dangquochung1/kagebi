@@ -41,6 +41,7 @@ class ContentValidatorTest {
 
     private ContentRegistry reg;
     private ShopCatalog shop;
+    private VillageCatalog village;
     private ContentValidator.AssetIndex assets;
 
     @BeforeEach
@@ -48,11 +49,12 @@ class ContentValidatorTest {
         FileHandle data = ContentLoaderTest.DISK.apply(Assets.DATA_DIR);
         reg = ContentLoader.parse(data);
         shop = ShopCatalog.parse(data);
+        village = VillageCatalog.parse(data);
         assets = ContentValidator.AssetIndex.read(ContentLoaderTest.DISK);
     }
 
     private List<String> problems() {
-        return ContentValidator.check(reg, shop, assets);
+        return ContentValidator.check(reg, shop, village, assets);
     }
 
     /** Asserts exactly one problem, and that it says what it should. */
@@ -67,6 +69,34 @@ class ContentValidatorTest {
     @Test
     void theShippedContentIsClean() {
         assertEquals(List.of(), problems());
+    }
+
+    // ---- the village -----------------------------------------------------------------
+
+    /** A crop whose harvest is a good nobody defined: a field that grows nothing to sell. */
+    @Test
+    void aCropOfAGoodThatDoesNotExistIsCaught() {
+        VillageCatalog.Crop carrot = village.crop("carrot");
+        village.add(new VillageCatalog.Crop(carrot.id, "carot", carrot.seedPrice, carrot.yield,
+            carrot.stageSeconds, carrot.farmLevel));
+        expectOne("crop 'carrot'", "carot");
+    }
+
+    /** A meal with a price is a meal the dungeon's trader would stock beside the potions. */
+    @Test
+    void aMealTheTraderWouldSellIsCaught() {
+        ItemDef sushi = reg.item("food_sushi");
+        reg.put(new ItemDef(sushi.id, sushi.nameKey, sushi.descKey, sushi.sprite, sushi.icon,
+            sushi.kind, sushi.effect, sushi.magnitude, sushi.stackSize, 90));
+        expectOne("recipe 'sushi'", "has a price");
+    }
+
+    @Test
+    void aWorkshopGoodWeighedAtNothingIsCaught() {
+        VillageCatalog.Workshop forest = village.workshop("forest");
+        village.add(new VillageCatalog.Workshop(forest.id, forest.goods, new int[] {0},
+            forest.seconds, forest.capacity, forest.tool));
+        expectOne("workshop 'forest'", "weight");
     }
 
     // ---- the headline failure ------------------------------------------------------

@@ -16,6 +16,7 @@ import com.kagebi.audio.AudioService;
 import com.kagebi.data.ContentLoader;
 import com.kagebi.data.ContentRegistry;
 import com.kagebi.data.ShopCatalog;
+import com.kagebi.data.VillageCatalog;
 import com.kagebi.input.InputMap;
 import com.kagebi.input.InputService;
 import com.kagebi.run.RunState;
@@ -26,6 +27,7 @@ import com.kagebi.screen.ScreenStack;
 import com.kagebi.screen.Screens;
 import com.kagebi.settings.Settings;
 import com.kagebi.ui.I18n;
+import com.kagebi.village.VillageClock;
 
 /** Entry point. Owns everything that outlives a single screen. */
 public class Kagebi extends ApplicationAdapter {
@@ -41,6 +43,7 @@ public class Kagebi extends ApplicationAdapter {
     private ScreenStack screens;
     private ContentRegistry content;
     private ShopCatalog shop;
+    private VillageCatalog village;
     private SaveManager saves;
     private Profile profile;
     /** The run in progress, or null outside one. Set by the screens. */
@@ -68,6 +71,11 @@ public class Kagebi extends ApplicationAdapter {
 
     private final Boot boot;
     private int framesRendered;
+
+    /** How often the village clock writes the profile, in seconds of play. */
+    private static final float AUTOSAVE_SECONDS = 30f;
+    /** Seconds since the clock last wrote it. */
+    private float sinceSave;
 
     public Kagebi() {
         this(new Boot());
@@ -117,6 +125,11 @@ public class Kagebi extends ApplicationAdapter {
         return shop;
     }
 
+    /** The village economy's content: goods, crops, workshops, tools, recipes. */
+    public VillageCatalog village() {
+        return village;
+    }
+
     public Profile profile() {
         return profile;
     }
@@ -161,6 +174,7 @@ public class Kagebi extends ApplicationAdapter {
 
         content = ContentLoader.load();
         shop = ShopCatalog.load();
+        village = VillageCatalog.load();
         saves = new SaveManager();
         profile = saves.load();
 
@@ -176,6 +190,7 @@ public class Kagebi extends ApplicationAdapter {
     @Override
     public void render() {
         float delta = Gdx.graphics.getDeltaTime();
+        tickVillage(delta);
         ScreenUtils.clear(0.05f, 0.04f, 0.07f, 1f);
         audio.update(delta);
         screens.render(delta);
@@ -191,6 +206,34 @@ public class Kagebi extends ApplicationAdapter {
         screens.resize(width, height);
     }
 
+    /**
+     * The village clock, and the save that keeps it.
+     *
+     * <p>Advanced here, above every screen, because the village grows while the
+     * game is open - in the dungeon and the menus as much as on the island - and
+     * not while it is closed. Written every thirty seconds and on the way out:
+     * before the village had a clock the profile changed only at a purchase or
+     * the end of a stage, and those were the only saves it needed.
+     *
+     * <p>A review run, one taking a screenshot, never writes the profile, so
+     * photographing a screen changes nothing about the game photographed.
+     */
+    private void tickVillage(float delta) {
+        VillageClock.advance(profile.village, delta);
+        if (reviewing()) {
+            return;
+        }
+        sinceSave += delta;
+        if (sinceSave >= AUTOSAVE_SECONDS) {
+            sinceSave = 0f;
+            saves.save(profile);
+        }
+    }
+
+    private boolean reviewing() {
+        return boot.screenshotAfterFrames >= 0;
+    }
+
     private static void saveScreenshot(String path) {
         int w = Gdx.graphics.getBackBufferWidth();
         int h = Gdx.graphics.getBackBufferHeight();
@@ -204,6 +247,10 @@ public class Kagebi extends ApplicationAdapter {
 
     @Override
     public void dispose() {
+        // First, while everything the profile could depend on still exists.
+        if (saves != null && profile != null && !reviewing()) {
+            saves.save(profile);
+        }
         if (screens != null) {
             screens.dispose();
         }

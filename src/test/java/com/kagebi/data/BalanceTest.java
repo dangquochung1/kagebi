@@ -14,6 +14,8 @@ import com.kagebi.data.def.ItemDef;
 import com.kagebi.data.def.LootTableDef;
 import com.kagebi.data.def.WeaponDef;
 import com.kagebi.save.Profile;
+import com.kagebi.village.Farm;
+import com.kagebi.village.Kitchen;
 
 /**
  * The balance arithmetic, run against the shipped JSON.
@@ -62,11 +64,13 @@ class BalanceTest {
 
     static ContentRegistry reg;
     static ShopCatalog shop;
+    static VillageCatalog village;
 
     @BeforeAll
     static void load() {
         reg = ContentLoaderTest.real();
         shop = ShopCatalog.parse(ContentLoaderTest.DISK.apply(com.kagebi.assets.Assets.DATA_DIR));
+        village = VillageCatalog.parse(ContentLoaderTest.DISK.apply(com.kagebi.assets.Assets.DATA_DIR));
     }
 
     // ---- per-floor quantities -------------------------------------------------------------
@@ -277,6 +281,9 @@ class BalanceTest {
                 stageBank(f.number, true), stageBank(f.number, false), running));
         }
         sb.append(String.format("level-1 costs %s%n", Arrays.toString(levelOneCosts())));
+        sb.append(String.format("village an hour: %.0f with the first tools, %.0f with the best;"
+            + " a cleared stage averages %.0f%n",
+            villagePerHour(false), villagePerHour(true), averageStage()));
         sb.append(trajectory("first-timer", FIRST_TIMER_HITS, FIRST_TIMER_BOSS_HITS, BASE_HP));
         sb.append(trajectory("first-timer + vigor 1", FIRST_TIMER_HITS, FIRST_TIMER_BOSS_HITS,
             BASE_HP + (int) shop.upgrade("vigor").magnitudePerLevel));
@@ -466,6 +473,110 @@ class BalanceTest {
         }
         assertTrue(all >= cheapest, "clearing every stage banks " + all
             + ", cheapest character " + cheapest);
+    }
+
+    // ---- the village -----------------------------------------------------------------------------
+
+    /** What a cleared stage banks, averaged over the five: what "a stage" means below. */
+    static double averageStage() {
+        double total = 0;
+        int stages = 0;
+        for (FloorDef f : reg.allFloors()) {
+            total += stageBank(f.number, true);
+            stages++;
+        }
+        return total / stages;
+    }
+
+    /**
+     * Gold an hour from the farm: every plot of the whole field growing whichever
+     * crop earns most, picked the moment it ripens and sold at once.
+     */
+    static double farmPerHour() {
+        double best = 0;
+        for (VillageCatalog.Crop c : village.crops()) {
+            double profit = c.yield * village.good(c.good).price - c.seedPrice;
+            best = Math.max(best, profit * 3600 / (c.stageSeconds * Farm.RIPE));
+        }
+        return best * Farm.allPlots(village);
+    }
+
+    /** Gold an hour from one worker, collected and sold as fast as they make it. */
+    static double workshopPerHour(VillageCatalog.Workshop w, boolean bestTool) {
+        VillageCatalog.Tool tool = village.tool(w.tool);
+        double period = w.seconds / Math.pow(tool.speedPerLevel, bestTool ? tool.maxLevel : 0);
+        double value = 0;
+        double weights = 0;
+        for (int i = 0; i < w.goods.length; i++) {
+            value += w.weights[i] * village.good(w.goods[i]).price;
+            weights += w.weights[i];
+        }
+        return 3600 / period * value / weights;
+    }
+
+    static double villagePerHour(boolean bestTools) {
+        double total = farmPerHour();
+        for (VillageCatalog.Workshop w : village.workshops()) {
+            total += workshopPerHour(w, bestTools);
+        }
+        return total;
+    }
+
+    /**
+     * An hour in the village, played perfectly with every tool bought, pays less
+     * than one stage of the dungeon.
+     *
+     * <p>The promise the village economy was built on. A stage takes about six
+     * minutes; if an hour on the island paid more, the dungeon would be what a
+     * player does between harvests, and this game is the other way round. What
+     * the village is for is food, which is priced in its ingredients below.
+     */
+    @Test
+    void anHourInTheVillageAtItsBestPaysLessThanAStage() {
+        assertTrue(villagePerHour(true) < averageStage(), "the village pays "
+            + villagePerHour(true) + " an hour at its best; a cleared stage averages " + averageStage());
+    }
+
+    /**
+     * No meal heals more for what its ingredients would sell for than a small
+     * potion heals for its price. Otherwise buying a potion from the herbalist
+     * is a mistake a player makes once.
+     */
+    @Test
+    void noMealHealsMoreForItsIngredientsThanASmallPotionDoesForItsPrice() {
+        ItemDef potion = reg.item("potion_small");
+        for (VillageCatalog.Recipe r : village.recipes()) {
+            ItemDef meal = reg.item(r.item);
+            if (!"heal".equals(meal.effect)) {
+                continue;
+            }
+            int cost = Kitchen.cost(village, r);
+            assertTrue(meal.magnitude * potion.price <= potion.magnitude * cost, r.id + " heals "
+                + meal.magnitude + " for " + cost + " gold of ingredients; a small potion heals "
+                + potion.magnitude + " for " + potion.price);
+        }
+    }
+
+    /** A meal that buffs costs at least the draught with the same buff, and gives no more of it. */
+    @Test
+    void aBuffingMealCostsAtLeastTheDraughtItStandsInFor() {
+        for (VillageCatalog.Recipe r : village.recipes()) {
+            ItemDef meal = reg.item(r.item);
+            if ("heal".equals(meal.effect)) {
+                continue;
+            }
+            ItemDef draught = null;
+            for (ItemDef i : reg.allItems()) {
+                if (i.forSale() && i.effect.equals(meal.effect)) {
+                    draught = i;
+                }
+            }
+            assertTrue(draught != null, r.id + " gives " + meal.effect + ", which nothing the trader sells gives");
+            int cost = Kitchen.cost(village, r);
+            assertTrue(cost >= draught.price, r.id + " costs " + cost + " in ingredients; "
+                + draught.id + " costs " + draught.price);
+            assertTrue(meal.magnitude <= draught.magnitude, r.id + " is stronger than " + draught.id);
+        }
     }
 
     // ---- weapons ---------------------------------------------------------------------------------

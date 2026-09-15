@@ -74,6 +74,60 @@ class SaveManagerTest {
         assertSameProfile(p, new SaveManager(dir).load());
     }
 
+    /** The clock, the field, the workers, the storehouse and the pantry, all of it. */
+    @Test
+    void theVillageIsSavedAndLoadedWithTheRestOfTheProfile() {
+        Profile p = rich();
+        VillageState v = p.village;
+        v.clock = 12_345.5;
+        v.harvests = 7;
+        v.planted = true;
+        v.stock.put("carrot", 4);
+        v.seeds.put("pumpkin", 2);
+        v.tools.put("axe", 1);
+        v.pantry.put("food_sushi", 1);
+        VillageState.Plot growing = new VillageState.Plot();
+        growing.crop = "carrot";
+        growing.sown = 12_000.25;
+        v.plots.add(growing);
+        v.plots.add(new VillageState.Plot());
+        VillageState.Work forest = new VillageState.Work();
+        forest.held = 3;
+        forest.since = 12_100.0;
+        forest.made = 41;
+        v.workshops.put("forest", forest);
+
+        assertTrue(new SaveManager(dir).save(p));
+        VillageState back = new SaveManager(dir).load().village;
+        assertEquals(12_345.5, back.clock, 1e-9);
+        assertEquals(7, back.harvests);
+        assertTrue(back.planted);
+        assertEquals(v.stock, back.stock, "stock");
+        assertEquals(v.seeds, back.seeds, "seeds");
+        assertEquals(v.tools, back.tools, "tools");
+        assertEquals(v.pantry, back.pantry, "pantry");
+        assertEquals(2, back.plots.size, "a bare plot keeps its place in the field");
+        assertEquals("carrot", back.plots.get(0).crop);
+        assertEquals(12_000.25, back.plots.get(0).sown, 1e-9);
+        assertEquals(null, back.plots.get(1).crop);
+        VillageState.Work work = back.workshops.get("forest");
+        assertEquals(3, work.held);
+        assertEquals(12_100.0, work.since, 1e-9);
+        assertEquals(41, work.made);
+    }
+
+    /** Adding the village needed no migration: a save without one loads a village just begun. */
+    @Test
+    void aSaveFromBeforeTheVillageLoadsAFreshOne() throws IOException {
+        Files.writeString(file(SaveManager.FILE),
+            "{ \"version\": " + Profile.CURRENT_VERSION + ", \"gold\": 5 }", StandardCharsets.UTF_8);
+        Profile p = new SaveManager(dir).load();
+        assertEquals(5, p.gold);
+        assertEquals(0.0, p.village.clock);
+        assertEquals(0, p.village.stock.size);
+        assertFalse(p.village.planted);
+    }
+
     @Test
     void loadReturnsTheSameProfileEachTime() {
         SaveManager saves = new SaveManager(dir);

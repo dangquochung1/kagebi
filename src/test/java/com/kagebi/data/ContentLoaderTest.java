@@ -43,7 +43,7 @@ class ContentLoaderTest {
         assertEquals(22, reg.allEnemies().size, "enemies");
         assertEquals(7, reg.allWeapons().size, "weapons");
         assertEquals(24, reg.allRelics().size, "relics");
-        assertEquals(18, reg.allItems().size, "items");
+        assertEquals(23, reg.allItems().size, "items");
         assertEquals(14, reg.allLootTables().size, "loot tables");
         assertEquals(5, reg.allFloors().size, "floors");
     }

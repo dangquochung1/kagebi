@@ -67,6 +67,9 @@ public final class Profile {
      */
     public int clearedStages;
 
+    /** The island between visits: its farm, its workers, its storehouse and pantry. */
+    public final VillageState village = new VillageState();
+
     public Profile() {
         unlockedCharacters.add("ninjagreen");
         unlockedWeapons.add("katana");

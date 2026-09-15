@@ -205,6 +205,7 @@ public final class SaveManager {
         root.addChild("unlockedCharacters", sortedArray(p.unlockedCharacters));
         root.addChild("unlockedWeapons", sortedArray(p.unlockedWeapons));
         root.addChild("bestiary", sortedArray(p.bestiary));
+        root.addChild("village", village(p.village));
         return root.prettyPrint(JsonWriter.OutputType.json, 60) + "\n";
     }
 
@@ -265,6 +266,12 @@ public final class SaveManager {
         addAll(root.get("unlockedCharacters"), p.unlockedCharacters);
         addAll(root.get("unlockedWeapons"), p.unlockedWeapons);
         addAll(root.get("bestiary"), p.bestiary);
+        // A save from before the village had an economy has no such object,
+        // and reads as a village that has just begun.
+        JsonValue village = root.get("village");
+        if (village != null && village.isObject()) {
+            readVillage(village, p.village);
+        }
         return p;
     }
 
@@ -274,6 +281,120 @@ public final class SaveManager {
         }
         for (JsonValue e = array.child; e != null; e = e.next) {
             into.add(e.asString());
+        }
+    }
+
+    // ---- the village ---------------------------------------------------------------
+
+    /**
+     * The village laid out like the rest of the file: counts sorted by name,
+     * workshops by id, and a bare plot written as null so the field keeps its
+     * order.
+     */
+    private static JsonValue village(VillageState v) {
+        JsonValue out = new JsonValue(JsonValue.ValueType.object);
+        out.addChild("clock", new JsonValue(v.clock));
+        out.addChild("harvests", new JsonValue(v.harvests));
+        out.addChild("planted", new JsonValue(v.planted));
+        out.addChild("stock", sortedCounts(v.stock));
+        out.addChild("seeds", sortedCounts(v.seeds));
+        out.addChild("tools", sortedCounts(v.tools));
+        out.addChild("pantry", sortedCounts(v.pantry));
+
+        JsonValue plots = new JsonValue(JsonValue.ValueType.array);
+        for (VillageState.Plot plot : v.plots) {
+            if (plot == null || plot.crop == null) {
+                plots.addChild(new JsonValue(JsonValue.ValueType.nullValue));
+                continue;
+            }
+            JsonValue o = new JsonValue(JsonValue.ValueType.object);
+            o.addChild("crop", new JsonValue(plot.crop));
+            o.addChild("sown", new JsonValue(plot.sown));
+            plots.addChild(o);
+        }
+        out.addChild("plots", plots);
+
+        List<String> ids = new ArrayList<>();
+        for (String id : v.workshops.keys()) {
+            ids.add(id);
+        }
+        Collections.sort(ids);
+        JsonValue works = new JsonValue(JsonValue.ValueType.object);
+        for (String id : ids) {
+            VillageState.Work w = v.workshops.get(id);
+            JsonValue o = new JsonValue(JsonValue.ValueType.object);
+            o.addChild("held", new JsonValue(w.held));
+            o.addChild("since", new JsonValue(w.since));
+            o.addChild("made", new JsonValue(w.made));
+            works.addChild(id, o);
+        }
+        out.addChild("workshops", works);
+        return out;
+    }
+
+    private static JsonValue sortedCounts(ObjectIntMap<String> counts) {
+        List<String> keys = new ArrayList<>();
+        for (ObjectIntMap.Entry<String> e : counts) {
+            keys.add(e.key);
+        }
+        Collections.sort(keys);
+        JsonValue out = new JsonValue(JsonValue.ValueType.object);
+        for (String key : keys) {
+            out.addChild(key, new JsonValue(counts.get(key, 0)));
+        }
+        return out;
+    }
+
+    /**
+     * Reads what {@link #village} wrote. A missing field takes the value a new
+     * village has; a negative count, or a time later than the clock - both only
+     * reachable by editing the file - is brought back to something the rules
+     * can use rather than trusted.
+     */
+    private static void readVillage(JsonValue j, VillageState v) {
+        v.clock = Math.max(0, j.getDouble("clock", 0));
+        v.harvests = Math.max(0, j.getInt("harvests", 0));
+        v.planted = j.getBoolean("planted", false);
+        readCounts(j.get("stock"), v.stock);
+        readCounts(j.get("seeds"), v.seeds);
+        readCounts(j.get("tools"), v.tools);
+        readCounts(j.get("pantry"), v.pantry);
+
+        JsonValue plots = j.get("plots");
+        if (plots != null && plots.isArray()) {
+            for (JsonValue e = plots.child; e != null; e = e.next) {
+                VillageState.Plot plot = new VillageState.Plot();
+                if (e.isObject() && e.getString("crop", null) != null) {
+                    plot.crop = e.getString("crop");
+                    plot.sown = Math.min(v.clock, e.getDouble("sown", v.clock));
+                }
+                v.plots.add(plot);
+            }
+        }
+
+        JsonValue works = j.get("workshops");
+        if (works != null && works.isObject()) {
+            for (JsonValue e = works.child; e != null; e = e.next) {
+                if (!e.isObject()) {
+                    continue;
+                }
+                VillageState.Work w = new VillageState.Work();
+                w.held = Math.max(0, e.getInt("held", 0));
+                w.since = Math.min(v.clock, e.getDouble("since", v.clock));
+                w.made = Math.max(0, e.getLong("made", 0));
+                v.workshops.put(e.name, w);
+            }
+        }
+    }
+
+    private static void readCounts(JsonValue object, ObjectIntMap<String> into) {
+        if (object == null || !object.isObject()) {
+            return;
+        }
+        for (JsonValue e = object.child; e != null; e = e.next) {
+            if (e.isNumber() && e.asInt() > 0) {
+                into.put(e.name, e.asInt());
+            }
         }
     }
 

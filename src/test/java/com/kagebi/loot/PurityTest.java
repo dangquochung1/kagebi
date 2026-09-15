@@ -32,6 +32,9 @@ class PurityTest {
         // i-frames, knockback and the relic arithmetic are the numbers that
         // most need testing and would otherwise need a GL context to reach.
         "src/main/java/com/kagebi/combat",
+        // The village economy: crops, workers, trade and the kitchen, tested
+        // over hours of village clock in milliseconds of test.
+        "src/main/java/com/kagebi/village",
     };
 
     private static final String[] FORBIDDEN = {

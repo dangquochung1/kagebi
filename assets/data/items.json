@@ -62,6 +62,39 @@
       "kind": "CONSUMABLE", "effect": "drop_aggro", "magnitude": 180, "stackSize": 2, "price": 55
     },
 
+    // ---------------- village food --------------------------------
+
+    // Cooked by the village cook from what the island produces, and carried
+    // down in the pantry. No price, so the dungeon's trader never stocks one
+    // and the kitchen is the only way to a meal. What goes into each is in
+    // village.json, and BalanceTest keeps each one worth no more than the
+    // potion or draught its ingredients would buy.
+    {
+      "id": "food_grilled_fish", "nameKey": "item.food_grilled_fish.name", "descKey": "item.food_grilled_fish.desc",
+      "sprite": "items/food/fish",
+      "kind": "CONSUMABLE", "effect": "heal", "magnitude": 20, "stackSize": 3
+    },
+    {
+      "id": "food_veggie_noodles", "nameKey": "item.food_veggie_noodles.name", "descKey": "item.food_veggie_noodles.desc",
+      "sprite": "items/food/noodle",
+      "kind": "CONSUMABLE", "effect": "heal", "magnitude": 18, "stackSize": 3
+    },
+    {
+      "id": "food_onigiri", "nameKey": "item.food_onigiri.name", "descKey": "item.food_onigiri.desc",
+      "sprite": "items/food/onigiri",
+      "kind": "CONSUMABLE", "effect": "heal", "magnitude": 18, "stackSize": 3
+    },
+    {
+      "id": "food_yakitori", "nameKey": "item.food_yakitori.name", "descKey": "item.food_yakitori.desc",
+      "sprite": "items/food/yakitori",
+      "kind": "CONSUMABLE", "effect": "speed_buff", "magnitude": 1.35, "stackSize": 2
+    },
+    {
+      "id": "food_sushi", "nameKey": "item.food_sushi.name", "descKey": "item.food_sushi.desc",
+      "sprite": "items/food/sushi",
+      "kind": "CONSUMABLE", "effect": "damage_buff", "magnitude": 1.50, "stackSize": 2
+    },
+
     // ---------------- keys ---------------------------------------------
 
     {

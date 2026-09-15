@@ -61,10 +61,11 @@ public final class ContentLoader {
         FileHandle dataDir = files.apply(Assets.DATA_DIR);
         ContentRegistry registry = parse(dataDir, problems);
         ShopCatalog shop = ShopCatalog.parse(dataDir, problems);
+        VillageCatalog village = VillageCatalog.parse(dataDir, problems);
         if (problems.isEmpty()) {
             // Cross-checks on a half-built registry would only bury the real
             // parse errors under a pile of consequential ones.
-            problems.addAll(ContentValidator.check(registry, shop,
+            problems.addAll(ContentValidator.check(registry, shop, village,
                 ContentValidator.AssetIndex.read(files)));
         }
         ContentValidator.throwIfAny(problems);
