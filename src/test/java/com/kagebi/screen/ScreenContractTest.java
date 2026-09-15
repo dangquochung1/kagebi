@@ -134,6 +134,8 @@ class ScreenContractTest {
             "shop.title", "shop.tab.upgrades", "shop.tab.unlocks", "shop.buy",
             "shop.max", "shop.owned", "shop.poor", "shop.bought",
             "prompt.talk", "prompt.descend", "prompt.escape",
+            "prompt.harvest", "prompt.sow", "prompt.no_seed", "prompt.plot_locked",
+            "prompt.growing", "prompt.collect", "village.got",
             // Advertised by World.promptKey(); the screens only look them up.
             "prompt.open_chest", "prompt.shop",
             "pause.title", "pause.resume", "pause.abandon", "pause.confirm", "pause.to_menu",

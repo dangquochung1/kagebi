@@ -58,6 +58,14 @@ SPLITS = {
     "ui/tab_disabled":      (4, 6, 4, 0),
     "ui/cell":              (3, 1, 3, 1),
     "ui/white":             (1, 1, 1, 1),
+    # The Sunnyside interface's boxes - dark, light and white - and its name
+    # label, each put together from the pack's loose pieces by
+    # tools/make_island.py. The boxes' pieces are all 3px; the label stretches
+    # only across.
+    "ui/sunny/box_dark":    (3, 3, 3, 3),
+    "ui/sunny/box_light":   (3, 3, 3, 3),
+    "ui/sunny/box_white":   (3, 3, 3, 3),
+    "ui/sunny/label":       (4, 4, 0, 0),
 }
 
 # Content insets, as (left, right, top, bottom). libGDX applies these via

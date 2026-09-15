@@ -117,6 +117,13 @@
   "prompt.escape": "Escape the depths",
   "prompt.open_chest": "Open chest",
   "prompt.shop": "Trade",
+  "prompt.harvest": "Harvest",
+  "prompt.sow": "Sow {0}",
+  "prompt.no_seed": "Needs seed",
+  "prompt.plot_locked": "Not open yet",
+  "prompt.growing": "{0} min to go",
+  "prompt.collect": "Collect",
+  "village.got": "+{0} {1}",
 
   "npc.oldman.name": "Village Elder",
   "npc.oldman.1": "The village flame still burns. As long as someone goes down, it will.",

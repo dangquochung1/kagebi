@@ -2,6 +2,7 @@ package com.kagebi.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -23,12 +24,14 @@ import org.junit.jupiter.api.Test;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.XmlReader;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.VillageCatalog;
 import com.kagebi.entity.Player;
 import com.kagebi.entity.Projectile;
 import com.kagebi.gen.CollisionGrid;
 import com.kagebi.gen.TiledRooms;
 import com.kagebi.integration.RoomCollision;
 import com.kagebi.screen.island.IslandProps;
+import com.kagebi.village.Farm;
 
 /**
  * What {@code village.tmx} and {@code home.tmx} promise the screens that read
@@ -325,6 +328,44 @@ class VillageLayoutTest {
             assertFalse(grid.overlaps(x - half, door[1] - half, Projectile.BODY, Projectile.BODY),
                 "a kunai thrown left from the doormat stops " + (door[0] - x) + "px out");
         }
+    }
+
+    // ---- the farm field ------------------------------------------------------
+
+    /**
+     * The field has as many plots as the farm can open, named in the order it
+     * opens them; each crop the scene left on one is a crop the village knows,
+     * at a picture the pack has; and every plot is close enough to walk to that
+     * its prompt comes up. A plot that cannot be reached is a plot the farm
+     * counts and nobody can sow.
+     */
+    @Test
+    void theFieldHasItsPlotsInOrderAndEveryOneCanBeWorked() {
+        XmlReader.Element map = xml(Assets.MAP_VILLAGE);
+        VillageCatalog village = VillageCatalog.parse(new FileHandle(new File(Assets.DATA_DIR)));
+        List<XmlReader.Element> plots = objects(map, HubScreen.PLOTS);
+        assertEquals(Farm.allPlots(village), plots.size(), "plots on the map");
+
+        float height = map.getIntAttribute("height") * CollisionGrid.TILE;
+        Map<String, float[]> at = markers(Assets.MAP_VILLAGE);
+        Reach reach = walk(villageGrid(at), at.get("entry"));
+        int growing = 0;
+        for (int i = 0; i < plots.size(); i++) {
+            XmlReader.Element plot = plots.get(i);
+            assertEquals(String.format("plot_%02d", i), plot.getAttribute("name", ""));
+            String crop = property(plot, "crop");
+            if (crop != null) {
+                assertNotNull(village.crop(crop), "plot " + i + " grows '" + crop + "', which village.json does not know");
+                int stage = Integer.parseInt(property(plot, "stage"));
+                assertTrue(stage >= 0 && stage <= Farm.RIPE, "plot " + i + " is at picture " + stage);
+                growing++;
+            }
+            // The marker is the plot's bottom edge; a player works it from its middle.
+            float[] middle = {plot.getFloatAttribute("x"),
+                              height - plot.getFloatAttribute("y") + CollisionGrid.TILE / 2f};
+            assertTrue(reach.near(middle, HubScreen.PLOT_RANGE), "plot " + i + " cannot be walked to");
+        }
+        assertTrue(growing > 0, "the scene's crops never reached the plots");
     }
 
     // ---- walking the house ---------------------------------------------------

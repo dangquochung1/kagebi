@@ -117,6 +117,13 @@
   "prompt.escape": "Thoát khỏi hầm",
   "prompt.open_chest": "Mở rương",
   "prompt.shop": "Mua bán",
+  "prompt.harvest": "Thu hoạch",
+  "prompt.sow": "Gieo {0}",
+  "prompt.no_seed": "Cần hạt giống",
+  "prompt.plot_locked": "Luống chưa mở",
+  "prompt.growing": "Còn {0} phút",
+  "prompt.collect": "Lấy hàng",
+  "village.got": "+{0} {1}",
 
   "npc.oldman.name": "Trưởng làng",
   "npc.oldman.1": "Ngọn lửa của làng vẫn cháy. Chừng nào còn người dám xuống, nó còn cháy.",

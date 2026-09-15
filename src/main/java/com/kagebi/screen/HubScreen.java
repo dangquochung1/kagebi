@@ -17,10 +17,13 @@ import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.IntArray;
+import com.badlogic.gdx.utils.ObjectIntMap;
+import com.badlogic.gdx.utils.ObjectMap;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.VillageCatalog;
 import com.kagebi.entity.EntityWorld;
 import com.kagebi.entity.Player;
 import com.kagebi.entity.World;
@@ -34,11 +37,14 @@ import com.kagebi.gfx.Anim;
 import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
 import com.kagebi.run.RunState;
+import com.kagebi.save.VillageState;
 import com.kagebi.screen.island.CloudLayer;
 import com.kagebi.screen.island.IslandProps;
 import com.kagebi.ui.DialogBox;
 import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
+import com.kagebi.village.Farm;
+import com.kagebi.village.Workshops;
 
 /**
  * Kagemura, between runs: the island of the Sunnyside World pack, with the
@@ -89,6 +95,18 @@ public class HubScreen extends SimScreen {
     static final float WORK_RANGE = 32f;
     /** The object layer the village's own markers live in. */
     static final String SPAWNS = "spawns";
+    /** The object layer the farm field's plots are marked in, named in the order the farm opens them. */
+    static final String PLOTS = "plots";
+    /**
+     * How close to a plot's middle a player works it: most of a tile, so the
+     * plot in front of the player is the one worked and not its neighbour.
+     * {@code tools/make_island.py} checks each plot can be walked this close to.
+     */
+    static final float PLOT_RANGE = 14f;
+    /** Over a worker with goods waiting. */
+    private static final String ALERT = "ui/sunny/icons/expression_alerted";
+    /** Steps a "+2 wood" floats over the player. */
+    private static final int TOAST_STEPS = 60;
     /** Villagers turn to face the player inside this range. */
     private static final float NOTICE_RANGE = 56f;
 
@@ -136,6 +154,17 @@ public class HubScreen extends SimScreen {
     /** The same villagers, highest on the map first, for the depth sort. */
     private final Array<Villager> byFoot = new Array<>();
     private final Array<IslandProps.Prop> workers = new Array<>();
+
+    /** Each plot's middle across and bottom edge, y up, in the order the farm counts them. */
+    private final Array<float[]> plots = new Array<>();
+    /** Crop pictures by region name, null for one the atlas does not have. */
+    private final ObjectMap<String, TextureRegion> cropArt = new ObjectMap<>();
+    private VillageCatalog village;
+    private VillageState farm;
+    /** What was just harvested or collected, floating over the player, and its steps left. */
+    private String toast;
+    private int toastSteps;
+
     private DialogBox dialog;
     private BitmapFont font;
 
@@ -152,6 +181,7 @@ public class HubScreen extends SimScreen {
     /** What INTERACT would do this step. At most one of these is set. */
     private Villager nearVillager;
     private IslandProps.Prop nearWorker;
+    private int nearPlot = -1;
     private boolean nearGate;
     private boolean nearDoor;
 
@@ -234,6 +264,9 @@ public class HubScreen extends SimScreen {
         props = IslandProps.load(map, Gdx.files.internal(Assets.MAP_VILLAGE));
         buildPasses();
         readSpawns(map);
+        village = game.village();
+        farm = game.profile().village;
+        readPlots(map);
 
         grid = TiledRooms.collision(map);
         mapW = grid.width() * CollisionGrid.TILE;
@@ -402,12 +435,46 @@ public class HubScreen extends SimScreen {
         entryY = entry[1];
     }
 
+    /**
+     * The field's plots, and on the very first visit the crops the scene grows on
+     * them. The map carries a crop only where the scene painted one; from then on
+     * the farm is the save's, and every crop is drawn from it.
+     */
+    private void readPlots(TiledMap map) {
+        MapLayer layer = map.getLayers().get(PLOTS);
+        if (layer == null) {
+            return;
+        }
+        Array<MapObject> named = new Array<>();
+        for (MapObject object : layer.getObjects()) {
+            if (object.getName() != null) {
+                named.add(object);
+            }
+        }
+        named.sort((a, b) -> a.getName().compareTo(b.getName()));
+        String[] crops = new String[named.size];
+        int[] stages = new int[named.size];
+        for (int i = 0; i < named.size; i++) {
+            MapObject object = named.get(i);
+            Float x = object.getProperties().get("x", Float.class);
+            Float y = object.getProperties().get("y", Float.class);
+            plots.add(new float[] {x == null ? 0f : x, y == null ? 0f : y});
+            crops[i] = object.getProperties().get("crop", String.class);
+            Integer stage = object.getProperties().get("stage", Integer.class);
+            stages[i] = stage == null ? 0 : stage;
+        }
+        Farm.plantScene(village, farm, crops, stages);
+    }
+
     // ---- simulation --------------------------------------------------------
 
     @Override
     protected void step() {
         if (card > 0) {
             card--;
+        }
+        if (toastSteps > 0) {
+            toastSteps--;
         }
         for (Villager v : villagers) {
             v.face(world.playerX(), world.playerY());
@@ -447,7 +514,12 @@ public class HubScreen extends SimScreen {
             if (nearVillager != null) {
                 talk(nearVillager);
             } else if (nearWorker != null) {
-                talkTo(nearWorker);
+                // Goods waiting are taken first; a worker with none has a word.
+                if (!collect(nearWorker)) {
+                    talkTo(nearWorker);
+                }
+            } else if (nearPlot >= 0) {
+                workPlot(nearPlot);
             } else if (nearGate) {
                 openMap();
             } else if (nearDoor) {
@@ -481,8 +553,106 @@ public class HubScreen extends SimScreen {
             }
         }
         boolean someone = nearVillager != null || nearWorker != null;
-        nearGate = !someone && dist(px, py, gateX, gateY) < GATE_RANGE;
-        nearDoor = !someone && !nearGate && dist(px, py, doorX, doorY) < DOOR_RANGE;
+        nearPlot = -1;
+        if (!someone) {
+            float closest = PLOT_RANGE;
+            for (int i = 0; i < plots.size; i++) {
+                float[] plot = plots.get(i);
+                float d = dist(px, py, plot[0], plot[1] + CollisionGrid.TILE / 2f);
+                if (d < closest) {
+                    closest = d;
+                    nearPlot = i;
+                }
+            }
+        }
+        boolean busy = someone || nearPlot >= 0;
+        nearGate = !busy && dist(px, py, gateX, gateY) < GATE_RANGE;
+        nearDoor = !busy && !nearGate && dist(px, py, doorX, doorY) < DOOR_RANGE;
+    }
+
+    // ---- the farm and the workers ----------------------------------------------
+
+    /** The workshop a worker keeps, or null for the farmer and the cook, who make nothing alone. */
+    private VillageCatalog.Workshop workshopOf(IslandProps.Prop worker) {
+        return village.workshop(worker.properties.get("role"));
+    }
+
+    /** Takes what a worker has made into the storehouse. False when there was nothing waiting. */
+    private boolean collect(IslandProps.Prop worker) {
+        VillageCatalog.Workshop workshop = workshopOf(worker);
+        if (workshop == null) {
+            return false;
+        }
+        ObjectIntMap<String> got = Workshops.collect(village, farm, workshop);
+        if (got.size == 0) {
+            return false;
+        }
+        StringBuilder said = new StringBuilder();
+        for (ObjectIntMap.Entry<String> e : got) {
+            if (said.length() > 0) {
+                said.append("  ");
+            }
+            said.append(game.i18n().format("village.got", e.value, goodName(e.key)));
+        }
+        showToast(said.toString());
+        game.audio().playSfx(Assets.SFX_ACCEPT);
+        return true;
+    }
+
+    /** Picks a plot's ripe crop, or sows a bare one with the first seed that fits. */
+    private void workPlot(int index) {
+        if (Farm.ripe(village, farm, index)) {
+            VillageCatalog.Crop crop = Farm.crop(village, farm, index);
+            int picked = Farm.harvest(village, farm, index);
+            showToast(game.i18n().format("village.got", picked, goodName(crop.good)));
+            game.audio().playSfx(Assets.SFX_ACCEPT);
+            return;
+        }
+        VillageCatalog.Crop seed = seedFor(index);
+        if (seed != null && Farm.sow(village, farm, index, seed)) {
+            game.audio().playSfx(Assets.SFX_ACCEPT);
+        }
+    }
+
+    /**
+     * The seed a plot would take now: the first crop, in the catalog's order, of
+     * which the player holds a seed the farm's level allows. Null when the plot
+     * is growing, not yet open, or there is no such seed.
+     */
+    private VillageCatalog.Crop seedFor(int index) {
+        for (int i = 0; i < village.crops().size; i++) {
+            VillageCatalog.Crop crop = village.crops().get(i);
+            if (Farm.canSow(village, farm, index, crop)) {
+                return crop;
+            }
+        }
+        return null;
+    }
+
+    /** What the prompt at a plot says: what pressing would do, or why it would do nothing. */
+    private String plotLabel(I18n t, int index) {
+        if (Farm.ripe(village, farm, index)) {
+            return t.get("prompt.harvest");
+        }
+        if (Farm.stage(village, farm, index) >= 0) {
+            int minutes = (int) Math.ceil(Farm.untilRipe(village, farm, index) / 60.0);
+            return t.format("prompt.growing", Math.max(1, minutes));
+        }
+        if (index >= Farm.openPlots(village, farm)) {
+            return t.get("prompt.plot_locked");
+        }
+        VillageCatalog.Crop seed = seedFor(index);
+        return seed == null ? t.get("prompt.no_seed") : t.format("prompt.sow", goodName(seed.good));
+    }
+
+    private String goodName(String goodId) {
+        VillageCatalog.Good good = village.good(goodId);
+        return good == null ? goodId : game.i18n().get(good.nameKey);
+    }
+
+    private void showToast(String text) {
+        toast = text;
+        toastSteps = TOAST_STEPS;
     }
 
     private void talk(Villager v) {
@@ -612,9 +782,17 @@ public class HubScreen extends SimScreen {
                         p.draw(batch, seconds);
                     }
                 }
+                if (pass.sprites == props.ground) {
+                    drawCrops(batch);
+                }
             }
             batch.end();
         }
+
+        batch.setProjectionMatrix(cam.combined);
+        batch.begin();
+        drawOverWorld(batch);
+        batch.end();
 
         ui.snapTo(Cfg.VIRT_W / 2f, Cfg.VIRT_H / 2f);
         ui.apply();
@@ -622,6 +800,55 @@ public class HubScreen extends SimScreen {
         batch.begin();
         drawOverlay(batch);
         batch.end();
+    }
+
+    /**
+     * The farm's crops, from the save, on the ground under everyone: a crop is
+     * no taller than its soil, so nobody ever stands behind one. Each sits in
+     * the middle of its plot's tile.
+     */
+    private void drawCrops(SpriteBatch batch) {
+        for (int i = 0; i < plots.size; i++) {
+            int stage = Farm.stage(village, farm, i);
+            if (stage < 0) {
+                continue;
+            }
+            TextureRegion art = cropArt(Farm.crop(village, farm, i).id, stage);
+            if (art == null) {
+                continue;
+            }
+            float[] plot = plots.get(i);
+            batch.draw(art, Math.round(plot[0] - art.getRegionWidth() / 2f),
+                       plot[1] + Math.round((CollisionGrid.TILE - art.getRegionHeight()) / 2f));
+        }
+    }
+
+    private TextureRegion cropArt(String crop, int stage) {
+        String name = "ui/sunny/crops/" + crop + "_0" + stage;
+        if (!cropArt.containsKey(name)) {
+            cropArt.put(name, game.skin().has(name, TextureRegion.class) ? game.skin().getRegion(name) : null);
+        }
+        return cropArt.get(name);
+    }
+
+    /** Over each worker, a mark while goods wait; over the player, what was just taken. */
+    private void drawOverWorld(SpriteBatch batch) {
+        TextureRegion alert = game.skin().has(ALERT, TextureRegion.class) ? game.skin().getRegion(ALERT) : null;
+        if (alert != null) {
+            for (IslandProps.Prop worker : workers) {
+                VillageCatalog.Workshop workshop = workshopOf(worker);
+                if (workshop != null && Workshops.ready(village, farm, workshop) > 0) {
+                    batch.draw(alert, Math.round(worker.centreX() - alert.getRegionWidth() / 2f),
+                               worker.foot + 26);
+                }
+            }
+        }
+        if (toastSteps > 0 && toast != null) {
+            float rise = (TOAST_STEPS - toastSteps) * 0.25f;
+            batch.setColor(1f, 0.93f, 0.72f, Math.min(1f, toastSteps / 20f));
+            Hud.shadowed(batch, font, toast, world.playerX(), world.playerY() + 22 + rise, Align.center);
+            batch.setColor(Color.WHITE);
+        }
     }
 
     /**
@@ -683,14 +910,29 @@ public class HubScreen extends SimScreen {
             dialog.draw(batch);
             return;
         }
-        String key = nearVillager != null || nearWorker != null ? "prompt.talk"
-            : nearGate ? "prompt.descend"
-            : nearDoor ? "prompt.enter_home"
-            : world.promptKey();
-        if (key != null) {
-            Hud.prompt(batch, game.skin(), font,
-                       game.input().map().primary(GameAction.INTERACT),
-                       t.get(key), Cfg.VIRT_W / 2f, 10);
+        // A prompt that would do nothing - a crop still growing, no seed in hand -
+        // says why without a key on it.
+        int keycode = game.input().map().primary(GameAction.INTERACT);
+        String label;
+        if (nearVillager != null) {
+            label = t.get("prompt.talk");
+        } else if (nearWorker != null) {
+            VillageCatalog.Workshop workshop = workshopOf(nearWorker);
+            label = t.get(workshop != null && Workshops.ready(village, farm, workshop) > 0
+                ? "prompt.collect" : "prompt.talk");
+        } else if (nearPlot >= 0) {
+            label = plotLabel(t, nearPlot);
+            if (!Farm.ripe(village, farm, nearPlot) && seedFor(nearPlot) == null) {
+                keycode = -1;
+            }
+        } else {
+            String key = nearGate ? "prompt.descend"
+                : nearDoor ? "prompt.enter_home"
+                : world.promptKey();
+            label = key == null ? null : t.get(key);
+        }
+        if (label != null) {
+            Hud.prompt(batch, game.skin(), font, keycode, label, Cfg.VIRT_W / 2f, 10);
         }
     }
 

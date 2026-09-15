@@ -1512,13 +1512,109 @@ class Walker:
 class Marker:
     """A named point, in pixels with y down, for HubScreen to read."""
 
-    def __init__(self, name, x, y, kind="spawn"):
+    def __init__(self, name, x, y, kind="spawn", properties=None):
         self.name, self.x, self.y, self.kind = name, x, y, kind
+        self.properties = properties or {}
 
 
 class Shape:
     def __init__(self, x, y, w, h):
         self.x, self.y, self.w, self.h = x, y, w, h
+
+
+# The farm field's plots, in the order the farm opens them - the scene's row of
+# ripe pumpkins first, so a first visit finds a harvest waiting, then the two
+# rows below. Island tile coordinates; the rest of the field stays as painted.
+PLOTS = [(x, y) for y in (12, 13, 14) for x in (20, 21, 22, 23)]
+# What a tile of the tileset's crop block draws: the crop by its column, and
+# which of the pack's six pictures it stands for by its row. A ripe crop is two
+# tiles tall - its top half, one row up in the sheet, sits in the tile above.
+CROP_COLUMNS = {51: "carrot", 52: "cauliflower", 53: "pumpkin", 54: "sunflower",
+                55: "radish", 56: "parsnip", 57: "potato", 58: "cabbage",
+                59: "beetroot", 60: "wheat", 61: "kale"}
+CROP_ROWS = {12: 1, 13: 2, 15: 4, 17: 5}
+RIPE_ROW = 17
+# How close a player stands to a plot's middle to sow or pick it: most of a tile.
+PLOT_RANGE = 14
+
+
+def farm_plots(island):
+    """The field's plots as markers, and their crops taken off the map.
+
+    The farm draws its crops from the save, so a plot the player has picked
+    must not still show the scene's pumpkin beneath the empty soil. Each marker
+    carries the crop the scene painted there and the picture it was at, which
+    Farm.plantScene gives the plot on the first visit. x is the plot's middle
+    and y its bottom edge, where a crop stands.
+    """
+    dressing = [l for l in island.layers if isinstance(l, Grid) and l.name.startswith("dressing_")]
+    markers = []
+    for index, (tx, ty) in enumerate(PLOTS):
+        crop, stage = None, 0
+        for layer in dressing:
+            here = ty * layer.width + tx
+            cell = layer.data[here]
+            if not cell or cell[0].name != "sunnyside":
+                continue
+            columns = cell[0].columns
+            col, row = cell[1] % columns, cell[1] // columns
+            if col not in CROP_COLUMNS or row not in CROP_ROWS:
+                continue
+            crop, stage = CROP_COLUMNS[col], CROP_ROWS[row]
+            layer.data[here] = 0
+            if row == RIPE_ROW:
+                for upper in dressing:
+                    above = upper.data[here - upper.width]
+                    if above and above[0].name == "sunnyside" and above[1] == cell[1] - columns:
+                        upper.data[here - upper.width] = 0
+        properties = {"crop": crop, "stage": stage} if crop else {}
+        markers.append(Marker("plot_%02d" % index, (tx + 0.5) * TILE, (ty + 1) * TILE,
+                              kind="plot", properties=properties))
+    return markers
+
+
+UI_DIR = os.path.join(ROOT, "assets", "gfx", "ui", "sunny")
+
+
+def export_ui_art():
+    """The pack's crops, goods and interface pictures, for the UI atlas.
+
+    Written under assets/gfx/ui/, which tools/pack_atlas.py packs into ui.atlas
+    as ui/sunny/...: the farm draws its crops from there, and the village's
+    trade and bag screens their boxes and icons. The three boxes and the label
+    ship as nine and three loose pieces, and are put together here so the atlas
+    can carry each as one nine-patch. Like everything derived from the pack,
+    none of it is in git.
+    """
+    assets = os.path.dirname(S.EXAMPLE)
+    ui = os.path.join(assets, "UI")
+    for sub, source in (("crops", os.path.join(assets, "Elements", "Crops")), ("icons", ui)):
+        out = os.path.join(UI_DIR, sub)
+        os.makedirs(out, exist_ok=True)
+        for name in sorted(os.listdir(source)):
+            if name.endswith(".png"):
+                Image.open(os.path.join(source, name)).convert("RGBA").save(
+                    os.path.join(out, name.replace(" ", "_")))
+    pieces = os.path.join(ui, "9slice_box_white")
+    for kind, name in (("dt", "box_dark"), ("lt", "box_light"), ("w", "box_white")):
+        box = Image.new("RGBA", (9, 9))
+        for row, parts in enumerate((("tl", "tc", "tr"), ("lc", "c", "rc"), ("bl", "bc", "br"))):
+            for col, part in enumerate(parts):
+                piece = Image.open(os.path.join(pieces, "%s_box_9slice_%s.png" % (kind, part)))
+                box.paste(piece.convert("RGBA"), (col * 3, row * 3))
+        box.save(os.path.join(UI_DIR, name + ".png"))
+    parts = [Image.open(os.path.join(ui, "label_%s.png" % p)).convert("RGBA")
+             for p in ("left", "middle", "right")]
+    label = Image.new("RGBA", (sum(p.width for p in parts), max(p.height for p in parts)))
+    x = 0
+    for part in parts:
+        label.paste(part, (x, 0))
+        x += part.width
+    label.save(os.path.join(UI_DIR, "label.png"))
+    # The mine's nugget has no picture among the pack's goods; the first frame
+    # of the sprite the room scatters in the pit stands in for it.
+    ore = S.sprite("spr_deco_ore_gold").frames[0]
+    ore.crop(ore.getbbox()).save(os.path.join(UI_DIR, "crops", "gold_ore.png"))
 
 
 # The one person in each part of the island the player deals with, found by
@@ -1578,7 +1674,7 @@ def place_markers(island, walker, workers):
     return markers
 
 
-def check_walks(walker, markers, workers):
+def check_walks(walker, markers, workers, plots=()):
     """Everything the village needs reached must be reachable from the front door."""
     seen = walker.reach(markers["entry"])
     wanted = [("the front door", markers["door"], DOOR_RANGE),
@@ -1591,6 +1687,8 @@ def check_walks(walker, markers, workers):
         art = Art(thing)
         p = thing.placement
         wanted.append(("the %s worker" % role, (p.x + LEFT * TILE, art.foot - 8), WORK_RANGE))
+    for plot in plots:
+        wanted.append((plot.name, (plot.x, plot.y - TILE / 2), PLOT_RANGE))
     missing = [(what, target) for what, target, radius in wanted
                if not walker.near(seen, target, radius)]
     return seen, missing
@@ -1782,6 +1880,24 @@ def _num(v):
     return str(int(r)) if r == int(r) else repr(r)
 
 
+def write_properties(obj, properties):
+    """An object's custom properties, typed the way Tiled types them, in name order."""
+    if not properties:
+        return
+    props = ET.SubElement(obj, "properties")
+    for key in sorted(properties):
+        value = properties[key]
+        kind = ("int" if isinstance(value, int) and not isinstance(value, bool)
+                else "float" if isinstance(value, float)
+                else "bool" if isinstance(value, bool) else None)
+        pattrs = {"name": key, "value": (str(value).lower() if kind == "bool"
+                                         else _num(value) if kind == "float"
+                                         else str(value))}
+        if kind:
+            pattrs["type"] = kind
+        ET.SubElement(props, "property", pattrs)
+
+
 def write(island, path):
     """The map as a finite, CSV-encoded .tmx, image paths relative to `path`."""
     island.number()
@@ -1835,9 +1951,10 @@ def write(island, path):
             node = ET.SubElement(m, "objectgroup", attrs)
             for thing in layer.things:
                 if isinstance(thing, Marker):
-                    ET.SubElement(node, "object", {
+                    obj = ET.SubElement(node, "object", {
                         "id": str(object_id), "name": thing.name, "type": thing.kind,
                         "x": _num(thing.x), "y": _num(thing.y)})
+                    write_properties(obj, thing.properties)
                     object_id += 1
                     continue
                 if isinstance(thing, Shape):
@@ -1863,19 +1980,7 @@ def write(island, path):
                     properties["frame"] = thing.frame
                 if thing.speed != 1.0:
                     properties["speed"] = thing.speed
-                if properties:
-                    props = ET.SubElement(obj, "properties")
-                    for key in sorted(properties):
-                        value = properties[key]
-                        kind = ("int" if isinstance(value, int) and not isinstance(value, bool)
-                                else "float" if isinstance(value, float)
-                                else "bool" if isinstance(value, bool) else None)
-                        pattrs = {"name": key, "value": (str(value).lower() if kind == "bool"
-                                                         else _num(value) if kind == "float"
-                                                         else str(value))}
-                        if kind:
-                            pattrs["type"] = kind
-                        ET.SubElement(props, "property", pattrs)
+                write_properties(obj, properties)
                 object_id += 1
         layer_id += 1
     m.set("nextlayerid", str(layer_id))
@@ -1965,9 +2070,11 @@ def main(argv=None):
     if exact_only:
         return 0
     village_changes(island)
+    export_ui_art()
     if assets_only:
-        print("  images written under assets/gfx/sunnyside/")
+        print("  images written under assets/gfx/sunnyside/ and assets/gfx/ui/sunny/")
         return 0
+    plots = farm_plots(island)
     insert_after(island, "dressing_house_shutters", [Grid("decor", island.width, island.height)])
     carried = carry_decor(island, os.path.join(OUT, "village.tmx"))
     if carried:
@@ -1982,10 +2089,11 @@ def main(argv=None):
     blocked = blocking.blocked()
     walker = Walker(blocked, blocking.width, blocking.height)
     markers = place_markers(island, walker, workers)
-    seen, missing = check_walks(walker, markers, workers)
+    seen, missing = check_walks(walker, markers, workers, plots)
     stand_markers(walker, seen, workers, markers)
     check_arrivals(markers, workers)
     island.layers.append(Group("spawns", [Marker(n, x, y) for n, (x, y) in sorted(markers.items())]))
+    island.layers.append(Group("plots", plots))
     shapes = blocking.rectangles(blocked)
     island.layers.append(Group("collision", [Shape(*r) for r in shapes], visible=False,
                                color="#ff3c3c"))
