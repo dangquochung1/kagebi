@@ -3,6 +3,7 @@ package com.kagebi.screen;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
@@ -10,15 +11,18 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.MapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
+import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.IntArray;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.entity.EntityWorld;
+import com.kagebi.entity.Player;
 import com.kagebi.entity.World;
 import com.kagebi.gen.CollisionGrid;
 import com.kagebi.gen.Room;
@@ -30,48 +34,40 @@ import com.kagebi.gfx.Anim;
 import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
 import com.kagebi.run.RunState;
+import com.kagebi.screen.island.CloudLayer;
+import com.kagebi.screen.island.IslandProps;
 import com.kagebi.ui.DialogBox;
 import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
 
 /**
- * Kagemura, between runs: three villagers, a torii, and a house of your own.
+ * Kagemura, between runs: the island of the Sunnyside World pack, with the
+ * player's house in the middle of it and the torii down to the dungeon beside.
  *
- * <p><b>Where everything stands is read off the map.</b> It used to be eight
- * pixel constants in this file, which {@code notes/a.md} recorded as a thing to
- * fix and which made the village impossible to rearrange without editing Java.
- * {@code village.tmx} carries a {@code spawns} object layer now - {@code entry},
- * {@code gate}, {@code door}, {@code villager1..3} - so moving a house in Tiled
- * moves the person standing at its door. The constants below are the fallback
- * for a map that has lost the layer, and nothing more.
+ * <p><b>The map is the scene.</b> {@code tools/make_island.py} builds
+ * {@code village.tmx} from the pack's own showcase room, and this screen draws
+ * it in the file's own layer order: runs of tile layers through the map
+ * renderer, and between them the four object layers of sprites that libGDX
+ * loads but never draws. One of those, {@code sprites}, is where the player is
+ * slotted in among the people, animals and things by where each stands.
+ *
+ * <p><b>Where everything stands is read off the map.</b> The {@code spawns}
+ * layer names the front door, the torii, the shop, a place in front of each
+ * region's worker, and where the three villagers stand. Nothing about the
+ * village's shape is written down in Java.
  *
  * <p>The only map in the game larger than the screen, so the only screen where
  * the camera scrolls. It follows the player and is clamped to the map; the
  * rounding to whole pixels happens inside {@link CameraController}.
  *
- * <p><b>Drawn in the art's own colours, every visit.</b> The village used to
- * darken a step with each failed descent, as a wash over the finished frame.
- * Nothing on screen said why, so a player who saw it bright one day and dim
- * the next read it as the game breaking - and a tint that has to be explained
- * is not carrying a story.
- *
- * <p>The villagers are drawn and managed here, not by the {@link World}. They
- * are furniture that talks: they do not move, fight or drop anything, and
- * teaching the simulation about them would be teaching combat code about
- * dialogue.
+ * <p>The villagers and the island's people are drawn and managed here, not by
+ * the {@link World}. They are furniture that talks: they do not move, fight or
+ * drop anything, and teaching the simulation about them would be teaching combat
+ * code about dialogue.
  */
 public class HubScreen extends SimScreen {
 
     private static final Color GOLD = new Color(0xffad55ff);
-
-    /** Fallbacks, in map pixels y-up, for a map with no {@code spawns} layer. */
-    private static final int[][] VILLAGER_AT = {{64, 288}, {64, 192}, {64, 96}};
-    private static final int ENTRY_X = 400;
-    private static final int ENTRY_Y = 160;
-    private static final int GATE_X = 72;
-    private static final int GATE_Y = 48;
-    private static final int DOOR_X = 400;
-    private static final int DOOR_Y = 192;
 
     static final float GATE_RANGE = 24f;
     /**
@@ -84,10 +80,30 @@ public class HubScreen extends SimScreen {
      */
     static final float DOOR_RANGE = 26f;
     static final float TALK_RANGE = 22f;
+    /**
+     * How close a player comes to a region's worker to deal with them. Wider
+     * than {@link #TALK_RANGE}: a cook stands behind her counter and a
+     * woodcutter among his logs. {@code tools/make_island.py} checks every
+     * worker can be walked this close to.
+     */
+    static final float WORK_RANGE = 32f;
     /** The object layer the village's own markers live in. */
     static final String SPAWNS = "spawns";
     /** Villagers turn to face the player inside this range. */
     private static final float NOTICE_RANGE = 56f;
+
+    /** The marker each villager stands at, and who they are. */
+    static final String[][] VILLAGERS = {
+        {"elder", Assets.Npc.ELDER},
+        {"master", Assets.Npc.MASTER},
+        {"herbalist", Assets.Npc.HERBALIST},
+    };
+    /**
+     * The island's regions, each with the one person in it the player deals
+     * with, in the order {@code --screen hub} and {@code --screen talk} count
+     * them. Each is a sprite with this {@code role} on the map.
+     */
+    static final String[] REGIONS = {"farm", "forest", "ranch", "fishing", "mine", "kitchen"};
 
     /**
      * The kit badge: the ninja's own face, top right, opening the loadout.
@@ -108,8 +124,8 @@ public class HubScreen extends SimScreen {
 
     private TiledMap map;
     private OrthogonalTiledMapRenderer renderer;
-    private int[] below;
-    private int[] above;
+    private IslandProps props;
+    private final Array<Pass> passes = new Array<>();
     private int mapW;
     private int mapH;
     private CollisionGrid grid;
@@ -117,32 +133,34 @@ public class HubScreen extends SimScreen {
     private World world;
     private RunState run;
     private final Array<Villager> villagers = new Array<>();
+    /** The same villagers, highest on the map first, for the depth sort. */
+    private final Array<Villager> byFoot = new Array<>();
+    private final Array<IslandProps.Prop> workers = new Array<>();
     private DialogBox dialog;
     private BitmapFont font;
 
     /** Steps left on the arrival card. */
     private int card = Hud.CARD_STEPS;
 
-    /** Read off the map's object layer, or the constants above. */
-    private int[][] villagerAt = VILLAGER_AT;
-    private int gateX = GATE_X;
-    private int gateY = GATE_Y;
-    private int doorX = DOOR_X;
-    private int doorY = DOOR_Y;
-    private int entryX = ENTRY_X;
-    private int entryY = ENTRY_Y;
+    private int gateX;
+    private int gateY;
+    private int doorX;
+    private int doorY;
+    private int entryX;
+    private int entryY;
 
-    /** What INTERACT would do this step: a villager, the gate, the door, or nothing. */
+    /** What INTERACT would do this step. At most one of these is set. */
     private Villager nearVillager;
+    private IslandProps.Prop nearWorker;
     private boolean nearGate;
     private boolean nearDoor;
 
-    /** A villager to be already talking to on arrival, or -1. */
+    /** Someone to be already talking to on arrival - villagers, then workers - or -1. */
     private int talkOnShow = -1;
 
     /** A marker to arrive at instead of the front door, or null. */
     private String arriveAt;
-    /** Every marker the map names, y-up, for {@link #arriveAt}. */
+    /** Every marker the map names, y-up. */
     private final java.util.Map<String, int[]> markers = new java.util.HashMap<>();
 
     /** The badge portrait, rebuilt when the player changes who they are. */
@@ -155,26 +173,31 @@ public class HubScreen extends SimScreen {
     /** Set while the herbalist is speaking; her last page opens her stall. */
     private boolean openShopAfterTalk;
 
+    // Per-frame state of the depth-sorted pass.
+    private int nextVillager;
+    private boolean actorsDrawn;
+    private float playerFoot;
+
     public HubScreen(Kagebi game) {
         super(game.input());
         this.game = game;
     }
 
     /**
-     * Opens with a villager mid-sentence. For {@code --screen talk}: the dialog
-     * box is the screen's densest Vietnamese text, and the one most likely to
-     * clip a tone mark, so it has to be reachable without walking to it.
+     * Opens with someone mid-sentence: a villager for 0 to 2, a region's worker
+     * after that. For {@code --screen talk}: the dialog box is the screen's
+     * densest Vietnamese text, and the one most likely to clip a tone mark, so it
+     * has to be reachable without walking to it.
      */
-    HubScreen talkingTo(int villager) {
-        talkOnShow = villager;
+    HubScreen talkingTo(int who) {
+        talkOnShow = who;
         return this;
     }
 
     /**
      * Opens with the player standing at a named marker rather than at their
-     * own door. For {@code --screen hub --page 2}, which stands them in the
-     * garden gateway: the one way out of the garden, which a player once could
-     * not get through, and so the first thing worth photographing.
+     * own door: {@code gate} on the way back up from the dungeon, and any of
+     * them for {@code --screen hub --page}.
      */
     HubScreen arriveAt(String marker) {
         arriveAt = marker;
@@ -194,10 +217,10 @@ public class HubScreen extends SimScreen {
                 loadoutOpen = false;
                 // Walk back into the village, which is how the world is told
                 // anything about the run: entering a room re-reads the ninja
-                // and both weapons. Without this a player who changes ninja
-                // stands in the village still wearing the old one until
-                // something else happens to move them between rooms.
-                world.enterRoom(villageRoom(), grid, null);
+                // and both weapons. Where the player already stands, and not at
+                // the front door: on an island this size that was a teleport.
+                world.enterRoom(villageRoom(Math.round(world.playerX()),
+                                            Math.round(world.playerY())), grid, null);
                 card = 0;
             }
             game.audio().playMusic(Assets.MUSIC_VILLAGE);
@@ -208,8 +231,8 @@ public class HubScreen extends SimScreen {
 
         map = new TmxMapLoader().load(Assets.MAP_VILLAGE);
         renderer = new OrthogonalTiledMapRenderer(map, game.batch());
-        below = TiledRooms.layerIndices(map, TiledRooms.BELOW);
-        above = TiledRooms.layerIndices(map, TiledRooms.ABOVE);
+        props = IslandProps.load(map, Gdx.files.internal(Assets.MAP_VILLAGE));
+        buildPasses();
         readSpawns(map);
 
         grid = TiledRooms.collision(map);
@@ -229,16 +252,25 @@ public class HubScreen extends SimScreen {
         run.room = null;
 
         TextureAtlas npc = Preload.npc();
-        for (int i = 0; i < Assets.Npc.VILLAGERS.length; i++) {
-            String id = Assets.Npc.VILLAGERS[i];
-            Villager v = new Villager(id, villagerAt[i][0], villagerAt[i][1],
+        for (String[] villager : VILLAGERS) {
+            int[] at = markers.get(villager[0]);
+            if (at == null) {
+                continue;
+            }
+            String id = villager[1];
+            Villager v = new Villager(id, at[0], at[1],
                 Anim.directional(npc, Assets.Npc.idle(id), 16, Anim.DEFAULT_STEPS_PER_FRAME, true),
                 npc.findRegion(Assets.Npc.face(id)));
             villagers.add(v);
-            // A villager occupies its tile, so the player walks round rather
-            // than through them. The world only knows about the grid, which is
-            // exactly why this is enough.
-            grid.set(v.x / CollisionGrid.TILE, v.y / CollisionGrid.TILE, true);
+            byFoot.add(v);
+            // A villager's feet are in the way, as the workers' are in the
+            // map's own collision layer; the player walks round rather than
+            // through them.
+            grid.fill(at[0] - 5f, at[1], 10f, 6f);
+        }
+        byFoot.sort((a, b) -> Integer.compare(b.y, a.y));
+        for (IslandProps.Prop p : props.with("role")) {
+            workers.add(p);
         }
 
         world = new EntityWorld(Preload.actors(), game.content(), run, game.settings());
@@ -252,18 +284,69 @@ public class HubScreen extends SimScreen {
             ((EntityWorld) world).useAudio(game.audio());
         }
         if (talkOnShow >= 0 && talkOnShow < villagers.size) {
-            // Standing in front of them, not across the village. The player
-            // arrives at their own house now, which is far enough from the
-            // villagers' row that --screen talk framed a dialogue box over an
-            // empty garden and photographed nobody.
             Villager v = villagers.get(talkOnShow);
             world.enterRoom(villageRoom(v.x, v.y - 20), grid, null);
             talk(v);
+        } else if (talkOnShow >= villagers.size && workerFor(talkOnShow - villagers.size) != null) {
+            IslandProps.Prop worker = workerFor(talkOnShow - villagers.size);
+            int[] at = markers.get("stand_" + worker.properties.get("role"));
+            world.enterRoom(at == null ? villageRoom() : villageRoom(at[0], at[1]), grid, null);
+            talkTo(worker);
         } else {
             int[] at = arriveAt == null ? null : markers.get(arriveAt);
             world.enterRoom(at == null ? villageRoom() : villageRoom(at[0], at[1]), grid, null);
         }
         game.audio().playMusic(Assets.MUSIC_VILLAGE);
+    }
+
+    /** The worker of the n-th region in {@link #REGIONS}, or null. */
+    private IslandProps.Prop workerFor(int region) {
+        if (region < 0 || region >= REGIONS.length) {
+            return null;
+        }
+        for (IslandProps.Prop w : workers) {
+            if (REGIONS[region].equals(w.properties.get("role"))) {
+                return w;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The map's layers, grouped into what one draw call can do.
+     *
+     * <p>Consecutive tile layers are one call to the map renderer; each object
+     * layer of sprites, and each cloud layer, is a pass of its own. The order is
+     * the file's, which is the order the build script checked its render in.
+     */
+    private void buildPasses() {
+        IntArray tiles = new IntArray();
+        for (int i = 0; i < map.getLayers().size(); i++) {
+            MapLayer layer = map.getLayers().get(i);
+            String name = layer.getName();
+            if (layer instanceof TiledMapTileLayer) {
+                if (name.startsWith("overhead_cloud")) {
+                    flushTiles(tiles);
+                    passes.add(new Pass(null, null, false, new CloudLayer((TiledMapTileLayer) layer)));
+                } else {
+                    tiles.add(i);
+                }
+                continue;
+            }
+            Array<IslandProps.Prop> sprites = props.layer(name);
+            if (sprites != null) {
+                flushTiles(tiles);
+                passes.add(new Pass(null, sprites, IslandProps.SORTED.equals(name), null));
+            }
+        }
+        flushTiles(tiles);
+    }
+
+    private void flushTiles(IntArray tiles) {
+        if (tiles.size > 0) {
+            passes.add(new Pass(tiles.toArray(), null, false, null));
+            tiles.clear();
+        }
     }
 
     /**
@@ -287,21 +370,18 @@ public class HubScreen extends SimScreen {
     }
 
     /**
-     * Where the people, the gate and the door stand, off the map's own object
-     * layer. Anything the layer does not name keeps the constant above.
+     * Every named marker, off the map's own object layer.
      *
-     * <p>The same shape as {@code WorldMapScreen.readNodes}: a map is content
-     * and content can be wrong, so a missing marker leaves the village
-     * playable with a villager in an odd spot rather than crashing on the way
-     * in. What it must never do is silently move nothing, which is why the
-     * names are asserted in {@code VillageLayoutTest}.
+     * <p>A marker the map does not name leaves what depends on it out - a
+     * villager who is not there, a door that does not open - rather than
+     * crashing on the way in. What it must never do is go unnoticed, which is
+     * why the names are asserted in {@code VillageLayoutTest}.
      */
     private void readSpawns(TiledMap map) {
         MapLayer layer = map.getLayers().get(SPAWNS);
         if (layer == null) {
             return;
         }
-        int[][] found = new int[villagerAt.length][];
         for (MapObject object : layer.getObjects()) {
             String name = object.getName();
             Float x = object.getProperties().get("x", Float.class);
@@ -309,30 +389,17 @@ public class HubScreen extends SimScreen {
             if (name == null || x == null || y == null) {
                 continue;
             }
-            int px = Math.round(x);
-            int py = Math.round(y);
-            markers.put(name, new int[] {px, py});
-            if (name.equals("gate")) {
-                gateX = px;
-                gateY = py;
-            } else if (name.equals("door")) {
-                doorX = px;
-                doorY = py;
-            } else if (name.equals("entry")) {
-                entryX = px;
-                entryY = py;
-            } else if (name.startsWith("villager")) {
-                int index = name.charAt(name.length() - 1) - '1';
-                if (index >= 0 && index < found.length) {
-                    found[index] = new int[] {px, py};
-                }
-            }
+            markers.put(name, new int[] {Math.round(x), Math.round(y)});
         }
-        for (int i = 0; i < found.length; i++) {
-            if (found[i] != null) {
-                villagerAt[i] = found[i];
-            }
-        }
+        int[] gate = markers.getOrDefault("gate", new int[] {-1000, -1000});
+        int[] door = markers.getOrDefault("door", new int[] {-1000, -1000});
+        int[] entry = markers.getOrDefault("entry", door);
+        gateX = gate[0];
+        gateY = gate[1];
+        doorX = door[0];
+        doorY = door[1];
+        entryX = entry[0];
+        entryY = entry[1];
     }
 
     // ---- simulation --------------------------------------------------------
@@ -379,6 +446,8 @@ public class HubScreen extends SimScreen {
         if (input().justPressed(GameAction.INTERACT)) {
             if (nearVillager != null) {
                 talk(nearVillager);
+            } else if (nearWorker != null) {
+                talkTo(nearWorker);
             } else if (nearGate) {
                 openMap();
             } else if (nearDoor) {
@@ -389,21 +458,31 @@ public class HubScreen extends SimScreen {
         }
     }
 
+    /** The nearest person in range, or else the torii, or else the door. */
     private void findInteraction() {
         float px = world.playerX();
         float py = world.playerY();
         nearVillager = null;
-        float best = TALK_RANGE;
+        nearWorker = null;
+        float best = Float.MAX_VALUE;
         for (Villager v : villagers) {
             float d = dist(px, py, v.x, v.y + 8);
-            if (d < best) {
+            if (d < TALK_RANGE && d < best) {
                 best = d;
                 nearVillager = v;
             }
         }
-        nearGate = nearVillager == null && dist(px, py, gateX, gateY) < GATE_RANGE;
-        nearDoor = nearVillager == null && !nearGate
-            && dist(px, py, doorX, doorY) < DOOR_RANGE;
+        for (IslandProps.Prop w : workers) {
+            float d = dist(px, py, w.centreX(), w.foot + 8);
+            if (d < WORK_RANGE && d < best) {
+                best = d;
+                nearWorker = w;
+                nearVillager = null;
+            }
+        }
+        boolean someone = nearVillager != null || nearWorker != null;
+        nearGate = !someone && dist(px, py, gateX, gateY) < GATE_RANGE;
+        nearDoor = !someone && !nearGate && dist(px, py, doorX, doorY) < DOOR_RANGE;
     }
 
     private void talk(Villager v) {
@@ -418,6 +497,29 @@ public class HubScreen extends SimScreen {
         dialog.show(t.get(prefix + "name"), v.face, first,
                     t.get(prefix + (broke ? "broke" : "2")));
         game.audio().playSfx(Assets.SFX_ACCEPT);
+    }
+
+    /** A region's worker, who has a name, two lines, and their own face. */
+    private void talkTo(IslandProps.Prop worker) {
+        I18n t = game.i18n();
+        String prefix = "npc.worker_" + worker.properties.get("role") + ".";
+        openShopAfterTalk = false;
+        dialog.show(t.get(prefix + "name"), portrait(worker), t.get(prefix + "1"),
+                    t.get(prefix + "2"));
+        game.audio().playSfx(Assets.SFX_ACCEPT);
+    }
+
+    /**
+     * A worker's face for the dialog box, cut from their own first frame.
+     *
+     * <p>The pack's people have no portraits. Their frames are 96x64 with the
+     * figure standing in the middle, head about a third of the way down, so a
+     * 20px square there is head and shoulders.
+     */
+    private static TextureRegion portrait(IslandProps.Prop worker) {
+        TextureRegion frame = worker.frame(0f);
+        int x = frame.getRegionWidth() / 2 - 10;
+        return new TextureRegion(frame, Math.max(0, x), 16, 20, 20);
     }
 
     /**
@@ -482,30 +584,37 @@ public class HubScreen extends SimScreen {
         camera.follow(world.playerX(), world.playerY(), mapW, mapH);
         camera.apply();
         SpriteBatch batch = game.batch();
+        OrthographicCamera cam = camera.camera();
+        float seconds = steps() * Cfg.STEP;
+        float halfW = cam.viewportWidth * cam.zoom / 2f;
+        float halfH = cam.viewportHeight * cam.zoom / 2f;
+        float left = cam.position.x - halfW;
+        float right = cam.position.x + halfW;
+        float bottom = cam.position.y - halfH;
+        float top = cam.position.y + halfH;
 
         batch.setColor(Color.WHITE);
-        renderer.setView(camera.camera());
-        renderer.render(below);
-
-        batch.setProjectionMatrix(camera.camera().combined);
-        batch.begin();
-        // Villagers further up the screen are behind the player, the rest in
-        // front. The world draws the player in one call, so this split is the
-        // whole of the depth sort.
-        float py = world.playerY();
-        for (Villager v : villagers) {
-            if (v.y > py) {
-                v.draw(batch, steps());
+        for (Pass pass : passes) {
+            if (pass.tiles != null) {
+                renderer.setView(cam);
+                renderer.render(pass.tiles);
+                continue;
             }
-        }
-        world.renderActors(batch);
-        for (Villager v : villagers) {
-            if (v.y <= py) {
-                v.draw(batch, steps());
+            batch.setProjectionMatrix(cam.combined);
+            batch.begin();
+            if (pass.clouds != null) {
+                pass.clouds.draw(batch, cam, world.playerX(), world.playerY());
+            } else if (pass.sorted) {
+                drawSorted(batch, pass.sprites, seconds, left, bottom, right, top);
+            } else {
+                for (IslandProps.Prop p : pass.sprites) {
+                    if (p.touches(left, bottom, right, top)) {
+                        p.draw(batch, seconds);
+                    }
+                }
             }
+            batch.end();
         }
-        batch.end();
-        renderer.render(above);
 
         ui.snapTo(Cfg.VIRT_W / 2f, Cfg.VIRT_H / 2f);
         ui.apply();
@@ -513,6 +622,47 @@ public class HubScreen extends SimScreen {
         batch.begin();
         drawOverlay(batch);
         batch.end();
+    }
+
+    /**
+     * The sprites a player walks among, with the player and the villagers
+     * slotted in by where they stand.
+     *
+     * <p>The map lists these sprites already sorted, back to front, except
+     * where two overlap and the scene's own order has to win. So the pass is a
+     * merge, not a sort: before each sprite, everyone standing further back
+     * than it is drawn first.
+     */
+    private void drawSorted(SpriteBatch batch, Array<IslandProps.Prop> sprites, float seconds,
+                            float left, float bottom, float right, float top) {
+        nextVillager = 0;
+        actorsDrawn = false;
+        playerFoot = world.playerY() - Player.BODY / 2f;
+        for (IslandProps.Prop p : sprites) {
+            drawStandingBehind(batch, p.foot);
+            if (p.touches(left, bottom, right, top)) {
+                p.draw(batch, seconds);
+            }
+        }
+        drawStandingBehind(batch, -Float.MAX_VALUE);
+    }
+
+    /** Everyone not yet drawn who stands further back than {@code foot}, back first. */
+    private void drawStandingBehind(SpriteBatch batch, float foot) {
+        while (true) {
+            float villager = nextVillager < byFoot.size ? byFoot.get(nextVillager).y : -Float.MAX_VALUE;
+            float actors = actorsDrawn ? -Float.MAX_VALUE : playerFoot;
+            float furthest = Math.max(villager, actors);
+            if (furthest == -Float.MAX_VALUE || furthest <= foot) {
+                return;
+            }
+            if (actors >= villager) {
+                world.renderActors(batch);
+                actorsDrawn = true;
+            } else {
+                byFoot.get(nextVillager++).draw(batch, steps());
+            }
+        }
     }
 
     private void drawOverlay(SpriteBatch batch) {
@@ -533,7 +683,7 @@ public class HubScreen extends SimScreen {
             dialog.draw(batch);
             return;
         }
-        String key = nearVillager != null ? "prompt.talk"
+        String key = nearVillager != null || nearWorker != null ? "prompt.talk"
             : nearGate ? "prompt.descend"
             : nearDoor ? "prompt.enter_home"
             : world.promptKey();
@@ -587,6 +737,21 @@ public class HubScreen extends SimScreen {
         }
     }
 
+    /** One draw step: a run of tile layers, a layer of sprites, or a layer of cloud. */
+    private static final class Pass {
+        final int[] tiles;
+        final Array<IslandProps.Prop> sprites;
+        final boolean sorted;
+        final CloudLayer clouds;
+
+        Pass(int[] tiles, Array<IslandProps.Prop> sprites, boolean sorted, CloudLayer clouds) {
+            this.tiles = tiles;
+            this.sprites = sprites;
+            this.sorted = sorted;
+            this.clouds = clouds;
+        }
+    }
+
     /** A villager: where they stand, which way they look, what they look like. */
     private static final class Villager {
         final String id;
@@ -615,7 +780,7 @@ public class HubScreen extends SimScreen {
             }
         }
 
-        /** Feet at (x, y), which is also the tile the villager blocks. */
+        /** Feet at (x, y). */
         void draw(SpriteBatch batch, int steps) {
             TextureRegion frame = idle.frame(facing, steps);
             batch.draw(frame, x - frame.getRegionWidth() / 2, y);

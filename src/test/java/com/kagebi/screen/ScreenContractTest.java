@@ -168,6 +168,14 @@ class ScreenContractTest {
             keys.add("npc." + id + ".2");
         }
         keys.add("npc." + Assets.Npc.HERBALIST + ".broke");
+        for (String region : HubScreen.REGIONS) {
+            // Built from the role on the map's sprite, so a region added in
+            // make_island.py without its lines would be a dialog of raw keys.
+            keys.add("npc.worker_" + region + ".name");
+            keys.add("npc.worker_" + region + ".1");
+            keys.add("npc.worker_" + region + ".2");
+        }
+        keys.add("prompt.enter_home");
         for (String id : CharacterSelectScreen.FALLBACK_WEAPONS) {
             keys.add("select.weapon." + id);
         }

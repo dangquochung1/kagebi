@@ -274,7 +274,7 @@ public class WorldMapScreen extends SimScreen {
                 panelOpen = false;
                 game.audio().playSfx(Assets.SFX_CANCEL);
             } else {
-                stack().set(new HubScreen(game));
+                stack().set(new HubScreen(game).arriveAt("gate"));
             }
             return;
         }

@@ -84,7 +84,7 @@ abstract class RunEndScreen extends SimScreen {
      */
     protected void addButtons(MenuColumn menu, I18n t) {
         menu.add(t.get("end.to_map"), () -> stack().set(new WorldMapScreen(game)));
-        menu.add(t.get("end.to_village"), () -> stack().set(new HubScreen(game)));
+        menu.add(t.get("end.to_village"), () -> stack().set(new HubScreen(game).arriveAt("gate")));
     }
 
     @Override

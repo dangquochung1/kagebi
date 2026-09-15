@@ -429,7 +429,7 @@ public class DungeonScreen extends SimScreen {
         }
         if (failure != null) {
             if (input().justPressed(GameAction.INTERACT) || input().justPressed(GameAction.PAUSE)) {
-                stack().set(new HubScreen(game));
+                stack().set(new HubScreen(game).arriveAt("gate"));
             }
             return;
         }

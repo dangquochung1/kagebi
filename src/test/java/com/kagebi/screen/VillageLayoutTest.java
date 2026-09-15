@@ -8,7 +8,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -21,34 +20,33 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
+import com.badlogic.gdx.files.FileHandle;
+import com.badlogic.gdx.utils.XmlReader;
 import com.kagebi.assets.Assets;
 import com.kagebi.entity.Player;
 import com.kagebi.entity.Projectile;
 import com.kagebi.gen.CollisionGrid;
 import com.kagebi.gen.TiledRooms;
 import com.kagebi.integration.RoomCollision;
+import com.kagebi.screen.island.IslandProps;
 
 /**
  * What {@code village.tmx} and {@code home.tmx} promise the screens that read
  * them, and the player who walks them.
  *
- * <p>Parsed as text rather than through libGDX, which would want a GL context
- * for eleven tileset images. What cannot be checked here is what the place
- * looks like, which is what {@code --screen hub} and {@code --screen home} are
- * for; what can be checked is the half of a map that never draws - its layer
- * names, its markers and what blocks - and that half fails silently every time.
+ * <p>Read as text and XML rather than through libGDX, which would want a GL
+ * context for a hundred tileset images. What cannot be checked here is what
+ * the island looks like, which is what {@code --screen hub --page} is for; what
+ * can be checked is the half of a map that never draws - its layer names, its
+ * markers, who stands where and what blocks - and that half fails silently.
  *
  * <p>The walking tests move a body the size of the player's over the collision
  * grid the game builds, two pixels at a time. Each of them is somewhere a
- * player once could not get to.
+ * player needs to get to.
  */
 class VillageLayoutTest {
 
     private static final Pattern LAYER = Pattern.compile("<layer[^>]*name=\"([^\"]+)\"");
-    private static final Pattern OBJECT = Pattern.compile(
-        "<object[^>]*name=\"([^\"]*)\"[^>]*x=\"([0-9.-]+)\"[^>]*y=\"([0-9.-]+)\"");
-    private static final Pattern SIZE = Pattern.compile(
-        "<map[^>]*\\bwidth=\"(\\d+)\"\\s+height=\"(\\d+)\"");
     private static final Pattern COLLISION_LAYER = Pattern.compile(
         "<objectgroup[^>]*name=\"" + TiledRooms.COLLISION + "\"[^>]*>(.*?)</objectgroup>",
         Pattern.DOTALL);
@@ -61,6 +59,10 @@ class VillageLayoutTest {
         return new String(Files.readAllBytes(new File(path).toPath()), StandardCharsets.UTF_8);
     }
 
+    private static XmlReader.Element xml(String path) {
+        return new XmlReader().parse(new FileHandle(new File(path)));
+    }
+
     private static List<String> layers(String tmx) {
         List<String> names = new ArrayList<>();
         Matcher m = LAYER.matcher(tmx);
@@ -71,14 +73,11 @@ class VillageLayoutTest {
     }
 
     /**
-     * Every layer plays one of the six roles the renderer knows about.
+     * Every tile layer plays one of the roles the renderer knows about.
      *
-     * <p>The village is assembled from an art pack whose scene is twenty-two
-     * layers with its own names - {@code Grass_details3}, {@code House_roof} -
-     * and {@code tools/make_village.py} renames them all. One that slipped
-     * through would be loaded, held in memory, and never drawn: the map would
-     * simply be missing its roof, or its birds, with nothing anywhere to say
-     * so. This is the only thing that would notice.
+     * <p>One that slipped through would be loaded, held in memory, and never
+     * drawn - the island would simply be missing its roofs, with nothing
+     * anywhere to say so. This is the only thing that would notice.
      */
     @Test
     void everyLayerInBothMapsPlaysARoleTheRendererDraws() throws IOException {
@@ -103,9 +102,8 @@ class VillageLayoutTest {
     /**
      * Both maps say what blocks, in the one layer that can say it to the pixel.
      *
-     * <p>An empty or missing one is a real possible outcome of the generator's
-     * rules going wrong, and the symptom is a player who walks through the
-     * furniture and out through the side of the house.
+     * <p>An empty or missing one is a real possible outcome of a generator's
+     * rules going wrong, and the symptom is a player who walks on the sea.
      */
     @Test
     void bothMapsCarryACollisionLayer() throws IOException {
@@ -118,27 +116,20 @@ class VillageLayoutTest {
     }
 
     /**
-     * The pack's art blocks by its pixels and never by whole tiles. Blocking
-     * whole tiles is how two tiles with nothing drawn on them became a wall
-     * across the front of the house, and how a gate drawn as two thin posts
-     * became a fence with no gap. The villagers' houses are the exception:
-     * they come from the old tileset and are solid rectangles anyway.
+     * Neither map blocks by whole tiles. Both packs draw walls, posts and
+     * fences thinner than a tile, and blocking whole tiles is how two tiles
+     * with nothing drawn on them once became a wall across the front of a house.
      */
     @Test
-    void onlyTheOldHousesBlockByWholeTiles() throws IOException {
-        List<String> village = new ArrayList<>();
-        for (String name : layers(read(Assets.MAP_VILLAGE))) {
-            if (TiledRooms.blocks(name)) {
-                village.add(name);
+    void neitherMapBlocksByWholeTiles() throws IOException {
+        for (String path : new String[] {Assets.MAP_VILLAGE, Assets.MAP_HOME}) {
+            for (String name : layers(read(path))) {
+                assertFalse(TiledRooms.blocks(name), path + " blocks by whole tiles in " + name);
             }
-        }
-        assertEquals(List.of("props_village"), village);
-        for (String name : layers(read(Assets.MAP_HOME))) {
-            assertFalse(TiledRooms.blocks(name), "home.tmx blocks by whole tiles in " + name);
         }
     }
 
-    /** The layer a person's hand-drawn decoration survives in. */
+    /** The layer a person's hand-drawn decoration survives a regeneration in. */
     @Test
     void bothMapsKeepADecorLayerForHandEditing() throws IOException {
         for (String path : new String[] {Assets.MAP_VILLAGE, Assets.MAP_HOME}) {
@@ -151,30 +142,31 @@ class VillageLayoutTest {
      * The village names every marker {@link HubScreen} looks for, exactly once,
      * and each is on the map.
      *
-     * <p>A missing one is not a crash - the screen falls back to a constant -
-     * so nothing else would ever report it, and the village would quietly stop
-     * being the thing that decides where its own people stand.
+     * <p>A missing one is not a crash - the screen leaves the villager out, or
+     * the door shut - so nothing else would ever report it.
      */
     @Test
-    void theVillageNamesEveryMarkerTheHubLooksFor() throws IOException {
-        String tmx = read(Assets.MAP_VILLAGE);
-        Matcher size = SIZE.matcher(tmx);
-        assertTrue(size.find(), "village.tmx has no map size");
-        int width = Integer.parseInt(size.group(1)) * 16;
-        int height = Integer.parseInt(size.group(2)) * 16;
+    void theVillageNamesEveryMarkerTheHubLooksFor() {
+        XmlReader.Element map = xml(Assets.MAP_VILLAGE);
+        float width = map.getIntAttribute("width") * CollisionGrid.TILE;
+        float height = map.getIntAttribute("height") * CollisionGrid.TILE;
 
-        Set<String> wanted = new HashSet<>(Arrays.asList(
-            "entry", "gate", "door", "gateway", "villager1", "villager2", "villager3"));
+        Set<String> wanted = new HashSet<>(Arrays.asList("entry", "gate", "door", "shop"));
+        for (String[] villager : HubScreen.VILLAGERS) {
+            wanted.add(villager[0]);
+        }
+        for (String region : HubScreen.REGIONS) {
+            wanted.add("stand_" + region);
+        }
         Set<String> seen = new HashSet<>();
-        Matcher m = OBJECT.matcher(tmx);
-        while (m.find()) {
-            String name = m.group(1);
+        for (XmlReader.Element o : objects(map, HubScreen.SPAWNS)) {
+            String name = o.getAttribute("name", "");
             if (!wanted.contains(name)) {
                 continue;
             }
             assertTrue(seen.add(name), name + " is named twice");
-            float x = Float.parseFloat(m.group(2));
-            float y = Float.parseFloat(m.group(3));
+            float x = o.getFloatAttribute("x");
+            float y = o.getFloatAttribute("y");
             assertTrue(x >= 0 && x <= width, name + " x is " + x + ", off a " + width + " map");
             assertTrue(y >= 0 && y <= height, name + " y is " + y + ", off a " + height + " map");
         }
@@ -182,10 +174,52 @@ class VillageLayoutTest {
         assertTrue(wanted.isEmpty(), "village.tmx never names " + wanted);
     }
 
+    /** Each region has exactly one person the player deals with. */
+    @Test
+    void everyRegionHasOneWorker() {
+        Map<String, Integer> count = new HashMap<>();
+        XmlReader.Element map = xml(Assets.MAP_VILLAGE);
+        for (XmlReader.Element group : map.getChildrenByName("objectgroup")) {
+            for (XmlReader.Element o : group.getChildrenByName("object")) {
+                String role = property(o, "role");
+                if (role != null) {
+                    count.merge(role, 1, Integer::sum);
+                }
+            }
+        }
+        for (String region : HubScreen.REGIONS) {
+            assertEquals(Integer.valueOf(1), count.get(region),
+                "the " + region + " region should have exactly one worker");
+        }
+        assertEquals(HubScreen.REGIONS.length, count.size(), "workers with no region: " + count);
+    }
+
+    /**
+     * Every sprite on the island is in one of the four layers the hub draws
+     * sprites from. A tile object in any other layer loads, and never appears.
+     */
+    @Test
+    void everySpriteIsInALayerTheHubDraws() {
+        IslandProps names = new IslandProps();
+        XmlReader.Element map = xml(Assets.MAP_VILLAGE);
+        int sprites = 0;
+        for (XmlReader.Element group : map.getChildrenByName("objectgroup")) {
+            String name = group.getAttribute("name", "");
+            for (XmlReader.Element o : group.getChildrenByName("object")) {
+                if (o.getAttribute("gid", null) != null) {
+                    assertTrue(names.layer(name) != null,
+                        "a sprite is in object layer '" + name + "', which nothing draws");
+                    sprites++;
+                }
+            }
+        }
+        assertTrue(sprites > 400, "the island has only " + sprites + " sprites on it");
+    }
+
     /** The home names the markers it needs: the way in and out, and the rug. */
     @Test
-    void theHomeNamesItsDoorAndItsRug() throws IOException {
-        Set<String> seen = markers(read(Assets.MAP_HOME)).keySet();
+    void theHomeNamesItsDoorAndItsRug() {
+        Set<String> seen = markers(Assets.MAP_HOME).keySet();
         assertTrue(seen.contains("door"), "home.tmx has no door, so it cannot be left");
         assertTrue(seen.contains("entry"), "home.tmx has no entry, so it cannot be arrived in");
         assertTrue(seen.contains("rug"), "home.tmx has no rug, so --screen home --page 2 has nowhere to stand");
@@ -194,11 +228,9 @@ class VillageLayoutTest {
     /**
      * Neither map is infinite.
      *
-     * <p>The art pack ships both scenes as infinite maps, which libGDX cannot
-     * read: {@code BaseTmxMapLoader} has no notion of a {@code <chunk>}, so it
-     * parses the file, finds no tile data, and draws nothing at all. That is
-     * the failure this whole conversion exists to avoid, and it is one
-     * attribute away at any time.
+     * <p>Both art packs ship their scenes as infinite maps or rooms, which libGDX
+     * cannot read: {@code BaseTmxMapLoader} has no notion of a {@code <chunk>},
+     * so it parses the file, finds no tile data, and draws nothing at all.
      */
     @Test
     void neitherMapIsInfinite() throws IOException {
@@ -210,7 +242,7 @@ class VillageLayoutTest {
         }
     }
 
-    /** A role spans a family of layers now, but only across an underscore. */
+    /** A role spans a family of layers, but only across an underscore. */
     @Test
     void aRoleClaimsItsOwnNameAndItsUnderscoredFamily() {
         assertTrue(TiledRooms.plays("props", "props"));
@@ -221,46 +253,72 @@ class VillageLayoutTest {
         assertEquals(false, TiledRooms.plays(null, "props"));
     }
 
-    // ---- walking the village -------------------------------------------------
+    // ---- walking the island ----------------------------------------------------
 
     /**
-     * Out of the front door, through the gap in the garden fence, and down to
-     * the torii. The gap is drawn as two posts, and while each post blocked its
-     * whole tile there was no gap at all.
+     * From the front door to everything the village is for: back down through
+     * the torii, into the shop, and to every villager and every region's worker.
+     * The island was a picture before it was a map, and nothing in the picture
+     * had to be walked to.
      */
     @Test
-    void aNinjaWalksFromTheFrontDoorOutThroughTheGardenGateToTheTorii() throws IOException {
-        Map<String, float[]> at = markers(read(Assets.MAP_VILLAGE));
-        Set<Long> reach = walk(villageGrid(at), at.get("entry"));
-        assertTrue(reaches(reach, at.get("gateway"), 3), "the garden gateway, the only way out");
-        assertTrue(reaches(reach, at.get("gate"), HubScreen.GATE_RANGE), "the torii");
-    }
-
-    @Test
-    void everyoneInTheVillageCanBeWalkedUpTo() throws IOException {
-        Map<String, float[]> at = markers(read(Assets.MAP_VILLAGE));
-        Set<Long> reach = walk(villageGrid(at), at.get("entry"));
-        assertTrue(reaches(reach, at.get("door"), HubScreen.DOOR_RANGE), "the front door");
-        for (int i = 1; i <= 3; i++) {
-            float[] feet = at.get("villager" + i);
+    void fromTheFrontDoorEveryoneAndEverythingCanBeReached() {
+        Map<String, float[]> at = markers(Assets.MAP_VILLAGE);
+        Reach reach = walk(villageGrid(at), at.get("entry"));
+        assertTrue(reach.near(at.get("door"), HubScreen.DOOR_RANGE), "the front door");
+        assertTrue(reach.near(at.get("gate"), HubScreen.GATE_RANGE), "the torii");
+        assertTrue(reach.near(at.get("shop"), HubScreen.DOOR_RANGE), "the shop");
+        for (String[] villager : HubScreen.VILLAGERS) {
+            float[] feet = at.get(villager[0]);
             // HubScreen measures the distance to a point just above the feet.
-            float[] talk = {feet[0], feet[1] + 8};
-            assertTrue(reaches(reach, talk, HubScreen.TALK_RANGE), "villager " + i);
+            assertTrue(reach.near(new float[] {feet[0], feet[1] + 8}, HubScreen.TALK_RANGE),
+                villager[1]);
+        }
+        Map<String, float[]> workers = workers(Assets.MAP_VILLAGE);
+        for (String region : HubScreen.REGIONS) {
+            float[] feet = workers.get(region);
+            assertTrue(reach.near(new float[] {feet[0], feet[1] + 8}, HubScreen.WORK_RANGE),
+                "the " + region + " worker");
+            assertTrue(reach.near(at.get("stand_" + region), 3),
+                "where --screen hub puts a player in front of the " + region + " worker");
         }
     }
 
     /**
-     * The front of the house, left of the door. Two tiles there had nothing
-     * drawn on them and blocked anyway, so a player could not walk that way and
-     * a kunai thrown that way vanished a step from their hand.
+     * Every place a player is put down in the village has its prompt up on
+     * arrival: the front door from the step outside it, the torii, Bà lang from
+     * the shop, and each region's worker from in front of them.
+     *
+     * <p>Being in range of something and being offered it are not the same:
+     * the hub offers the nearest person in range before the torii or the door,
+     * and a shop marker a pixel too far from the herbalist is a shop with no
+     * way to open it that {@code --screen hub --page 3} shows as a quiet street.
      */
     @Test
-    void theHouseFrontIsOpenLeftOfTheDoorToAPlayerAndToAKunai() throws IOException {
-        Map<String, float[]> at = markers(read(Assets.MAP_VILLAGE));
+    void everyArrivalPointHasItsPromptUp() {
+        Map<String, float[]> at = markers(Assets.MAP_VILLAGE);
+        Map<String, float[]> workers = workers(Assets.MAP_VILLAGE);
+        assertEquals("door", offered(at, workers, at.get("entry")), "arriving at the front door");
+        assertEquals("gate", offered(at, workers, at.get("gate")), "arriving at the torii");
+        assertEquals(Assets.Npc.HERBALIST, offered(at, workers, at.get("shop")), "arriving at the shop");
+        for (String region : HubScreen.REGIONS) {
+            assertEquals("worker_" + region, offered(at, workers, at.get("stand_" + region)),
+                "arriving in front of the " + region + " worker");
+        }
+    }
+
+    /**
+     * The front of the house, left of the door, is open to a player and to a
+     * kunai: two tiles once blocked there with nothing drawn on them, and a
+     * kunai thrown that way vanished a step from the player's hand.
+     */
+    @Test
+    void theHouseFrontIsOpenLeftOfTheDoorToAPlayerAndToAKunai() {
+        Map<String, float[]> at = markers(Assets.MAP_VILLAGE);
         CollisionGrid grid = villageGrid(at);
         float[] door = at.get("door");
         float[] left = {door[0] - 3 * CollisionGrid.TILE, door[1]};
-        assertTrue(reaches(walk(grid, at.get("entry")), left, 3), "walking left along the front");
+        assertTrue(walk(grid, at.get("entry")).near(left, 3), "walking left along the front");
 
         float half = Projectile.BODY / 2f;
         for (float x = door[0]; x >= left[0]; x -= 1f) {
@@ -279,11 +337,11 @@ class VillageLayoutTest {
      * corner by the red rug could not be walked into at all.
      */
     @Test
-    void theHouseIsWalkedFromTheDoorOntoTheRugAndAcrossTheHall() throws IOException {
-        Map<String, float[]> at = markers(read(Assets.MAP_HOME));
-        Set<Long> reach = walk(RoomCollision.of(Assets.MAP_HOME), at.get("door"));
-        assertTrue(reaches(reach, at.get("rug"), 3), "the rug beside the table");
-        double floor = floorTiles(reach);
+    void theHouseIsWalkedFromTheDoorOntoTheRugAndAcrossTheHall() {
+        Map<String, float[]> at = markers(Assets.MAP_HOME);
+        Reach reach = walk(RoomCollision.of(Assets.MAP_HOME), at.get("door"));
+        assertTrue(reach.near(at.get("rug"), 3), "the rug beside the table");
+        double floor = reach.floorTiles();
         assertTrue(floor >= 40, "only " + floor + " tiles of the house can be walked on");
     }
 
@@ -311,52 +369,151 @@ class VillageLayoutTest {
 
     // ---- helpers -------------------------------------------------------------
 
+    private static List<XmlReader.Element> objects(XmlReader.Element map, String group) {
+        List<XmlReader.Element> found = new ArrayList<>();
+        for (XmlReader.Element g : map.getChildrenByName("objectgroup")) {
+            if (group.equals(g.getAttribute("name", ""))) {
+                for (XmlReader.Element o : g.getChildrenByName("object")) {
+                    found.add(o);
+                }
+            }
+        }
+        return found;
+    }
+
+    private static String property(XmlReader.Element object, String name) {
+        XmlReader.Element list = object.getChildByName("properties");
+        if (list == null) {
+            return null;
+        }
+        for (XmlReader.Element p : list.getChildrenByName("property")) {
+            if (name.equals(p.getAttribute("name", ""))) {
+                return p.getAttribute("value", "");
+            }
+        }
+        return null;
+    }
+
+    /**
+     * What {@code HubScreen.findInteraction} offers a player standing here: the
+     * nearest villager or worker in range, else the torii, else the door, else
+     * nothing.
+     */
+    private static String offered(Map<String, float[]> at, Map<String, float[]> workers,
+                                  float[] player) {
+        String best = null;
+        double nearest = Double.MAX_VALUE;
+        for (String[] villager : HubScreen.VILLAGERS) {
+            float[] feet = at.get(villager[0]);
+            double d = Math.hypot(player[0] - feet[0], player[1] - (feet[1] + 8));
+            if (d < HubScreen.TALK_RANGE && d < nearest) {
+                nearest = d;
+                best = villager[1];
+            }
+        }
+        for (Map.Entry<String, float[]> worker : workers.entrySet()) {
+            float[] feet = worker.getValue();
+            double d = Math.hypot(player[0] - feet[0], player[1] - (feet[1] + 8));
+            if (d < HubScreen.WORK_RANGE && d < nearest) {
+                nearest = d;
+                best = "worker_" + worker.getKey();
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        float[] gate = at.get("gate");
+        if (Math.hypot(player[0] - gate[0], player[1] - gate[1]) < HubScreen.GATE_RANGE) {
+            return "gate";
+        }
+        float[] door = at.get("door");
+        if (Math.hypot(player[0] - door[0], player[1] - door[1]) < HubScreen.DOOR_RANGE) {
+            return "door";
+        }
+        return null;
+    }
+
     /** Named markers, turned y-up the way libGDX turns them for the screens. */
-    private static Map<String, float[]> markers(String tmx) {
-        Matcher size = SIZE.matcher(tmx);
-        assertTrue(size.find(), "no map size");
-        float height = Integer.parseInt(size.group(2)) * CollisionGrid.TILE;
+    private static Map<String, float[]> markers(String path) {
+        XmlReader.Element map = xml(path);
+        float height = map.getIntAttribute("height") * CollisionGrid.TILE;
         Map<String, float[]> at = new HashMap<>();
-        Matcher m = OBJECT.matcher(tmx);
-        while (m.find()) {
-            at.put(m.group(1), new float[] {
-                Float.parseFloat(m.group(2)), height - Float.parseFloat(m.group(3))});
+        for (XmlReader.Element o : objects(map, HubScreen.SPAWNS)) {
+            at.put(o.getAttribute("name", ""),
+                   new float[] {o.getFloatAttribute("x"), height - o.getFloatAttribute("y")});
         }
         return at;
     }
 
-    /** The village's grid as HubScreen builds it: the map, and a villager on each of their tiles. */
+    /**
+     * Where each region's worker stands, y-up, as {@link IslandProps} reads it:
+     * the middle of their picture across, and their {@code foot} above its
+     * bottom edge.
+     */
+    private static Map<String, float[]> workers(String path) {
+        XmlReader.Element map = xml(path);
+        float height = map.getIntAttribute("height") * CollisionGrid.TILE;
+        Map<String, float[]> at = new HashMap<>();
+        for (XmlReader.Element group : map.getChildrenByName("objectgroup")) {
+            for (XmlReader.Element o : group.getChildrenByName("object")) {
+                String role = property(o, "role");
+                if (role == null) {
+                    continue;
+                }
+                String foot = property(o, "foot");
+                float x = o.getFloatAttribute("x") + o.getFloatAttribute("width") / 2f;
+                float y = height - o.getFloatAttribute("y") + (foot == null ? 0f : Float.parseFloat(foot));
+                at.put(role, new float[] {x, y});
+            }
+        }
+        return at;
+    }
+
+    /** The village's grid as HubScreen builds it: the map, and each villager's feet. */
     private static CollisionGrid villageGrid(Map<String, float[]> at) {
         CollisionGrid grid = RoomCollision.of(Assets.MAP_VILLAGE);
-        for (int i = 1; i <= 3; i++) {
-            float[] feet = at.get("villager" + i);
-            grid.set(Math.round(feet[0]) / CollisionGrid.TILE,
-                     Math.round(feet[1]) / CollisionGrid.TILE, true);
+        for (String[] villager : HubScreen.VILLAGERS) {
+            float[] feet = at.get(villager[0]);
+            if (feet != null) {
+                grid.fill(Math.round(feet[0]) - 5f, Math.round(feet[1]), 10f, 6f);
+            }
         }
         return grid;
     }
 
     /** Every point a player's body can walk to from a start, STEP pixels apart, y-up. */
-    private static Set<Long> walk(CollisionGrid grid, float[] start) {
-        int sx = Math.round(start[0]);
-        int sy = Math.round(start[1]);
-        assertTrue(fits(grid, sx, sy), "a player does not fit where they start, " + sx + "," + sy);
-        Set<Long> seen = new HashSet<>();
-        ArrayDeque<int[]> queue = new ArrayDeque<>();
-        seen.add(key(sx, sy));
-        queue.add(new int[] {sx, sy});
-        int[][] moves = {{STEP, 0}, {-STEP, 0}, {0, STEP}, {0, -STEP}};
-        while (!queue.isEmpty()) {
-            int[] p = queue.poll();
+    private static Reach walk(CollisionGrid grid, float[] start) {
+        int width = grid.width() * CollisionGrid.TILE / STEP + 1;
+        int height = grid.height() * CollisionGrid.TILE / STEP + 1;
+        int sx = Math.round(start[0] / STEP);
+        int sy = Math.round(start[1] / STEP);
+        assertTrue(fits(grid, sx * STEP, sy * STEP),
+            "a player does not fit where they start, " + sx * STEP + "," + sy * STEP);
+        boolean[] seen = new boolean[width * height];
+        int[] queue = new int[width * height];
+        int head = 0;
+        int tail = 0;
+        seen[sy * width + sx] = true;
+        queue[tail++] = sy * width + sx;
+        int[][] moves = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        while (head < tail) {
+            int i = queue[head++];
+            int x = i % width;
+            int y = i / width;
             for (int[] move : moves) {
-                int x = p[0] + move[0];
-                int y = p[1] + move[1];
-                if (fits(grid, x, y) && seen.add(key(x, y))) {
-                    queue.add(new int[] {x, y});
+                int nx = x + move[0];
+                int ny = y + move[1];
+                if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
+                    continue;
+                }
+                int n = ny * width + nx;
+                if (!seen[n] && fits(grid, nx * STEP, ny * STEP)) {
+                    seen[n] = true;
+                    queue[tail++] = n;
                 }
             }
         }
-        return seen;
+        return new Reach(seen, width, height);
     }
 
     /** The test Entity.moveBy makes before letting a player take a step. */
@@ -364,36 +521,54 @@ class VillageLayoutTest {
         return !grid.overlaps(x - HALF, y - HALF, Player.BODY, Player.BODY);
     }
 
-    private static long key(int x, int y) {
-        return ((long) x << 32) | (y & 0xffffffffL);
-    }
+    /** The points a body walked to, on a lattice STEP pixels apart. */
+    private static final class Reach {
+        final boolean[] seen;
+        final int width;
+        final int height;
 
-    private static boolean reaches(Set<Long> reach, float[] target, float radius) {
-        for (long k : reach) {
-            float dx = (int) (k >> 32) - target[0];
-            float dy = (int) k - target[1];
-            if (dx * dx + dy * dy < radius * radius) {
-                return true;
-            }
+        Reach(boolean[] seen, int width, int height) {
+            this.seen = seen;
+            this.width = width;
+            this.height = height;
         }
-        return false;
-    }
 
-    /** Tiles of floor a body covers, standing at every one of these points. */
-    private static double floorTiles(Set<Long> reach) {
-        int cell = CollisionGrid.CELL;
-        int half = (int) HALF;
-        Set<Long> covered = new HashSet<>();
-        for (long k : reach) {
-            int x = (int) (k >> 32);
-            int y = (int) k;
-            for (int cy = Math.floorDiv(y - half, cell); cy <= Math.floorDiv(y + half - 1, cell); cy++) {
-                for (int cx = Math.floorDiv(x - half, cell); cx <= Math.floorDiv(x + half - 1, cell); cx++) {
-                    covered.add(key(cx, cy));
+        boolean near(float[] target, float radius) {
+            int x0 = Math.max(0, (int) Math.floor((target[0] - radius) / STEP));
+            int x1 = Math.min(width - 1, (int) Math.ceil((target[0] + radius) / STEP));
+            int y0 = Math.max(0, (int) Math.floor((target[1] - radius) / STEP));
+            int y1 = Math.min(height - 1, (int) Math.ceil((target[1] + radius) / STEP));
+            for (int y = y0; y <= y1; y++) {
+                for (int x = x0; x <= x1; x++) {
+                    float dx = x * STEP - target[0];
+                    float dy = y * STEP - target[1];
+                    if (seen[y * width + x] && dx * dx + dy * dy < radius * radius) {
+                        return true;
+                    }
                 }
             }
+            return false;
         }
-        int perTile = (CollisionGrid.TILE / cell) * (CollisionGrid.TILE / cell);
-        return covered.size() / (double) perTile;
+
+        /** Tiles of floor a body covers, standing at every point it reached. */
+        double floorTiles() {
+            int cell = CollisionGrid.CELL;
+            int half = (int) HALF;
+            Set<Long> covered = new HashSet<>();
+            for (int i = 0; i < seen.length; i++) {
+                if (!seen[i]) {
+                    continue;
+                }
+                int x = (i % width) * STEP;
+                int y = (i / width) * STEP;
+                for (int cy = Math.floorDiv(y - half, cell); cy <= Math.floorDiv(y + half - 1, cell); cy++) {
+                    for (int cx = Math.floorDiv(x - half, cell); cx <= Math.floorDiv(x + half - 1, cell); cx++) {
+                        covered.add(((long) cx << 32) | (cy & 0xffffffffL));
+                    }
+                }
+            }
+            int perTile = (CollisionGrid.TILE / cell) * (CollisionGrid.TILE / cell);
+            return covered.size() / (double) perTile;
+        }
     }
 }

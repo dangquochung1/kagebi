@@ -102,8 +102,7 @@ public final class Screens {
                 sampleRun(game, page);
                 return new GameScreen[] {new StageClearScreen(game)};
             case "hub":
-                return new GameScreen[] {
-                    page >= 2 ? new HubScreen(game).arriveAt("gateway") : new HubScreen(game)};
+                return new GameScreen[] {hubAt(game, page)};
             case "home":
                 return new GameScreen[] {new HubScreen(game),
                     page >= 2 ? new HomeScreen(game).arriveAt("rug") : new HomeScreen(game)};
@@ -231,6 +230,26 @@ public final class Screens {
         }
         p.clearedStages = Math.max(0, Math.min(5, stage - 1));
         p.deepestFloor = Math.max(p.deepestFloor, p.clearedStages);
+    }
+
+    /**
+     * The village with the player standing somewhere worth photographing:
+     * 1 the front door, 2 the torii, 3 the shop, and after that in front of
+     * each region's worker, in the order {@link HubScreen#REGIONS} lists them.
+     */
+    private static HubScreen hubAt(Kagebi game, int page) {
+        HubScreen hub = new HubScreen(game);
+        if (page == 2) {
+            return hub.arriveAt("gate");
+        }
+        if (page == 3) {
+            return hub.arriveAt("shop");
+        }
+        int region = page - 4;
+        if (region >= 0 && region < HubScreen.REGIONS.length) {
+            return hub.arriveAt("stand_" + HubScreen.REGIONS[region]);
+        }
+        return hub;
     }
 
     private static void sampleRun(Kagebi game, int deepest) {

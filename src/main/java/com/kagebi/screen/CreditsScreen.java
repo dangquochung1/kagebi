@@ -68,6 +68,10 @@ public class CreditsScreen extends SimScreen {
         {Style.BY, "credits.home.by"},
         {Style.FOR, "credits.home.for"},
         {Style.GAP, null},
+        {Style.NAME, "credits.sunnyside.name"},
+        {Style.BY, "credits.sunnyside.by"},
+        {Style.FOR, "credits.sunnyside.for"},
+        {Style.GAP, null},
 
         {Style.HEAD, "credits.audio"},
         {Style.NAME, "credits.ninja.name"},
@@ -99,7 +103,7 @@ public class CreditsScreen extends SimScreen {
     }
 
     /** The row each {@code --page} starts at, so any section can be screenshotted. */
-    private static final int[] SECTIONS = {0, 5, 22, 29};
+    private static final int[] SECTIONS = {0, 5, 22, 33};
 
     private static final Color HEAD = new Color(0xffad55ff);
     private static final Color NAME = new Color(0xffe6c4ff);
