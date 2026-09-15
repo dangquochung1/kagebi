@@ -50,3 +50,9 @@ review/
 # redistributed. tools/make_village.py reads it to rebuild the village, and
 # tools/build_assets.py copies its sheets into assets/gfx/tiles/home/.
 homeassets/
+
+# The Sunnyside World pack: the island village's source, kept out of git for the
+# same reason as homeassets/ - it shipped no licence file, so it must not be
+# redistributed. tools/make_island.py reads its GameMaker project to build
+# assets/maps/village.tmx and the images under assets/gfx/sunnyside/.
+miniworld/

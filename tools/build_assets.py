@@ -376,8 +376,30 @@ def enforce_tile_grid():
             stats["rerouted_to_props"] += 1
 
 
+def build_sunnyside():
+    """The island village's images, from the Sunnyside World pack.
+
+    The village map names these images by path and they are not in git, so a
+    clone needs them rebuilt. tools/make_island.py derives them from the pack's
+    GameMaker project as it builds the map; asked for images only, it writes
+    those and review/ and leaves assets/maps/village.tmx as it is.
+
+    After enforce_tile_grid, which would otherwise take every sprite strip
+    under gfx/ for a mis-sized tileset and move it into props/.
+    """
+    print("sunnyside world")
+    if not os.path.isdir(os.path.join(ROOT, "miniworld")):
+        print("  ! missing source: %s" % os.path.join(ROOT, "miniworld"))
+        stats["missing_sources"] += 1
+        return
+    if not DRY:
+        import make_island
+        make_island.main(["--assets"])
+
+
 STEPS = [build_player, build_actors, build_tiles, build_depth_actors,
-         build_ui_fx_items, build_audio, build_licenses, enforce_tile_grid]
+         build_ui_fx_items, build_audio, build_licenses, enforce_tile_grid,
+         build_sunnyside]
 
 
 def main():

@@ -28,6 +28,10 @@ import xml.etree.ElementTree as ET
 
 from PIL import Image, ImageDraw
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from sunnyside import draw_transformed  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TILE = 16
 
@@ -49,72 +53,128 @@ SPAWN_STYLE = {
 
 
 def load(tmx_path):
-    """The tile layers and objects of a map, resolved against its tilesets."""
+    """The layers and objects of a map, resolved against its tilesets.
+
+    Tile layers and object layers are drawn in the order the file lists them,
+    which is the order the game draws them in. The island village interleaves
+    the two - sprites under a roof, sprites on it - so a render that laid every
+    tile first and every sprite after would be a picture of a different map.
+    """
     root = ET.parse(tmx_path).getroot()
     tw, th = int(root.get("tilewidth")), int(root.get("tileheight"))
     mw, mh = int(root.get("width")), int(root.get("height"))
     base = os.path.dirname(os.path.abspath(tmx_path))
 
-    # firstgid -> (image, columns), so a gid can be resolved to a source rect.
+    # firstgid -> the sheet, its grid and which of its tiles animate. The grid
+    # is the tileset's own: a sprite strip's frames are not the map's 16px.
     sheets = []
     for ts in root.findall("tileset"):
         img = ts.find("image")
         path = os.path.normpath(os.path.join(base, img.get("source")))
+        animations = {}
+        for tile in ts.findall("tile"):
+            animation = tile.find("animation")
+            if animation is not None:
+                animations[int(tile.get("id"))] = [int(f.get("tileid"))
+                                                   for f in animation.findall("frame")]
         sheets.append((int(ts.get("firstgid")), Image.open(path).convert("RGBA"),
-                       int(ts.get("columns")), ts.get("name")))
-    sheets.sort()
+                       int(ts.get("columns")), int(ts.get("tilewidth", tw)),
+                       int(ts.get("tileheight", th)), animations))
+    sheets.sort(key=lambda s: s[0])
 
-    def lookup(gid):
-        for firstgid, image, columns, _ in reversed(sheets):
+    def lookup(gid, frame=None):
+        """One tile's picture; for an animated tile, `frame` picks the frame."""
+        for firstgid, image, columns, stw, sth, animations in reversed(sheets):
             if gid >= firstgid:
                 local = gid - firstgid
-                return image, (local % columns) * tw, (local // columns) * th
-        return None, 0, 0
+                if frame is not None and local in animations:
+                    local = animations[local][frame % len(animations[local])]
+                sx, sy = (local % columns) * stw, (local // columns) * sth
+                return image.crop((sx, sy, sx + stw, sy + sth))
+        return None
 
     out = Image.new("RGBA", (mw * tw, mh * th), (0, 0, 0, 255))
-    layers = root.findall("layer")
-    shapes = []
-    for layer in layers:
-        data = layer.find("data").text.replace("\n", "")
-        gids = [int(v) for v in data.split(",") if v.strip()]
-        name = layer.get("name", "")
-        blocking = any(name == role or name.startswith(role + "_")
-                       for role in ("walls", "props"))
-        for i, raw in enumerate(gids):
-            if raw == 0:
-                continue
-            if blocking:
-                shapes.append(((i % mw) * tw, (i // mw) * th, tw, th))
-            # Tiled keeps horizontal, vertical and diagonal flips in the top
-            # three bits. Without masking them off, lookup() is handed a gid of
-            # two billion and Pillow is asked to crop past the end of the
-            # world; half the village's bushes are mirrored, so this is not a
-            # rare case. The flips are then applied, or the render is a picture
-            # of a map nobody drew.
-            flags, gid = raw & FLIP_BITS, raw & ~FLIP_BITS
-            image, sx, sy = lookup(gid)
-            if image is None:
-                continue
-            tile = image.crop((sx, sy, sx + tw, sy + th))
-            if flags & FLIP_DIAGONAL:
-                tile = tile.transpose(Image.TRANSPOSE)
-            if flags & FLIP_HORIZONTAL:
-                tile = tile.transpose(Image.FLIP_LEFT_RIGHT)
-            if flags & FLIP_VERTICAL:
-                tile = tile.transpose(Image.FLIP_TOP_BOTTOM)
-            out.paste(tile, ((i % mw) * tw, (i // mw) * th), tile)
+    names, objects, shapes = [], [], []
+    for node in root:
+        if node.tag == "layer":
+            names.append(node.get("name"))
+            draw_layer(out, node, lookup, (tw, th), mw, shapes)
+        elif node.tag == "objectgroup":
+            for obj in node.findall("object"):
+                x, y = float(obj.get("x", 0)), float(obj.get("y", 0))
+                if node.get("name") == "collision":
+                    shapes.append((x, y, float(obj.get("width", 0)),
+                                   float(obj.get("height", 0))))
+                elif obj.get("gid"):
+                    draw_tile_object(out, obj, lookup)
+                else:
+                    objects.append((obj.get("type", ""), x, y, obj.get("name", "")))
+    return out, names, objects, shapes, (mw, mh)
 
-    objects = []
-    for group in root.findall("objectgroup"):
-        for obj in group.findall("object"):
-            if group.get("name") == "collision":
-                shapes.append((float(obj.get("x", 0)), float(obj.get("y", 0)),
-                               float(obj.get("width", 0)), float(obj.get("height", 0))))
-                continue
-            objects.append((obj.get("type", ""),
-                            float(obj.get("x", 0)), float(obj.get("y", 0)),
-                            obj.get("name", "")))
-    return out, [l.get("name") for l in layers], objects, shapes, (mw, mh)
+
+def draw_layer(out, layer, lookup, size, mw, shapes):
+    """One tile layer, onto `out`; whole-tile blockers are added to `shapes`."""
+    tw, th = size
+    data = layer.find("data").text.replace("\n", "")
+    gids = [int(v) for v in data.split(",") if v.strip()]
+    name = layer.get("name", "")
+    blocking = any(name == role or name.startswith(role + "_")
+                   for role in ("walls", "props"))
+    for i, raw in enumerate(gids):
+        if raw == 0:
+            continue
+        if blocking:
+            shapes.append(((i % mw) * tw, (i // mw) * th, tw, th))
+        # Tiled keeps horizontal, vertical and diagonal flips in the top
+        # three bits. Without masking them off, lookup() is handed a gid of
+        # two billion and Pillow is asked to crop past the end of the
+        # world; half the village's bushes are mirrored, so this is not a
+        # rare case. The flips are then applied, or the render is a picture
+        # of a map nobody drew.
+        flags, gid = raw & FLIP_BITS, raw & ~FLIP_BITS
+        tile = lookup(gid)
+        if tile is None:
+            continue
+        if flags & FLIP_DIAGONAL:
+            tile = tile.transpose(Image.TRANSPOSE)
+        if flags & FLIP_HORIZONTAL:
+            tile = tile.transpose(Image.FLIP_LEFT_RIGHT)
+        if flags & FLIP_VERTICAL:
+            tile = tile.transpose(Image.FLIP_TOP_BOTTOM)
+        out.alpha_composite(tile, ((i % mw) * tw, (i // mw) * th))
+
+
+def draw_tile_object(out, obj, lookup):
+    """A tile placed as an object - a sprite - the way Tiled draws one.
+
+    Tiled anchors a tile object at its bottom-left corner, stretches the tile
+    to the object's width and height, mirrors it inside that box for the flip
+    bits and turns the box clockwise about the anchor. `frame` is this game's
+    own property: which frame of an animated tile the object starts on, so a
+    still render shows each sprite where the scene caught it rather than every
+    windmill at the same angle.
+    """
+    raw = int(obj.get("gid"))
+    flags, gid = raw & FLIP_BITS, raw & ~FLIP_BITS
+    frame = 0
+    properties = obj.find("properties")
+    if properties is not None:
+        for p in properties.findall("property"):
+            if p.get("name") == "frame":
+                frame = int(p.get("value"))
+    art = lookup(gid, frame)
+    if art is None:
+        return
+    if flags & FLIP_HORIZONTAL:
+        art = art.transpose(Image.FLIP_LEFT_RIGHT)
+    if flags & FLIP_VERTICAL:
+        art = art.transpose(Image.FLIP_TOP_BOTTOM)
+    width = float(obj.get("width", art.width))
+    height = float(obj.get("height", art.height))
+    draw_transformed(out, art, (0, art.height),
+                     (float(obj.get("x", 0)), float(obj.get("y", 0))),
+                     (width / art.width, height / art.height),
+                     -float(obj.get("rotation", 0)))
 
 
 def draw_shapes(image, shapes, zoom):

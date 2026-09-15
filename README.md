@@ -141,7 +141,8 @@ play or to build.
 
 ```powershell
 python tools/make_maps.py      # regenerate the 104 room .tmx files
-python tools/make_village.py   # rebuild the village and the house from the art pack
+python tools/make_island.py    # rebuild the island village from the Sunnyside pack, keeping its decor layer
+python tools/make_village.py   # rebuild the house from its art pack
 python tools/make_world.py     # lay out the world map again, keeping its decor layer
 python tools/pack_atlas.py     # repack the texture atlases
 python tools/make_font.py      # rebuild the bitmap font, Vietnamese marks included
@@ -153,7 +154,7 @@ python tools/preview_tiles.py  # render a tileset with its grid, for measuring
 
 ```
 assets/          art, audio, fonts, maps, and the JSON the game is balanced in
-  maps/          village.tmx and home.tmx (make_village.py), world.tmx, rooms/
+  maps/          village.tmx (make_island.py), home.tmx (make_village.py), world.tmx, rooms/
   data/          enemies, weapons, relics, items, floors, upgrades, loot tables
   i18n/          vi.json + en.json (interface), content.*.json (names and flavour)
 src/main/java/com/kagebi/

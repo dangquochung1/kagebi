@@ -11,7 +11,8 @@ below was obtained free. Licences are reproduced verbatim in `LICENSES/`.
 | [Dungeon Asset Pack](https://pixel-poem.itch.io/dungeon-assetpuck) | Pixel_Poem | No licence file shipped — see the itch.io page | Deep-floor tileset and animated props |
 | Enemy Animations Set | *unknown — pack shipped no licence or attribution* | Unknown | Deep-floor skeletons and vampire |
 | [Raven Fantasy Icons (Free)](https://clockwork-raven.itch.io/) | Caio / Clockwork Raven Studios | No licence file shipped — see the itch.io page | Loot, relic and equipment icons |
-| Top-Down Character Home | *unknown — pack shipped no licence or attribution* | Unknown | The village map: the player's house, its garden and interior, and the animated trees, smoke, birds and cat on it |
+| Top-Down Character Home | *unknown — pack shipped no licence or attribution* | Unknown | The player's house: its walls, windows and roof in the village, and the rooms inside |
+| [Sunnyside World](https://danieldiggle.itch.io/sunnyside) | Daniel Diggle | No licence file shipped — see the itch.io page | The island village: its land, buildings, trees and animals, and the villagers and their work animations |
 
 ## Audio
 
@@ -30,6 +31,13 @@ The Top-Down Character Home pack was downloaded without a licence file or a
 readme, so neither its author nor its terms are recorded here. Its art is in the
 game and is credited as far as it can be; if the source turns up, this row and
 the `credits.home.*` strings in `assets/i18n/` are the two places to correct.
+
+The Sunnyside World pack came as a folder of art and the GameMaker project it
+was shown off in, with no licence file. The village is built from that
+project's own showcase room by `tools/make_island.py`; the pack itself stays
+out of git (`miniworld/` in `.gitignore`), and only the images the game loads
+are derived from it. As with the house, this row and the `credits.sunnyside.*`
+strings are the places to correct if its terms turn out to need more.
 
 Pixeloid ships without the 32 Vietnamese letters that stack a tone mark on a
 circumflex or breve. `tools/make_font.py` synthesises them from the font's own
