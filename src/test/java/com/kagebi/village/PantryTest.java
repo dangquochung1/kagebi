@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import com.badlogic.gdx.utils.ObjectIntMap;
 import com.kagebi.data.ShopCatalog;
 import com.kagebi.save.Profile;
 
@@ -34,5 +35,31 @@ class PantryTest {
         assertEquals(1, p.village.pantry.get("food_omelette", 0));
         assertTrue(Pantry.take(p.village, "food_omelette", 1));
         assertFalse(p.village.pantry.containsKey("food_omelette"), "and nothing left at zero");
+    }
+
+    @Test
+    void whatIsPackedGoesDownWithTheRunAndLeavesThePantryEmpty() {
+        p.village.pantry.put("food_omelette", 2);
+        ObjectIntMap<String> runItems = new ObjectIntMap<>();
+        runItems.put("potion_small", 1);
+        Pantry.packInto(p.village, runItems);
+        assertEquals(2, runItems.get("food_omelette", 0));
+        assertEquals(1, runItems.get("potion_small", 0), "added to what the run already had");
+        assertEquals(0, p.village.pantry.size);
+    }
+
+    @Test
+    void aClearedStageBringsTheLeftoversHomeAsFarAsThereIsRoom() {
+        ObjectIntMap<String> runItems = new ObjectIntMap<>();
+        runItems.put("food_omelette", 2);
+        runItems.put("potion_small", 3);
+        runItems.put("antidote", 0);
+        runItems.put("key_iron", 5);
+        int brought = Pantry.bringHome(p, shop, runItems, id -> !id.startsWith("key"));
+        assertEquals(3, brought, "three is all there is room for");
+        assertEquals(2, p.village.pantry.get("food_omelette", 0), "lowest id first");
+        assertEquals(1, p.village.pantry.get("potion_small", 0));
+        assertFalse(p.village.pantry.containsKey("key_iron"), "only what may come home does");
+        assertFalse(p.village.pantry.containsKey("antidote"), "and nothing of which none is left");
     }
 }

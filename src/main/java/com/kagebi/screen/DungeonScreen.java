@@ -637,12 +637,29 @@ public class DungeonScreen extends SimScreen {
             drawFailure(batch);
         } else {
             hud.draw(batch, run, Cfg.VIRT_W, Cfg.VIRT_H);
+            drawQuickSlot(batch);
             drawPrompt(batch);
             drawTitle(batch);
         }
         drawFade(batch);
         batch.setColor(Color.WHITE);
         batch.end();
+    }
+
+    /**
+     * What the quick key will use, bottom left, with the key beside it. Drawn
+     * only while there is something to use.
+     */
+    private void drawQuickSlot(SpriteBatch batch) {
+        String id = world instanceof EntityWorld ? ((EntityWorld) world).quickItem() : null;
+        if (id == null) {
+            return;
+        }
+        hud.drawQuickSlot(batch, game.skin(), InventoryScreen.itemIcon(game, id), run.items.get(id, 0));
+        // Centred far enough right that the key's panel clears the cell, whose
+        // lower-right corner is where the count is written.
+        Hud.prompt(batch, game.skin(), font, game.input().map().primary(GameAction.USE_ITEM), "",
+                   4 + Hud.QUICK_CELL + 16, 7);
     }
 
     private void drawSlide(SpriteBatch batch) {

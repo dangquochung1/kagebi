@@ -90,6 +90,13 @@ public final class RunState {
     public final Array<String> relics = new Array<>();
     public final ObjectIntMap<String> items = new ObjectIntMap<>();
 
+    /**
+     * The consumable the quick key uses, chosen in the inventory, or null to let
+     * the world pick - whatever heals first. Kept when its stack runs out, so the
+     * same thing found again goes straight back on the key the player chose.
+     */
+    public String quickItem;
+
     public int kills;
     public int deepestFloor;
     public float elapsedSeconds;

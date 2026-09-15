@@ -88,6 +88,25 @@ public final class Hud {
         mapOpen = false;
     }
 
+    /** The quick slot's cell, square. */
+    public static final int QUICK_CELL = 20;
+
+    /**
+     * The quick key's slot, bottom left: what it will use, and how many are
+     * left. The dungeon draws it only while something is carried - an empty
+     * slot says nothing - and this corner is the only one not already taken.
+     */
+    public void drawQuickSlot(SpriteBatch batch, Skin skin, TextureRegion icon, int count) {
+        skin.getDrawable(Assets.Ui.CELL).draw(batch, MARGIN, MARGIN, QUICK_CELL, QUICK_CELL);
+        batch.draw(icon, MARGIN + (QUICK_CELL - icon.getRegionWidth()) / 2,
+                   MARGIN + (QUICK_CELL - icon.getRegionHeight()) / 2);
+        if (count > 1) {
+            batch.setColor(SOFT);
+            right(batch, font, String.valueOf(count), MARGIN + QUICK_CELL - 1, MARGIN + 11);
+            batch.setColor(Color.WHITE);
+        }
+    }
+
     /** Draws the whole HUD. The batch must already be open, in screen space. */
     public void draw(SpriteBatch batch, RunState run, int screenW, int screenH) {
         drawHearts(batch, run, screenH);

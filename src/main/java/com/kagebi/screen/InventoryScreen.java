@@ -105,14 +105,8 @@ public class InventoryScreen extends SimScreen {
                 ItemDef def = content.item(held.key);
                 e.nameKey = def.nameKey;
                 e.descKey = def.descKey;
-                // A def names either an atlas region or an index into the icon
-                // sheet; both come from data, so neither is a literal here.
-                e.icon = def.sprite != null && game.skin().has(def.sprite, TextureRegion.class)
-                    ? game.skin().getRegion(def.sprite) : ravenIcon(def.icon);
             }
-            if (e.icon == null) {
-                e.icon = game.skin().getRegion(Assets.Ui.ICON_RELIC);
-            }
+            e.icon = itemIcon(game, held.key);
             items.add(e);
         }
         items.sort((a, b) -> a.id.compareTo(b.id));
@@ -121,6 +115,24 @@ public class InventoryScreen extends SimScreen {
 
     private TextureRegion ravenIcon(int index) {
         return Preload.icon(index);
+    }
+
+    /**
+     * An item's picture: its atlas region, else its icon from the sheet, else the
+     * generic one for an id the content does not know. Shared with the dungeon's
+     * quick slot, so the two never draw one item two ways.
+     */
+    static TextureRegion itemIcon(Kagebi game, String itemId) {
+        ContentRegistry content = game.content();
+        TextureRegion icon = null;
+        if (content.hasItem(itemId)) {
+            ItemDef def = content.item(itemId);
+            // A def names either an atlas region or an index into the icon
+            // sheet; both come from data, so neither is a literal here.
+            icon = def.sprite != null && game.skin().has(def.sprite, TextureRegion.class)
+                ? game.skin().getRegion(def.sprite) : Preload.icon(def.icon);
+        }
+        return icon != null ? icon : game.skin().getRegion(Assets.Ui.ICON_RELIC);
     }
 
     private int slotCount() {
@@ -132,6 +144,15 @@ public class InventoryScreen extends SimScreen {
         if (input().justPressed(GameAction.INVENTORY) || input().justPressed(GameAction.PAUSE)) {
             game.audio().playSfx(Assets.SFX_CANCEL);
             stack().pop();
+            return;
+        }
+        if (input().justPressed(GameAction.INTERACT) && focus >= SLOTS && focus - SLOTS < items.size) {
+            // What the quick key uses is chosen here, and kept on the run.
+            RunState run = game.run();
+            if (run != null) {
+                run.quickItem = items.get(focus - SLOTS).id;
+                game.audio().playSfx(Assets.SFX_ACCEPT);
+            }
             return;
         }
         int col = focus % SLOTS;
@@ -231,6 +252,16 @@ public class InventoryScreen extends SimScreen {
             Hud.line(batch, font, t.get(e.descKey), left, top - Hud.LINE);
         }
         batch.setColor(Color.WHITE);
+        if (list == items) {
+            // On the name's row at the right, where the way out sits on the
+            // title's: the key that uses this now, or the one that makes it so.
+            RunState run = game.run();
+            boolean onKey = run != null && e.id.equals(run.quickItem);
+            Hud.prompt(batch, game.skin(), font,
+                       game.input().map().primary(onKey ? GameAction.USE_ITEM : GameAction.INTERACT),
+                       t.get(onKey ? "inv.on_quick" : "inv.set_quick"),
+                       left + SLOTS * (CELL + GAP) - GAP, top - Hud.LINE, Align.right);
+        }
     }
 
     @Override

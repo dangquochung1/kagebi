@@ -11,11 +11,13 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.kagebi.Cfg;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.def.ItemDef;
 import com.kagebi.gfx.PixelViewport;
 import com.kagebi.run.RunState;
 import com.kagebi.run.RunSummary;
 import com.kagebi.save.Profile;
 import com.kagebi.ui.I18n;
+import com.kagebi.village.Pantry;
 
 /**
  * What victory and game over have in common: the numbers, the bank, the way
@@ -125,6 +127,11 @@ abstract class RunEndScreen extends SimScreen {
         // keeping it out of this screen is what stops the two drifting apart.
         Profile profile = game.profile();
         bankInto(profile, summary);
+        if (victory) {
+            // A cleared stage brings home what is left of what was carried, as
+            // far as the pantry has room; a death loses it with everything else.
+            Pantry.bringHome(profile, game.shop(), run.items, this::carriable);
+        }
         if (!game.saves().save(profile)) {
             Gdx.app.error("save", "profile not written; the previous save stands");
         }
@@ -139,7 +146,15 @@ abstract class RunEndScreen extends SimScreen {
         RunState next = Screens.freshRun(game, run.characterId, run.weaponId,
                                          Screens.DEFAULT_MAX_HP);
         next.throwWeaponId = run.throwWeaponId;
+        // So is the choice of what the quick key uses, for the same reason.
+        next.quickItem = run.quickItem;
         game.setRun(next);
+    }
+
+    /** Whether a run item may come home in the pantry: a consumable the content knows. */
+    private boolean carriable(String itemId) {
+        return game.content().hasItem(itemId)
+            && game.content().item(itemId).kind == ItemDef.Kind.CONSUMABLE;
     }
 
     private void build() {

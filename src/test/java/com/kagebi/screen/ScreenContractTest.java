@@ -138,6 +138,7 @@ class ScreenContractTest {
             "prompt.open_chest", "prompt.shop",
             "pause.title", "pause.resume", "pause.abandon", "pause.confirm", "pause.to_menu",
             "inv.title", "inv.relics", "inv.items", "inv.empty", "inv.slot_empty",
+            "inv.set_quick", "inv.on_quick",
             "end.banked", "end.to_village", "end.to_map",
             "dungeon.no_rooms", "dungeon.locked", "dungeon.unlocked",
             "map.title", "map.play", "stage.cleared", "prompt.leave",

@@ -7,6 +7,7 @@ import com.kagebi.gen.RoomKind;
 import com.kagebi.run.RunState;
 import com.kagebi.save.Profile;
 import com.kagebi.settings.Difficulty;
+import com.kagebi.village.Pantry;
 
 /**
  * Builds the screen a {@code --screen} launch flag asks for.
@@ -181,6 +182,10 @@ public final class Screens {
         RunState run = freshRun(game, Assets.Actor.DEFAULT_CHARACTER,
                                 "katana", DEFAULT_MAX_HP);
         run.floor = Math.max(1, floor);
+        // Something carried, so a screenshot of the dungeon shows the quick
+        // key's slot - which draws only while there is something to use.
+        run.items.put("food_onigiri", 2);
+        run.items.put("potion_small", 1);
         game.setRun(run);
         return run;
     }
@@ -280,8 +285,11 @@ public final class Screens {
             previous != null ? previous.weaponId : "katana",
             DEFAULT_MAX_HP);
         run.throwWeaponId = previous == null ? null : previous.throwWeaponId;
+        run.quickItem = previous == null ? null : previous.quickItem;
         run.difficulty = difficulty != null ? difficulty : Difficulty.DEFAULT;
         run.floor = Math.max(1, stage);
+        // What the village packed goes down with the ninja, and is the run's now.
+        Pantry.packInto(game.profile().village, run.items);
         game.setRun(run);
         return run;
     }

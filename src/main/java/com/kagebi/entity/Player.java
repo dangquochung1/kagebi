@@ -320,6 +320,14 @@ public final class Player extends Entity {
             beginSwing(intent, world);
         }
 
+        // The quick key, which until the village had a kitchen nothing read.
+        // Not mid-roll: the press stays buffered for a few steps, so one made as
+        // a roll ends still lands.
+        if (intent.useItem && !rolling) {
+            intent.consumeUseItem();
+            world.useQuickItem();
+        }
+
         if (rolling) {
             advanceRoll(world.collision());
             return;

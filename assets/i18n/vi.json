@@ -158,6 +158,8 @@
   "inv.items": "Vật phẩm",
   "inv.empty": "Chưa có gì",
   "inv.slot_empty": "Ô trống",
+  "inv.set_quick": "Gán vào phím nhanh",
+  "inv.on_quick": "Dùng nhanh",
 
   "end.banked": "Đã gửi {0} vàng vào kho làng",
   "end.to_village": "Về làng",

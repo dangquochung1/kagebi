@@ -19,6 +19,7 @@ import com.kagebi.combat.Hitbox;
 import com.kagebi.data.ContentRegistry;
 import com.kagebi.data.ShopCatalog;
 import com.kagebi.data.def.FloorDef;
+import com.kagebi.data.def.ItemDef;
 import com.kagebi.gen.Room;
 import com.kagebi.gen.RoomKind;
 import com.kagebi.gen.SpawnPoint;
@@ -101,6 +102,36 @@ class EntityWorldTest {
         for (Enemy e : w.hostiles()) {
             assertEquals("slime", e.def.id);
         }
+    }
+
+    // ---- the quick key --------------------------------------------------------
+
+    @Test
+    void theQuickKeyUsesWhatIsOnItOrElseWhateverHeals() {
+        ContentRegistry r = registry();
+        r.put(new ItemDef("food_onigiri", "item.food_onigiri.name", "item.food_onigiri.desc", null, 1,
+            ItemDef.Kind.CONSUMABLE, "heal", 18, 3));
+        r.put(new ItemDef("antidote", "item.antidote.name", "item.antidote.desc", null, 1,
+            ItemDef.Kind.CONSUMABLE, "cure_poison", 1, 3, 35));
+        RunState run = TestDefs.run();
+        run.items.put("antidote", 1);
+        run.items.put("food_onigiri", 2);
+        EntityWorld w = world(r, run);
+        w.enterRoom(TestDefs.room(RoomKind.NORMAL), TestDefs.walled(), null);
+        run.hp = 50;
+
+        assertEquals("food_onigiri", w.quickItem(), "with nothing chosen, what heals comes first");
+        assertTrue(w.useQuickItem());
+        assertEquals(68, run.hp);
+        assertEquals(1, run.items.get("food_onigiri", 0));
+
+        run.quickItem = "antidote";
+        assertEquals("antidote", w.quickItem(), "what the player chose comes before healing");
+        assertTrue(w.useQuickItem());
+        assertEquals("food_onigiri", w.quickItem(), "a choice that has run out gives way");
+        assertTrue(w.useQuickItem());
+        assertFalse(w.useQuickItem(), "and with nothing left the key does nothing");
+        assertNull(w.quickItem());
     }
 
     // ---- surviving content that is not written yet ---------------------------

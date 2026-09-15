@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.ObjectIntMap;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
 import com.kagebi.ai.AiBrain;
@@ -1652,6 +1653,45 @@ public final class EntityWorld implements World, AiContext {
             return false;
         }
         applyItem(content.item(itemId));
+        return true;
+    }
+
+    /**
+     * What the quick key would use now: the item the player put on it while one
+     * is carried, else whatever heals, else any consumable - lowest id first, so
+     * the choice does not flicker from one frame to the next.
+     *
+     * @return null when nothing usable is carried
+     */
+    public String quickItem() {
+        if (run.quickItem != null && run.items.get(run.quickItem, 0) > 0 && content.hasItem(run.quickItem)) {
+            return run.quickItem;
+        }
+        String healing = null;
+        String any = null;
+        for (ObjectIntMap.Entry<String> e : new ObjectIntMap.Entries<>(run.items)) {
+            if (e.value <= 0 || !content.hasItem(e.key)
+                || content.item(e.key).kind != ItemDef.Kind.CONSUMABLE) {
+                continue;
+            }
+            if (any == null || e.key.compareTo(any) < 0) {
+                any = e.key;
+            }
+            if ("heal".equals(content.item(e.key).effect)
+                && (healing == null || e.key.compareTo(healing) < 0)) {
+                healing = e.key;
+            }
+        }
+        return healing != null ? healing : any;
+    }
+
+    /** The quick key: uses {@link #quickItem}, if there is one, and says whether it did. */
+    public boolean useQuickItem() {
+        String id = quickItem();
+        if (id == null || !useItem(id)) {
+            return false;
+        }
+        sfx("heal".equals(content.item(id).effect) ? Assets.Sfx.HEAL : Assets.Sfx.PICKUP);
         return true;
     }
 

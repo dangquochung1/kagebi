@@ -158,6 +158,8 @@
   "inv.items": "Items",
   "inv.empty": "Nothing yet",
   "inv.slot_empty": "Empty slot",
+  "inv.set_quick": "Put on the quick key",
+  "inv.on_quick": "Quick use",
 
   "end.banked": "{0} gold banked in the village",
   "end.to_village": "Back to village",
