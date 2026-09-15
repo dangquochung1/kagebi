@@ -39,6 +39,8 @@
   "action.use_item": "Dùng vật phẩm",
   "action.inventory": "Túi đồ",
   "action.map": "Bản đồ",
+  "action.zoom_in": "Phóng to",
+  "action.zoom_out": "Thu nhỏ",
   "action.pause": "Tạm dừng",
 
   "common.back": "Quay lại",
@@ -65,6 +67,7 @@
   "floor.4": "Vực Nguyền Rủa",
   "floor.5": "Lõi Lửa",
   "floor.home": "Nhà của bạn",
+  "hub.zoom.fit": "Toàn cảnh",
   "floor.hub": "Làng Kagemura",
 
   "select.title": "Chọn ninja",

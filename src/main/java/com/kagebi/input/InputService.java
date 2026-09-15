@@ -88,6 +88,11 @@ public final class InputService extends InputAdapter {
     /** How many system modifiers are held. Zero means the game may listen. */
     private int modifiersHeld;
 
+    /** Wheel travel since the last step, kept fractional for touchpads. */
+    private float pendingScroll;
+    /** Whole wheel notches this step, positive towards the player. */
+    private int scroll;
+
     public InputService(InputMap map) {
         this.map = map;
         java.util.Arrays.fill(lastPressStep, Integer.MIN_VALUE / 2);
@@ -108,6 +113,18 @@ public final class InputService extends InputAdapter {
             pendingPress[i] = false;
             stepsHeld[i] = down[i] ? stepsHeld[i] + 1 : 0;
         }
+        // Promoted on the step like a press, and for the same reason: a notch
+        // turned between two steps would otherwise be read twice or never.
+        scroll = (int) pendingScroll;
+        pendingScroll -= scroll;
+    }
+
+    /**
+     * Whole mouse-wheel notches turned since the last step: positive when the
+     * wheel rolls towards the player, which libGDX reports as scrolling down.
+     */
+    public int scroll() {
+        return scroll;
     }
 
     public boolean isDown(GameAction a) {
@@ -160,6 +177,8 @@ public final class InputService extends InputAdapter {
         java.util.Arrays.fill(justPressed, false);
         java.util.Arrays.fill(stepsHeld, 0);
         modifiersHeld = 0;
+        pendingScroll = 0f;
+        scroll = 0;
     }
 
     /** Whether a chord aimed at the window manager is in progress. */
@@ -206,6 +225,16 @@ public final class InputService extends InputAdapter {
         // Released even if the press was suppressed. A key that went down
         // during a chord and up after it must not be left stuck down.
         down[a.ordinal()] = false;
+        return true;
+    }
+
+    /** Ctrl+wheel is the desktop's zoom, not the game's, so it is left alone. */
+    @Override
+    public boolean scrolled(float amountX, float amountY) {
+        if (modifiersHeld > 0) {
+            return false;
+        }
+        pendingScroll += amountY;
         return true;
     }
 }

@@ -18,6 +18,7 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas.TextureAtlasData.Region;
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.kagebi.assets.Assets;
+import com.kagebi.input.GameAction;
 
 /**
  * What the screens ask the asset pipeline and the translators for.
@@ -184,6 +185,12 @@ class ScreenContractTest {
             keys.add("npc.worker_" + region + ".2");
         }
         keys.add("prompt.enter_home");
+        keys.add("hub.zoom.fit");
+        for (GameAction action : GameAction.values()) {
+            // Listed by the controls screen straight off the enum, so a new
+            // action is a raw key there until someone translates it.
+            keys.add(action.i18nKey);
+        }
         for (String id : CharacterSelectScreen.FALLBACK_WEAPONS) {
             keys.add("select.weapon." + id);
         }

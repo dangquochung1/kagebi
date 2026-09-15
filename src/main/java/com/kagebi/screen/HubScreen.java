@@ -64,7 +64,11 @@ import com.kagebi.village.Workshops;
  *
  * <p>The only map in the game larger than the screen, so the only screen where
  * the camera scrolls. It follows the player and is clamped to the map; the
- * rounding to whole pixels happens inside {@link CameraController}.
+ * rounding to whole pixels happens inside {@link CameraController}. It is also
+ * the only one that zooms, from half out to the whole island, on the mouse
+ * wheel or {@link GameAction#ZOOM_IN}/{@link GameAction#ZOOM_OUT}. Marks over
+ * the world - who has goods, what was just taken - are drawn at the screen's
+ * size rather than the map's, so they stay readable however far out it is.
  *
  * <p>The villagers and the island's people are drawn and managed here, not by
  * the {@link World}. They are furniture that talks: they do not move, fight or
@@ -74,6 +78,12 @@ import com.kagebi.village.Workshops;
 public class HubScreen extends SimScreen {
 
     private static final Color GOLD = new Color(0xffad55ff);
+    /**
+     * The pack's open water, painted under the map: zoomed out to the whole
+     * island the view is wider than the map, and the bands either side would
+     * otherwise be the dark the rest of the game clears to.
+     */
+    private static final Color SEA = new Color(0x0099dbff);
 
     static final float GATE_RANGE = 24f;
     /**
@@ -190,6 +200,8 @@ public class HubScreen extends SimScreen {
 
     /** A marker to arrive at instead of the front door, or null. */
     private String arriveAt;
+    /** Zoom notches to open at, for a screenshot; spent once the map's size is known. */
+    private int zoomOnShow;
     /** Every marker the map names, y-up. */
     private final java.util.Map<String, int[]> markers = new java.util.HashMap<>();
 
@@ -234,6 +246,12 @@ public class HubScreen extends SimScreen {
         return this;
     }
 
+    /** Opens already zoomed out by this many notches, for {@code --screen hub --page 10}. */
+    HubScreen zoomedTo(int notches) {
+        zoomOnShow = notches;
+        return this;
+    }
+
     @Override
     public InputProcessor inputProcessor() {
         return game.input();
@@ -271,6 +289,11 @@ public class HubScreen extends SimScreen {
         grid = TiledRooms.collision(map);
         mapW = grid.width() * CollisionGrid.TILE;
         mapH = grid.height() * CollisionGrid.TILE;
+        if (zoomOnShow != 0) {
+            camera.zoomBy(zoomOnShow, CameraController.fitZoom(mapW, mapH));
+            camera.snapZoom();
+            zoomOnShow = 0;
+        }
 
         run = game.run();
         if (run == null) {
@@ -479,6 +502,9 @@ public class HubScreen extends SimScreen {
         for (Villager v : villagers) {
             v.face(world.playerX(), world.playerY());
         }
+        // Before the dialog: looking around is not doing anything, so it is
+        // allowed mid-sentence too.
+        stepZoom();
 
         if (dialog.open()) {
             dialog.step();
@@ -533,6 +559,17 @@ public class HubScreen extends SimScreen {
                 world.interact();
             }
         }
+    }
+
+    /** The wheel, towards the player to go further out, and the two zoom keys. */
+    private void stepZoom() {
+        int notches = input().scroll()
+            + (input().justPressed(GameAction.ZOOM_OUT) ? 1 : 0)
+            - (input().justPressed(GameAction.ZOOM_IN) ? 1 : 0);
+        if (camera.zoomBy(notches, CameraController.fitZoom(mapW, mapH))) {
+            game.audio().playSfx(Assets.SFX_MOVE);
+        }
+        camera.stepZoom();
     }
 
     /** The nearest person in range, or else the torii, or else the door. */
@@ -778,7 +815,13 @@ public class HubScreen extends SimScreen {
         float bottom = cam.position.y - halfH;
         float top = cam.position.y + halfH;
 
+        batch.setProjectionMatrix(cam.combined);
+        batch.begin();
+        batch.setColor(SEA);
+        batch.draw(game.skin().getRegion(Assets.Ui.PIXEL), left, bottom, right - left, top - bottom);
         batch.setColor(Color.WHITE);
+        batch.end();
+
         for (Pass pass : passes) {
             if (pass.tiles != null) {
                 renderer.setView(cam);
@@ -804,15 +847,11 @@ public class HubScreen extends SimScreen {
             batch.end();
         }
 
-        batch.setProjectionMatrix(cam.combined);
-        batch.begin();
-        drawOverWorld(batch);
-        batch.end();
-
         ui.snapTo(Cfg.VIRT_W / 2f, Cfg.VIRT_H / 2f);
         ui.apply();
         batch.setProjectionMatrix(ui.camera().combined);
         batch.begin();
+        drawOverWorld(batch, cam);
         drawOverlay(batch);
         batch.end();
     }
@@ -846,24 +885,39 @@ public class HubScreen extends SimScreen {
         return cropArt.get(name);
     }
 
-    /** Over each worker, a mark while goods wait; over the player, what was just taken. */
-    private void drawOverWorld(SpriteBatch batch) {
+    /**
+     * Over each worker, a mark while goods wait; over the player, what was just
+     * taken. Drawn in screen space at a map point, so they keep their size at
+     * any zoom: from the whole island the marks are how to find who has goods.
+     */
+    private void drawOverWorld(SpriteBatch batch, OrthographicCamera cam) {
         TextureRegion alert = game.skin().has(ALERT, TextureRegion.class) ? game.skin().getRegion(ALERT) : null;
         if (alert != null) {
             for (IslandProps.Prop worker : workers) {
                 VillageCatalog.Workshop workshop = workshopOf(worker);
                 if (workshop != null && Workshops.ready(village, farm, workshop) > 0) {
-                    batch.draw(alert, Math.round(worker.centreX() - alert.getRegionWidth() / 2f),
-                               worker.foot + 26);
+                    batch.draw(alert,
+                               Math.round(screenX(cam, worker.centreX()) - alert.getRegionWidth() / 2f),
+                               Math.round(screenY(cam, worker.foot + 24)) + 2);
                 }
             }
         }
         if (toastSteps > 0 && toast != null) {
             float rise = (TOAST_STEPS - toastSteps) * 0.25f;
             batch.setColor(1f, 0.93f, 0.72f, Math.min(1f, toastSteps / 20f));
-            Hud.shadowed(batch, font, toast, world.playerX(), world.playerY() + 22 + rise, Align.center);
+            Hud.shadowed(batch, font, toast, Math.round(screenX(cam, world.playerX())),
+                         Math.round(screenY(cam, world.playerY() + 22)) + rise, Align.center);
             batch.setColor(Color.WHITE);
         }
+    }
+
+    /** Where a map x is on the virtual screen, through the world camera. */
+    private static float screenX(OrthographicCamera cam, float x) {
+        return (x - cam.position.x) / cam.zoom + Cfg.VIRT_W / 2f;
+    }
+
+    private static float screenY(OrthographicCamera cam, float y) {
+        return (y - cam.position.y) / cam.zoom + Cfg.VIRT_H / 2f;
     }
 
     /**
@@ -920,6 +974,11 @@ public class HubScreen extends SimScreen {
         // first screenshot it sat across a roof, unreadable, saying something
         // the player already knew.
         Hud.card(batch, game.skin(), font, card, t.get("floor.hub"), null);
+        if (camera.targetZoom() >= CameraController.fitZoom(mapW, mapH)) {
+            // Says where the player is, and the key that brings them back.
+            Hud.prompt(batch, game.skin(), font, game.input().map().primary(GameAction.ZOOM_IN),
+                       t.get("hub.zoom.fit"), 6, Cfg.VIRT_H - 32, Align.left);
+        }
 
         if (dialog.open()) {
             dialog.draw(batch);

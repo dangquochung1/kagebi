@@ -26,6 +26,10 @@ public enum GameAction {
 
     INVENTORY("action.inventory", Keys.TAB, Keys.I),
     MAP("action.map", Keys.M, -1),
+    // The village only: the island is thirty screens of map, and the mouse
+    // wheel does the same thing.
+    ZOOM_IN("action.zoom_in", Keys.EQUALS, Keys.NUMPAD_ADD),
+    ZOOM_OUT("action.zoom_out", Keys.MINUS, Keys.NUMPAD_SUBTRACT),
     PAUSE("action.pause", Keys.ESCAPE, -1);
 
     /** Lookup key for the label shown in the controls screen. */

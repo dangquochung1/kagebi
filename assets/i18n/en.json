@@ -39,6 +39,8 @@
   "action.use_item": "Use item",
   "action.inventory": "Inventory",
   "action.map": "Map",
+  "action.zoom_in": "Zoom in",
+  "action.zoom_out": "Zoom out",
   "action.pause": "Pause",
 
   "common.back": "Back",
@@ -65,6 +67,7 @@
   "floor.4": "The Cursed Depths",
   "floor.5": "The Flame Core",
   "floor.home": "Home",
+  "hub.zoom.fit": "Whole island",
   "floor.hub": "Kagemura Village",
 
   "select.title": "Choose your ninja",

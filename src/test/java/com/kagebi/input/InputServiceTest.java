@@ -172,4 +172,48 @@ class InputServiceTest {
         in.beginStep();
         assertTrue(in.justPressed(GameAction.MOVE_UP), "input must work after a focus loss");
     }
+
+    /** A wheel notch is read on the next step, once, the way a press is. */
+    @Test
+    void aWheelNotchArrivesOnTheNextStepOnly() {
+        InputService in = service();
+        in.scrolled(0f, 1f);
+        assertEquals(0, in.scroll(), "nothing until the step");
+        in.beginStep();
+        assertEquals(1, in.scroll());
+        in.beginStep();
+        assertEquals(0, in.scroll());
+
+        in.scrolled(0f, -1f);
+        in.scrolled(0f, -1f);
+        in.beginStep();
+        assertEquals(-2, in.scroll(), "two notches in one step are both counted");
+    }
+
+    /** A touchpad reports fractions of a notch; they add up rather than vanish. */
+    @Test
+    void touchpadFractionsAddUpToANotch() {
+        InputService in = service();
+        in.scrolled(0f, 0.6f);
+        in.beginStep();
+        assertEquals(0, in.scroll());
+        in.scrolled(0f, 0.6f);
+        in.beginStep();
+        assertEquals(1, in.scroll());
+    }
+
+    @Test
+    void ctrlWheelAndAFocusLossAreNotZooms() {
+        InputService in = service();
+        in.keyDown(Keys.CONTROL_LEFT);
+        assertFalse(in.scrolled(0f, 1f), "Ctrl+wheel belongs to the desktop");
+        in.keyUp(Keys.CONTROL_LEFT);
+        in.beginStep();
+        assertEquals(0, in.scroll());
+
+        in.scrolled(0f, 1f);
+        in.clear();
+        in.beginStep();
+        assertEquals(0, in.scroll(), "a notch pending at a focus loss is dropped");
+    }
 }

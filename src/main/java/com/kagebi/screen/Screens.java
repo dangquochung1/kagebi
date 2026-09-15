@@ -29,7 +29,9 @@ import com.kagebi.village.Pantry;
  *   style     --page 1-2   widget sheet, surface sheet
  *   select    --page 1-6   character select, with that ninja highlighted
  *   loadout   --page 1-6   the same screen editing the run, over the village
- *   hub       --page 1-2   the village: arriving home, or in the garden gateway
+ *   hub       --page 1-11  the village: 1 at home, 2 the torii, 3 the shop, 4-9 each
+ *                          region's worker, 10 zoomed out to the whole island,
+ *                          11 zoomed out once at the torii
  *   home      --page 1-2   inside the house: on the doormat, or on the rug by the table
  *   world     --page 1-5   the world map, open to that stage and focused on it
  *   stage     --page 1-5   the same, with that stage's panel and difficulty row
@@ -253,6 +255,12 @@ public final class Screens {
         }
         if (page == 3) {
             return hub.arriveAt("shop");
+        }
+        if (page == 10) {
+            return hub.zoomedTo(10);
+        }
+        if (page == 11) {
+            return hub.arriveAt("gate").zoomedTo(1);
         }
         int region = page - 4;
         if (region >= 0 && region < HubScreen.REGIONS.length) {
