@@ -135,7 +135,12 @@ class ScreenContractTest {
             "shop.max", "shop.owned", "shop.poor", "shop.bought",
             "prompt.talk", "prompt.descend", "prompt.escape",
             "prompt.harvest", "prompt.sow", "prompt.no_seed", "prompt.plot_locked",
-            "prompt.growing", "prompt.collect", "village.got",
+            "prompt.growing", "prompt.collect", "village.got", "prompt.cook",
+            "trade.tab.sell", "trade.tab.buy", "trade.tab.tools", "trade.tab.upgrades",
+            "trade.tab.seeds", "trade.tab.kitchen", "trade.sell", "trade.buy", "trade.cook",
+            "trade.open", "trade.done", "trade.max", "trade.empty", "trade.held", "trade.seed",
+            "trade.grows", "trade.farm_level", "trade.level", "trade.needs", "trade.amount",
+            "trade.pantry", "trade.pantry_full", "trade.upgrades.name", "trade.upgrades.desc",
             // Advertised by World.promptKey(); the screens only look them up.
             "prompt.open_chest", "prompt.shop",
             "pause.title", "pause.resume", "pause.abandon", "pause.confirm", "pause.to_menu",

@@ -489,7 +489,7 @@ public class HubScreen extends SimScreen {
                 // fewer thing on screen, and the dialogue is the sign.
                 if (dialog.advance() && openShopAfterTalk) {
                     openShopAfterTalk = false;
-                    stack().push(new ShopScreen(game));
+                    stack().push(new TradeScreen(game, TradeScreen.Counter.HERBALIST));
                 }
             } else if (input().justPressed(GameAction.PAUSE)) {
                 dialog.close();
@@ -514,8 +514,13 @@ public class HubScreen extends SimScreen {
             if (nearVillager != null) {
                 talk(nearVillager);
             } else if (nearWorker != null) {
-                // Goods waiting are taken first; a worker with none has a word.
-                if (!collect(nearWorker)) {
+                // The farmer and the cook keep a counter. Any other worker's
+                // goods are taken first, and one with none has a word.
+                TradeScreen.Counter counter = counterOf(nearWorker);
+                if (counter != null) {
+                    game.audio().playSfx(Assets.SFX_ACCEPT);
+                    stack().push(new TradeScreen(game, counter));
+                } else if (!collect(nearWorker)) {
                     talkTo(nearWorker);
                 }
             } else if (nearPlot >= 0) {
@@ -571,6 +576,14 @@ public class HubScreen extends SimScreen {
     }
 
     // ---- the farm and the workers ----------------------------------------------
+
+    /** The counter a worker keeps: the farmer's seed, the cook's kitchen, or null. */
+    private static TradeScreen.Counter counterOf(IslandProps.Prop worker) {
+        String role = worker.properties.get("role");
+        return "farm".equals(role) ? TradeScreen.Counter.FARMER
+            : "kitchen".equals(role) ? TradeScreen.Counter.COOK
+            : null;
+    }
 
     /** The workshop a worker keeps, or null for the farmer and the cook, who make nothing alone. */
     private VillageCatalog.Workshop workshopOf(IslandProps.Prop worker) {
@@ -662,7 +675,9 @@ public class HubScreen extends SimScreen {
         // The herbalist with an empty customer says so and opens nothing. A
         // shop screen where every price is out of reach is a worse answer than
         // a sentence, and she is the one who can give the sentence.
-        boolean broke = v.id.equals(Assets.Npc.HERBALIST) && game.profile().gold <= 0;
+        // Broke means nothing to pay with and nothing to sell her either.
+        boolean broke = v.id.equals(Assets.Npc.HERBALIST) && game.profile().gold <= 0
+            && game.profile().village.stock.size == 0;
         openShopAfterTalk = v.id.equals(Assets.Npc.HERBALIST) && !broke;
         dialog.show(t.get(prefix + "name"), v.face, first,
                     t.get(prefix + (broke ? "broke" : "2")));
@@ -917,9 +932,12 @@ public class HubScreen extends SimScreen {
         if (nearVillager != null) {
             label = t.get("prompt.talk");
         } else if (nearWorker != null) {
+            TradeScreen.Counter counter = counterOf(nearWorker);
             VillageCatalog.Workshop workshop = workshopOf(nearWorker);
-            label = t.get(workshop != null && Workshops.ready(village, farm, workshop) > 0
-                ? "prompt.collect" : "prompt.talk");
+            label = t.get(counter == TradeScreen.Counter.FARMER ? "prompt.shop"
+                : counter == TradeScreen.Counter.COOK ? "prompt.cook"
+                : workshop != null && Workshops.ready(village, farm, workshop) > 0 ? "prompt.collect"
+                : "prompt.talk");
         } else if (nearPlot >= 0) {
             label = plotLabel(t, nearPlot);
             if (!Farm.ripe(village, farm, nearPlot) && seedFor(nearPlot) == null) {

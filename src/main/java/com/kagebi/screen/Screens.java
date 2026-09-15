@@ -6,6 +6,7 @@ import com.kagebi.assets.Assets;
 import com.kagebi.gen.RoomKind;
 import com.kagebi.run.RunState;
 import com.kagebi.save.Profile;
+import com.kagebi.save.VillageState;
 import com.kagebi.settings.Difficulty;
 import com.kagebi.village.Pantry;
 
@@ -109,6 +110,9 @@ public final class Screens {
                     page >= 2 ? new HomeScreen(game).arriveAt("rug") : new HomeScreen(game)};
             case "talk":
                 return new GameScreen[] {new HubScreen(game).talkingTo(page - 1)};
+            case "counter":
+                stockVillage(game);
+                return new GameScreen[] {new HubScreen(game), tradeAt(game, page)};
             case "store":
                 stockProfile(game, page);
                 return new GameScreen[] {new HubScreen(game), new ShopScreen(game)};
@@ -255,6 +259,39 @@ public final class Screens {
             return hub.arriveAt("stand_" + HubScreen.REGIONS[region]);
         }
         return hub;
+    }
+
+    /**
+     * A trading counter to photograph: 1 to 4 the herbalist's tabs - sell, buy,
+     * tools, the old shelf - 5 the farmer's seed and 6 the cook's kitchen.
+     */
+    private static TradeScreen tradeAt(Kagebi game, int page) {
+        if (page == 5) {
+            return new TradeScreen(game, TradeScreen.Counter.FARMER);
+        }
+        if (page == 6) {
+            return new TradeScreen(game, TradeScreen.Counter.COOK);
+        }
+        return new TradeScreen(game, TradeScreen.Counter.HERBALIST).onTab(page - 1);
+    }
+
+    /**
+     * Something in the storehouse, the seed bag and the pantry, so the trading
+     * shelves have something on them. Guarded like {@link #stockProfile}: a
+     * village that has been played is left exactly as it is.
+     */
+    private static void stockVillage(Kagebi game) {
+        VillageState v = game.profile().village;
+        if (v.stock.size > 0 || v.seeds.size > 0 || v.pantry.size > 0) {
+            return;
+        }
+        v.stock.put("fish", 3);
+        v.stock.put("wood", 5);
+        v.stock.put("egg", 4);
+        v.stock.put("wheat", 2);
+        v.stock.put("carrot", 6);
+        v.seeds.put("carrot", 2);
+        v.pantry.put("food_onigiri", 1);
     }
 
     private static void sampleRun(Kagebi game, int deepest) {
