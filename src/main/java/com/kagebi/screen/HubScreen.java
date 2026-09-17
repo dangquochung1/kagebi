@@ -43,6 +43,7 @@ import com.kagebi.gfx.Silhouette;
 import com.kagebi.screen.island.CloudLayer;
 import com.kagebi.screen.island.HarvestFx;
 import com.kagebi.screen.island.IslandProps;
+import com.kagebi.screen.island.SeaRipple;
 import com.kagebi.ui.DialogBox;
 import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
@@ -128,6 +129,8 @@ public class HubScreen extends SimScreen {
     private static final float LINE_REACH = 12f;
     /** A splash further off than this is not heard. */
     private static final float EARSHOT = 180f;
+    /** The map layer that ripples, as the pack's scene has its sea under a water filter. */
+    private static final String SEA_LAYER = "ground_sea";
     /** The pack's green progress bars, 0 to 6 on the end. */
     private static final String BAR = "ui/sunny/icons/greenbar_0";
     /** Frames after arriving that {@code --screen harvest} sets its effect off. */
@@ -444,6 +447,9 @@ public class HubScreen extends SimScreen {
                 if (name.startsWith("overhead_cloud")) {
                     flushTiles(tiles);
                     passes.add(new Pass(null, null, false, new CloudLayer((TiledMapTileLayer) layer)));
+                } else if (SEA_LAYER.equals(name)) {
+                    flushTiles(tiles);
+                    passes.add(new Pass(new SeaRipple(i)));
                 } else {
                     tiles.add(i);
                 }
@@ -988,6 +994,10 @@ public class HubScreen extends SimScreen {
         batch.end();
 
         for (Pass pass : passes) {
+            if (pass.sea != null) {
+                pass.sea.draw(renderer, cam, camera.viewport(), batch, seconds);
+                continue;
+            }
             if (pass.tiles != null) {
                 renderer.setView(cam);
                 renderer.render(pass.tiles);
@@ -1264,6 +1274,11 @@ public class HubScreen extends SimScreen {
         if (silhouette != null) {
             silhouette.dispose();
         }
+        for (Pass pass : passes) {
+            if (pass.sea != null) {
+                pass.sea.dispose();
+            }
+        }
         if (renderer != null) {
             renderer.dispose();
         }
@@ -1272,18 +1287,28 @@ public class HubScreen extends SimScreen {
         }
     }
 
-    /** One draw step: a run of tile layers, a layer of sprites, or a layer of cloud. */
+    /** One draw step: a run of tile layers, a layer of sprites, a layer of cloud, or the sea. */
     private static final class Pass {
         final int[] tiles;
         final Array<IslandProps.Prop> sprites;
         final boolean sorted;
         final CloudLayer clouds;
+        final SeaRipple sea;
 
         Pass(int[] tiles, Array<IslandProps.Prop> sprites, boolean sorted, CloudLayer clouds) {
             this.tiles = tiles;
             this.sprites = sprites;
             this.sorted = sorted;
             this.clouds = clouds;
+            this.sea = null;
+        }
+
+        Pass(SeaRipple sea) {
+            this.tiles = null;
+            this.sprites = null;
+            this.sorted = false;
+            this.clouds = null;
+            this.sea = sea;
         }
     }
 
