@@ -35,7 +35,7 @@ the `credits.home.*` strings in `assets/i18n/` are the two places to correct.
 The Sunnyside World pack came as a folder of art and the GameMaker project it
 was shown off in, with no licence file. The village is built from that
 project's own showcase room by `tools/make_island.py`; the pack itself stays
-out of git (`miniworld/` in `.gitignore`), and only the images the game loads
+out of git (`assets/packs/miniworld/`, under `assets/packs/` in `.gitignore`), and only the images the game loads
 are derived from it. As with the house, this row and the `credits.sunnyside.*`
 strings are the places to correct if its terms turn out to need more.
 

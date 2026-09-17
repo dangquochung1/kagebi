@@ -50,7 +50,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from make_maps import OUT, ROOT, TILE, Layer, Tileset, write_tmx  # noqa: E402
 
-PACK = os.path.join(ROOT, "homeassets", "Tiled_files")
+PACK = os.path.join(ROOT, "assets", "packs", "homeassets", "Tiled_files")
 HOME_TILES = os.path.join(ROOT, "assets", "gfx", "tiles", "home")
 HOME_REL = "../gfx/tiles/home/"
 

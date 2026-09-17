@@ -45,14 +45,14 @@ tools/preview/
 # Regenerable review screenshots
 review/
 
-# The Top-Down Character Home pack: a source pack like the ones in _raw/, and
-# kept out of git for the same reason - it shipped no licence, so it must not be
-# redistributed. tools/make_village.py reads it to rebuild the village, and
-# tools/build_assets.py copies its sheets into assets/gfx/tiles/home/.
-homeassets/
-
-# The Sunnyside World pack: the island village's source, kept out of git for the
-# same reason as homeassets/ - it shipped no licence file, so it must not be
-# redistributed. tools/make_island.py reads its GameMaker project to build
-# assets/maps/village.tmx and the images under assets/gfx/sunnyside/.
-miniworld/
+# Source packs that arrived as folders of their own, kept out of git for the
+# same reason as _raw/ - neither shipped a licence, so they must not be
+# redistributed:
+#   assets/packs/homeassets/  the Top-Down Character Home pack. tools/make_village.py
+#                             reads it to rebuild the house, and tools/build_assets.py
+#                             copies its sheets into assets/gfx/tiles/home/.
+#   assets/packs/miniworld/   the Sunnyside World pack. tools/make_island.py reads its
+#                             GameMaker project to build assets/maps/village.tmx and
+#                             the images under assets/gfx/sunnyside/.
+# tools/make_exe.py leaves this folder out of the standalone build.
+assets/packs/

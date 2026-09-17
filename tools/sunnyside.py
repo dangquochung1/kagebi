@@ -34,7 +34,7 @@ from functools import lru_cache
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PACK = os.path.join(ROOT, "miniworld")
+PACK = os.path.join(ROOT, "assets", "packs", "miniworld")
 PROJECT = os.path.join(PACK, "Sunnyside_World_Gamemaker")
 LOOSE = os.path.join(PACK, "Sunnyside_World_Assets")
 EXAMPLE = os.path.join(LOOSE, "Sunnyside_World_ExampleScene.png")

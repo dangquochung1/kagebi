@@ -26,6 +26,7 @@ LINKED = [
     os.path.join("assets", "gfx"),
     os.path.join("assets", "audio"),
     os.path.join("assets", "atlas"),
+    os.path.join("assets", "packs"),
     "_raw",
 ]
 

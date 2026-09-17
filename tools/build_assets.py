@@ -29,11 +29,12 @@ DUNGEON = os.path.join(RAW, "2D Pixel Dungeon Asset Pack")
 ENEMIES = os.path.join(RAW, "Enemy_Animations_Set")
 RAVEN = os.path.join(RAW, "Free - Raven Fantasy Icons")
 SUNNY = os.path.join(RAW, "SunnyLand Music")
-# The one pack that is not under _raw/. It arrived as a folder of its own in
-# the project root and its .tmx files are read directly by tools/make_village.py,
-# which is the only reason it is not moved: the paths inside those files are
-# relative to where they sit.
-HOME = os.path.join(ROOT, "homeassets", "Tiled_files")
+# The two packs that are not under _raw/. Each arrived as a folder of its own
+# and lives whole in assets/packs/: tools/make_village.py reads the home pack's
+# .tmx files directly, and the paths inside those are relative to where they
+# sit, so the folder is moved as one piece or not at all.
+PACKS = os.path.join(OUT, "packs")
+HOME = os.path.join(PACKS, "homeassets", "Tiled_files")
 
 # Promo art, contact sheets and editor previews that ship alongside the real
 # assets. Matched case-insensitively against the bare filename.
@@ -388,8 +389,8 @@ def build_sunnyside():
     under gfx/ for a mis-sized tileset and move it into props/.
     """
     print("sunnyside world")
-    if not os.path.isdir(os.path.join(ROOT, "miniworld")):
-        print("  ! missing source: %s" % os.path.join(ROOT, "miniworld"))
+    if not os.path.isdir(os.path.join(PACKS, "miniworld")):
+        print("  ! missing source: %s" % os.path.join(PACKS, "miniworld"))
         stats["missing_sources"] += 1
         return
     if not DRY:

@@ -50,6 +50,13 @@ def run(cmd, **kw):
     subprocess.run(cmd, check=True, **kw)
 
 
+def skip_packs(directory, names):
+    """copytree's ignore: assets/packs, and nothing else anywhere."""
+    if os.path.normcase(os.path.abspath(directory)) == os.path.normcase(os.path.join(ROOT, "assets")):
+        return [n for n in names if n == "packs"]
+    return []
+
+
 def main():
     installer = "--installer" in sys.argv
 
@@ -66,8 +73,11 @@ def main():
     shutil.copy2(jar, STAGE)
     # The assets are NOT inside the jar - 118MB of them, and the .tmx files
     # reference their tilesets by relative path, which does not survive being
-    # flattened into a classpath. They ship as a folder next to the exe.
-    shutil.copytree(os.path.join(ROOT, "assets"), os.path.join(STAGE, "assets"))
+    # flattened into a classpath. They ship as a folder next to the exe -
+    # without assets/packs, the source packs the build reads, which the game
+    # never opens.
+    shutil.copytree(os.path.join(ROOT, "assets"), os.path.join(STAGE, "assets"),
+                    ignore=skip_packs)
 
     print("packaging")
     cmd = [jpackage(),
