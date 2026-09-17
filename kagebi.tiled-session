@@ -1,19 +1,19 @@
 {
     "activeFile": "assets/maps/village.tmx",
     "expandedProjectPaths": [
-        "assets/maps/rooms/ruins_orange",
-        "assets/maps/rooms/depths",
         "assets/maps/rooms",
+        "assets/maps",
+        "assets/maps/rooms/depths",
         "assets/maps/rooms/ruins_green",
-        "assets/maps"
+        "assets/maps/rooms/ruins_orange"
     ],
     "fileStates": {
         "assets/maps/rooms/depths/normal_01.tmx": {
             "scale": 1.85546875,
             "selectedLayer": 2,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 87.57894736842105
+                "x": 151.71368421052634,
+                "y": 87.57894736842104
             }
         },
         "assets/maps/rooms/depths/normal_01.tmx#dungeon": {
@@ -23,8 +23,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 151.71368421052634,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/depths/normal_03.tmx#dungeon": {
@@ -34,8 +34,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 151.71368421052634,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/depths/normal_07.tmx#dungeon": {
@@ -45,8 +45,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 151.71368421052634,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/depths/secret_01.tmx#dungeon": {
@@ -56,8 +56,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 159.7978947368421,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/depths/start_01.tmx#dungeon": {
@@ -67,8 +67,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 159.7978947368421,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/ruins_green/boss_01.tmx#elements": {
@@ -84,8 +84,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 159.7978947368421,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/ruins_green/exit_02.tmx#elements": {
@@ -101,8 +101,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 159.7978947368421,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/ruins_green/normal_05.tmx#elements": {
@@ -118,8 +118,8 @@
             "scale": 1.85546875,
             "selectedLayer": 0,
             "viewCenter": {
-                "x": 160.0673684210526,
-                "y": 88.1178947368421
+                "x": 151.71368421052634,
+                "y": 88.11789473684209
             }
         },
         "assets/maps/rooms/ruins_orange/treasure_02.tmx#elements": {
@@ -132,46 +132,526 @@
             "scaleInDock": 1
         },
         "assets/maps/village.tmx": {
-            "scale": 1.2369791666666665,
-            "selectedLayer": 1,
+            "scale": 0.75,
+            "selectedLayer": 12,
             "viewCenter": {
-                "x": 240.10105263157897,
-                "y": 144.30315789473687
+                "x": 881.9999999999999,
+                "y": 595.3333333333333
             }
         },
+        "assets/maps/village.tmx#beetroot_00": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#bird_fly_animation": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#bird_jump_animation": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#cabbage_05": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#cat_animation": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#cauliflower_05": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#chimneysmoke_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#chimneysmoke_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#chimneysmoke_03": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#chimneysmoke_04": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#chimneysmoke_05": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#doors_windows_animation": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#egg": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#expression_alerted": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#expression_attack": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#expression_chat": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#expression_love": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#expression_stress": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#expression_working": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#exterior": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#fish": {
+            "scaleInDock": 1
+        },
         "assets/maps/village.tmx#floor": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#ground_grass_details": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#happiness_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#happiness_03": {
             "scaleInDock": 1
         },
         "assets/maps/village.tmx#house": {
             "scaleInDock": 1
         },
+        "assets/maps/village.tmx#house_details": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_attack": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_axe": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_doing": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_reeling": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_roll": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_run": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_bowlhair_swimming": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_curlyhair_attack": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_curlyhair_carry": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_curlyhair_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_curlyhair_jump": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_curlyhair_run": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_curlyhair_swimming": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_longhair_carry": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_longhair_casting": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_longhair_hamering": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_longhair_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_longhair_jump": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_longhair_roll": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_attack": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_carry": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_death": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_doing": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_jump": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_reeling": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_mophair_run": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_shorthair_axe": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_shorthair_carry": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_shorthair_caught": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_shorthair_doing": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_shorthair_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_shorthair_roll": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_spikeyhair_axe": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_spikeyhair_carry": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_spikeyhair_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_spikeyhair_roll": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#human_spikeyhair_watering": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#kale_05": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#milk": {
+            "scaleInDock": 1
+        },
         "assets/maps/village.tmx#nature": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#parsnip_03": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#pumpkin_05": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#rock": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#skeleton_attack": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#skeleton_hurt": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#skeleton_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#skeleton_jump": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#smoke_animation": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_attack": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_axe": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_carry": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_casting": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_caught": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_death": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_acron": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_anvil": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_barrel_closed": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_barrel_open": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_barrel_swords": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_barrel_water": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_beam": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_bird_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_blinking": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_book_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_book_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_bucket": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_campfire": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_chair_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_charactershadow": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_chest_01_open": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_chest_02_closed": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_chicken_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_chinmney": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_coin": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_coins": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_cook_chinmney": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_coracle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_coracle_land": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_cow": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_crate_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_crate_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_duck_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_fire_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_fire_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_firepit": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_flowers_house_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_flowers_house_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_glint_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_glint_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_jar_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_jar_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_minecart": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_mug_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_mug_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_mushroom_blue_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_mushroom_blue_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_mushroom_blue_03": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_mushroom_red_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_oar": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_ore_coal": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_ore_gold": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_pig_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_plate_food": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_plate_knifeandfork": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_shadow": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_sheep_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_sidetable_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_sword_floor": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_tree_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_tree_02": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_trough": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_truffle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_waterbowl": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_well": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_well_covered": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_windmill": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_windmill_withshadow": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_windmillshadow": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_deco_wool": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_dig": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_doing": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_hammering": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_idle": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_jump": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_mining": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_reeling": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_roll": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_run": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_swimming": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_walking": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#spr_watering": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#sunnyside": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#sunnyside_forest": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#torii": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#trees_animation": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#wheat_01": {
+            "scaleInDock": 1
+        },
+        "assets/maps/village.tmx#wood": {
             "scaleInDock": 1
         }
     },
     "openFiles": [
-        "assets/maps/rooms/depths/normal_01.tmx",
-        "assets/maps/rooms/depths/normal_03.tmx",
-        "assets/maps/rooms/depths/normal_07.tmx",
-        "assets/maps/rooms/depths/secret_01.tmx",
-        "assets/maps/village.tmx",
-        "assets/maps/rooms/ruins_orange/treasure_02.tmx",
-        "assets/maps/rooms/ruins_green/boss_01.tmx",
-        "assets/maps/rooms/ruins_green/exit_02.tmx",
-        "assets/maps/rooms/ruins_green/normal_05.tmx",
-        "assets/maps/rooms/depths/start_01.tmx"
+        "assets/maps/village.tmx"
     ],
     "project": "kagebi.tiled-project",
     "recentFiles": [
-        "assets/maps/rooms/depths/normal_01.tmx",
-        "assets/maps/rooms/depths/normal_03.tmx",
-        "assets/maps/rooms/depths/normal_07.tmx",
-        "assets/maps/rooms/depths/secret_01.tmx",
+        "assets/maps/village.tmx",
         "assets/maps/rooms/depths/start_01.tmx",
         "assets/maps/rooms/ruins_green/normal_05.tmx",
         "assets/maps/rooms/ruins_green/exit_02.tmx",
         "assets/maps/rooms/ruins_green/boss_01.tmx",
         "assets/maps/rooms/ruins_orange/treasure_02.tmx",
-        "assets/maps/village.tmx"
+        "assets/maps/rooms/depths/secret_01.tmx",
+        "assets/maps/rooms/depths/normal_07.tmx",
+        "assets/maps/rooms/depths/normal_03.tmx",
+        "assets/maps/rooms/depths/normal_01.tmx"
     ]
 }
