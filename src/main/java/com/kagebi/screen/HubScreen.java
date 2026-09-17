@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.MapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
@@ -38,7 +39,9 @@ import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
 import com.kagebi.run.RunState;
 import com.kagebi.save.VillageState;
+import com.kagebi.gfx.Silhouette;
 import com.kagebi.screen.island.CloudLayer;
+import com.kagebi.screen.island.HarvestFx;
 import com.kagebi.screen.island.IslandProps;
 import com.kagebi.ui.DialogBox;
 import com.kagebi.ui.Hud;
@@ -117,6 +120,19 @@ public class HubScreen extends SimScreen {
     private static final String ALERT = "ui/sunny/icons/expression_alerted";
     /** Steps a "+2 wood" floats over the player. */
     private static final int TOAST_STEPS = 60;
+    /** Goods drawn flying at one collection; a worker holding eleven sends six. */
+    private static final int MAX_FLYING = 6;
+    /** The workshop whose units are fish, which leap rather than hop. */
+    private static final String FISHING = "fishing";
+    /** How far out from the fisher's middle the line meets the water. */
+    private static final float LINE_REACH = 12f;
+    /** A splash further off than this is not heard. */
+    private static final float EARSHOT = 180f;
+    /** The pack's green progress bars, 0 to 6 on the end. */
+    private static final String BAR = "ui/sunny/icons/greenbar_0";
+    /** Frames after arriving that {@code --screen harvest} sets its effect off. */
+    private static final int DEMO_FLY_FRAME = 212;
+    private static final int DEMO_LEAP_FRAME = 220;
     /** Villagers turn to face the player inside this range. */
     private static final float NOTICE_RANGE = 56f;
 
@@ -134,7 +150,8 @@ public class HubScreen extends SimScreen {
     static final String[] REGIONS = {"farm", "forest", "ranch", "fishing", "mine", "kitchen"};
 
     /**
-     * The kit badge: the ninja's own face, top right, opening the loadout.
+     * The kit badge: the ninja's own face, top right, opening the loadout when
+     * clicked.
      *
      * <p>Twenty-four square with the 32px idle frame drawn into it and
      * trimmed - the portrait is the label, so there is no text to translate and
@@ -145,6 +162,9 @@ public class HubScreen extends SimScreen {
     private static final int BADGE = 24;
     private static final int BADGE_X = Cfg.VIRT_W - BADGE - 4;
     private static final int BADGE_Y = Cfg.VIRT_H - BADGE - 4;
+    /** The bag button beside it, which Tab also presses. */
+    private static final int BAG_X = BADGE_X - BADGE - 4;
+    private static final String BAG_ICON = "ui/sunny/icons/basket";
 
     private final Kagebi game;
     private final CameraController camera = new CameraController();
@@ -167,13 +187,29 @@ public class HubScreen extends SimScreen {
 
     /** Each plot's middle across and bottom edge, y up, in the order the farm counts them. */
     private final Array<float[]> plots = new Array<>();
-    /** Crop pictures by region name, null for one the atlas does not have. */
-    private final ObjectMap<String, TextureRegion> cropArt = new ObjectMap<>();
+    /** Crop and mark pictures by region name, null for one the atlas does not have. */
+    private final ObjectMap<String, TextureRegion> art = new ObjectMap<>();
     private VillageCatalog village;
     private VillageState farm;
     /** What was just harvested or collected, floating over the player, and its steps left. */
     private String toast;
     private int toastSteps;
+
+    /** Goods flying to the player, the fisher's fish, a unit hopping over its maker. */
+    private HarvestFx fx;
+    /** For the white ring round a flying good; null where the driver would not compile it. */
+    private ShaderProgram silhouette;
+    /** Each workshop's waiting count as last seen, to notice a unit being made. */
+    private final ObjectIntMap<String> lastReady = new ObjectIntMap<>();
+    /**
+     * For {@code --screen harvest}: which effect to set off, and on which drawn
+     * frame. Frames rather than steps, because {@code --frames} counts frames and
+     * a slow first second runs several steps a frame to catch up, by a different
+     * amount every run.
+     */
+    private int demoKind;
+    private int demoAt = -1;
+    private int framesDrawn;
 
     private DialogBox dialog;
     private BitmapFont font;
@@ -243,6 +279,17 @@ public class HubScreen extends SimScreen {
      */
     HubScreen arriveAt(String marker) {
         arriveAt = marker;
+        return this;
+    }
+
+    /**
+     * Sets off one of the island's effects a few seconds after arriving, for
+     * {@code --screen harvest}: 1 the woodcutter's goods flying over, 2 a fish
+     * at the fisher's line, 3 a crop picked. Timed so a screenshot at 240
+     * frames lands mid-flight.
+     */
+    HubScreen demo(int kind) {
+        demoKind = kind;
         return this;
     }
 
@@ -351,6 +398,19 @@ public class HubScreen extends SimScreen {
         } else {
             int[] at = arriveAt == null ? null : markers.get(arriveAt);
             world.enterRoom(at == null ? villageRoom() : villageRoom(at[0], at[1]), grid, null);
+        }
+
+        fx = new HarvestFx(Double.doubleToLongBits(farm.clock));
+        silhouette = Silhouette.create();
+        for (IslandProps.Prop worker : workers) {
+            VillageCatalog.Workshop workshop = workshopOf(worker);
+            if (workshop != null) {
+                // What is already waiting was made while nobody watched.
+                lastReady.put(workshop.id, Workshops.ready(village, farm, workshop));
+            }
+        }
+        if (demoKind > 0) {
+            demoAt = framesDrawn + (demoKind == 2 ? DEMO_LEAP_FRAME : DEMO_FLY_FRAME);
         }
         game.audio().playMusic(Assets.MUSIC_VILLAGE);
     }
@@ -505,6 +565,7 @@ public class HubScreen extends SimScreen {
         // Before the dialog: looking around is not doing anything, so it is
         // allowed mid-sentence too.
         stepZoom();
+        stepFx();
 
         if (dialog.open()) {
             dialog.step();
@@ -528,7 +589,11 @@ public class HubScreen extends SimScreen {
             stack().push(new PauseScreen(game, false));
             return;
         }
-        if (input().justPressed(GameAction.INVENTORY) || badgeClicked()) {
+        if (input().justPressed(GameAction.INVENTORY) || clicked(BAG_X, BADGE_Y, BADGE)) {
+            openBag();
+            return;
+        }
+        if (clicked(BADGE_X, BADGE_Y, BADGE)) {
             openLoadout();
             return;
         }
@@ -558,6 +623,87 @@ public class HubScreen extends SimScreen {
             } else if (world.promptKey() != null) {
                 world.interact();
             }
+        }
+    }
+
+    /**
+     * The effects, a step on; and a unit being made anywhere on the island,
+     * noticed by its workshop's waiting count going up.
+     */
+    private void stepFx() {
+        fx.step(world.playerX(), world.playerY());
+        if (fx.arrived() > 0 && !fx.flying()) {
+            game.audio().playSfx(Assets.Sfx.COIN);
+        }
+        if (fx.splashed() > 0) {
+            game.audio().playSfx(Assets.Sfx.BUBBLE);
+        }
+        for (IslandProps.Prop worker : workers) {
+            VillageCatalog.Workshop workshop = workshopOf(worker);
+            if (workshop == null) {
+                continue;
+            }
+            int ready = Workshops.ready(village, farm, workshop);
+            if (ready > lastReady.get(workshop.id, ready)) {
+                made(worker, workshop, ready - 1);
+            }
+            lastReady.put(workshop.id, ready);
+        }
+        if (demoAt >= 0 && framesDrawn >= demoAt) {
+            demoAt = -1;
+            runDemo();
+        }
+    }
+
+    /**
+     * A unit just made: at the fisher's line a fish leaps clear of the water;
+     * over anyone else, the unit they made hops up. Either way it is the good
+     * that will be collected, not a picture of the workshop's usual one.
+     */
+    private void made(IslandProps.Prop worker, VillageCatalog.Workshop workshop, int index) {
+        String good = Workshops.upcoming(village, farm, workshop, index);
+        TextureRegion icon = good == null ? null : TradeScreen.goodIcon(game, good);
+        if (icon == null) {
+            return;
+        }
+        boolean heard = dist(world.playerX(), world.playerY(), worker.centreX(), worker.foot) < EARSHOT;
+        if (FISHING.equals(workshop.id)) {
+            boolean right = !worker.flipX;
+            fx.leap(icon, worker.centreX() + (right ? LINE_REACH : -LINE_REACH), worker.foot - 2, right);
+            if (heard) {
+                game.audio().playSfx(Assets.Sfx.WATER);
+            }
+        } else {
+            fx.hop(icon, worker.centreX(), worker.foot + 26);
+        }
+    }
+
+    private void runDemo() {
+        IslandProps.Prop worker = workerFor(demoKind == 2 ? 3 : 1);
+        VillageCatalog.Workshop workshop = worker == null ? null : workshopOf(worker);
+        if (demoKind == 3) {
+            for (int i = 0; i < plots.size; i++) {
+                if (Farm.ripe(village, farm, i)) {
+                    workPlot(i);
+                    return;
+                }
+            }
+            // Nothing ripe on this profile: the flight alone, from the first plot.
+            TextureRegion pumpkin = TradeScreen.goodIcon(game, "pumpkin");
+            for (int i = 0; i < 3 && plots.size > 0; i++) {
+                fx.fly(pumpkin, plots.get(0)[0], plots.get(0)[1] + 8);
+            }
+            return;
+        }
+        if (workshop == null) {
+            return;
+        }
+        VillageState.Work work = Workshops.work(farm, workshop);
+        work.held = Math.max(work.held, demoKind == 2 ? 1 : 3);
+        if (demoKind == 2) {
+            made(worker, workshop, 0);
+        } else {
+            collect(worker);
         }
     }
 
@@ -645,7 +791,14 @@ public class HubScreen extends SimScreen {
             said.append(game.i18n().format("village.got", e.value, goodName(e.key)));
         }
         showToast(said.toString());
-        game.audio().playSfx(Assets.SFX_ACCEPT);
+        int flying = 0;
+        for (ObjectIntMap.Entry<String> e : got) {
+            TextureRegion icon = TradeScreen.goodIcon(game, e.key);
+            for (int i = 0; i < e.value && flying < MAX_FLYING; i++, flying++) {
+                fx.fly(icon, worker.centreX(), worker.foot + 16);
+            }
+        }
+        game.audio().playSfx(Assets.Sfx.PICKUP);
         return true;
     }
 
@@ -655,7 +808,12 @@ public class HubScreen extends SimScreen {
             VillageCatalog.Crop crop = Farm.crop(village, farm, index);
             int picked = Farm.harvest(village, farm, index);
             showToast(game.i18n().format("village.got", picked, goodName(crop.good)));
-            game.audio().playSfx(Assets.SFX_ACCEPT);
+            TextureRegion icon = TradeScreen.goodIcon(game, crop.good);
+            float[] plot = plots.get(index);
+            for (int i = 0; i < Math.min(picked, MAX_FLYING); i++) {
+                fx.fly(icon, plot[0], plot[1] + 8);
+            }
+            game.audio().playSfx(Assets.Sfx.GRASS);
             return;
         }
         VillageCatalog.Crop seed = seedFor(index);
@@ -753,7 +911,7 @@ public class HubScreen extends SimScreen {
      * that; one clickable rectangle on one screen is not worth a second input
      * model. The badge is drawn in UI space, so the click is tested there.
      */
-    private boolean badgeClicked() {
+    private boolean clicked(int left, int bottom, int size) {
         if (!Gdx.input.justTouched()) {
             return false;
         }
@@ -762,11 +920,17 @@ public class HubScreen extends SimScreen {
         float x = Gdx.input.getX() / scaleX;
         // Screen y runs down from the top; the virtual one runs up.
         float y = Cfg.VIRT_H - Gdx.input.getY() / scaleY;
-        return x >= BADGE_X && x <= BADGE_X + BADGE
-            && y >= BADGE_Y && y <= BADGE_Y + BADGE;
+        return x >= left && x <= left + size
+            && y >= bottom && y <= bottom + size;
     }
 
-    private void openLoadout() {
+    /** The bag: the storehouse, the tools, the island's people, what is packed, and the kit. */
+    private void openBag() {
+        game.audio().playSfx(Assets.SFX_ACCEPT);
+        stack().push(new BagScreen(game, this::openLoadout));
+    }
+
+    void openLoadout() {
         game.audio().playSfx(Assets.SFX_ACCEPT);
         loadoutOpen = true;
         stack().push(new CharacterSelectScreen(game, 0).asLoadout());
@@ -803,6 +967,7 @@ public class HubScreen extends SimScreen {
 
     @Override
     public void render(float delta) {
+        framesDrawn++;
         camera.follow(world.playerX(), world.playerY(), mapW, mapH);
         camera.apply();
         SpriteBatch batch = game.batch();
@@ -847,11 +1012,18 @@ public class HubScreen extends SimScreen {
             batch.end();
         }
 
+        batch.setProjectionMatrix(cam.combined);
+        batch.begin();
+        fx.drawWorld(batch);
+        batch.end();
+
         ui.snapTo(Cfg.VIRT_W / 2f, Cfg.VIRT_H / 2f);
         ui.apply();
         batch.setProjectionMatrix(ui.camera().combined);
         batch.begin();
         drawOverWorld(batch, cam);
+        fx.drawScreen(batch, cam, silhouette);
+        drawToast(batch, cam);
         drawOverlay(batch);
         batch.end();
     }
@@ -878,11 +1050,26 @@ public class HubScreen extends SimScreen {
     }
 
     private TextureRegion cropArt(String crop, int stage) {
-        String name = "ui/sunny/crops/" + crop + "_0" + stage;
-        if (!cropArt.containsKey(name)) {
-            cropArt.put(name, game.skin().has(name, TextureRegion.class) ? game.skin().getRegion(name) : null);
+        return art("ui/sunny/crops/" + crop + "_0" + stage);
+    }
+
+    private TextureRegion art(String name) {
+        if (!art.containsKey(name)) {
+            art.put(name, game.skin().has(name, TextureRegion.class) ? game.skin().getRegion(name) : null);
         }
-        return cropArt.get(name);
+        return art.get(name);
+    }
+
+    /**
+     * Which of the pack's seven green bars, empty to full, shows a workshop's
+     * progress. The full one is kept for a full workshop, so a full bar always
+     * means come and collect.
+     */
+    static int barFrame(float progress) {
+        if (progress >= 1f) {
+            return 6;
+        }
+        return Math.max(0, Math.min(5, (int) (progress * 6f)));
     }
 
     /**
@@ -892,16 +1079,31 @@ public class HubScreen extends SimScreen {
      */
     private void drawOverWorld(SpriteBatch batch, OrthographicCamera cam) {
         TextureRegion alert = game.skin().has(ALERT, TextureRegion.class) ? game.skin().getRegion(ALERT) : null;
-        if (alert != null) {
-            for (IslandProps.Prop worker : workers) {
-                VillageCatalog.Workshop workshop = workshopOf(worker);
-                if (workshop != null && Workshops.ready(village, farm, workshop) > 0) {
-                    batch.draw(alert,
-                               Math.round(screenX(cam, worker.centreX()) - alert.getRegionWidth() / 2f),
-                               Math.round(screenY(cam, worker.foot + 24)) + 2);
-                }
+        for (IslandProps.Prop worker : workers) {
+            VillageCatalog.Workshop workshop = workshopOf(worker);
+            if (workshop == null) {
+                continue;
+            }
+            float x = screenX(cam, worker.centreX());
+            float y = Math.round(screenY(cam, worker.foot + 24)) + 2;
+            if (x < -16 || x > Cfg.VIRT_W + 16 || y < -24 || y > Cfg.VIRT_H + 8) {
+                continue;
+            }
+            // The bar over the head, and the mark for goods waiting over the bar.
+            TextureRegion bar = art(BAR + barFrame(Workshops.progress(village, farm, workshop)));
+            float top = y;
+            if (bar != null) {
+                batch.draw(bar, Math.round(x - bar.getRegionWidth() / 2f), y);
+                top = y + bar.getRegionHeight() + 1;
+            }
+            if (alert != null && Workshops.ready(village, farm, workshop) > 0) {
+                batch.draw(alert, Math.round(x - alert.getRegionWidth() / 2f), top);
             }
         }
+    }
+
+    /** What was just taken, over the player. After the flying goods, which would cover the words. */
+    private void drawToast(SpriteBatch batch, OrthographicCamera cam) {
         if (toastSteps > 0 && toast != null) {
             float rise = (TOAST_STEPS - toastSteps) * 0.25f;
             batch.setColor(1f, 0.93f, 0.72f, Math.min(1f, toastSteps / 20f));
@@ -970,6 +1172,7 @@ public class HubScreen extends SimScreen {
                      Align.left);
         batch.setColor(Color.WHITE);
         drawBadge(batch);
+        drawBagButton(batch);
         // The village's name as an arrival card, not a permanent label: in the
         // first screenshot it sat across a roof, unreadable, saying something
         // the player already knew.
@@ -1032,9 +1235,19 @@ public class HubScreen extends SimScreen {
         game.skin().getDrawable(Assets.Ui.CELL).draw(batch, BADGE_X, BADGE_Y, BADGE, BADGE);
         TextureRegion frame = badgeIdle.frame(Dir.DOWN, steps());
         batch.draw(frame, BADGE_X + (BADGE - 32) / 2f, BADGE_Y + (BADGE - 32) / 2f);
+    }
+
+    /** The bag, beside the badge: the pack's basket, with the key that opens it under it. */
+    private void drawBagButton(SpriteBatch batch) {
+        game.skin().getDrawable(Assets.Ui.CELL).draw(batch, BAG_X, BADGE_Y, BADGE, BADGE);
+        if (game.skin().has(BAG_ICON, TextureRegion.class)) {
+            TextureRegion basket = game.skin().getRegion(BAG_ICON);
+            batch.draw(basket, BAG_X + (BADGE - basket.getRegionWidth()) / 2,
+                       BADGE_Y + (BADGE - basket.getRegionHeight()) / 2);
+        }
         Hud.prompt(batch, game.skin(), font,
                    game.input().map().primary(GameAction.INVENTORY), "",
-                   BADGE_X + BADGE / 2f, BADGE_Y - Hud.LINE + 4);
+                   BAG_X + BADGE / 2f, BADGE_Y - Hud.LINE + 4);
     }
 
     @Override
@@ -1047,6 +1260,9 @@ public class HubScreen extends SimScreen {
     public void dispose() {
         if (world != null) {
             world.dispose();
+        }
+        if (silhouette != null) {
+            silhouette.dispose();
         }
         if (renderer != null) {
             renderer.dispose();

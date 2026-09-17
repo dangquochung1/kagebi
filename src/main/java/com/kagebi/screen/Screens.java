@@ -32,6 +32,10 @@ import com.kagebi.village.Pantry;
  *   hub       --page 1-11  the village: 1 at home, 2 the torii, 3 the shop, 4-9 each
  *                          region's worker, 10 zoomed out to the whole island,
  *                          11 zoomed out once at the torii
+ *   harvest   --page 1-3   the village mid-effect: goods flying from the woodcutter, a
+ *                          fish over the fisher, a pumpkin picked
+ *   bag       --page 1-5   the bag over the village, on that tab
+ *   counter   --page 1-6   a trading counter: the herbalist's four tabs, the farmer, the cook
  *   home      --page 1-2   inside the house: on the doormat, or on the rug by the table
  *   world     --page 1-5   the world map, open to that stage and focused on it
  *   stage     --page 1-5   the same, with that stage's panel and difficulty row
@@ -115,6 +119,18 @@ public final class Screens {
             case "counter":
                 stockVillage(game);
                 return new GameScreen[] {new HubScreen(game), tradeAt(game, page)};
+            case "harvest": {
+                // 1 goods flying from the woodcutter, 2 a fish over the fisher,
+                // 3 a pumpkin picked.
+                int kind = Math.max(1, Math.min(3, page));
+                String at = kind == 2 ? "stand_fishing" : kind == 3 ? "stand_farm" : "stand_forest";
+                return new GameScreen[] {new HubScreen(game).arriveAt(at).demo(kind)};
+            }
+            case "bag": {
+                stockVillage(game);
+                HubScreen hub = new HubScreen(game);
+                return new GameScreen[] {hub, new BagScreen(game, hub::openLoadout).onTab(page - 1)};
+            }
             case "store":
                 stockProfile(game, page);
                 return new GameScreen[] {new HubScreen(game), new ShopScreen(game)};

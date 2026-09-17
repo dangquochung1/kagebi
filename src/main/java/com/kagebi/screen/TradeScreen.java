@@ -1,23 +1,12 @@
 package com.kagebi.screen;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.InputProcessor;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.g2d.BitmapFont;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
-import com.kagebi.Cfg;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.VillageCatalog;
 import com.kagebi.data.def.ItemDef;
-import com.kagebi.gfx.CameraController;
-import com.kagebi.input.GameAction;
 import com.kagebi.save.Profile;
-import com.kagebi.ui.Hud;
-import com.kagebi.ui.I18n;
 import com.kagebi.village.Farm;
 import com.kagebi.village.Kitchen;
 import com.kagebi.village.Market;
@@ -32,17 +21,12 @@ import com.kagebi.village.Pantry;
  * on the shelf. The herbalist buys the island's goods and sells potions for the
  * pantry and tools for the workers, and keeps the old shelf of upgrades and
  * unlocks one tab along; the farmer sells seed; the cook turns goods into meals.
- *
- * <p>Built the way {@link ShopScreen} is - straight to the batch, a focus ring
- * driven by the movement keys, running off the top or bottom of a shelf to
- * change tab - so the village's two trading screens are learned once. Like it,
- * every trade writes the save at once: the goods have left the storehouse, and
- * the gold and the goods must land together.
+ * The shape itself is {@link ShelfScreen}'s, shared with the bag.
  *
  * <p>The rules are {@code com.kagebi.village}'s. This decides only what is on
  * the shelf and what the words say.
  */
-public class TradeScreen extends SimScreen {
+public class TradeScreen extends ShelfScreen {
 
     /** Who is behind the counter. */
     public enum Counter { HERBALIST, FARMER, COOK }
@@ -62,56 +46,12 @@ public class TradeScreen extends SimScreen {
         }
     }
 
-    private static final int COLUMNS = 9;
-    private static final int CELL = 20;
-    private static final int GAP = 3;
-
-    private static final int PANEL_X = 8;
-    private static final int PANEL_W = Cfg.VIRT_W - 2 * PANEL_X;
-    private static final int PANEL_Y = 4;
-    private static final int PANEL_H = Cfg.VIRT_H - 2 * PANEL_Y;
-
-    // Line tops leave the four rows above cap height a stacked tone mark needs.
-    private static final int TITLE_TOP = PANEL_Y + PANEL_H - 7;
-    private static final int TAB_TOP = TITLE_TOP - Hud.LINE - 5;
-    private static final int GRID_TOP = TAB_TOP - Hud.LINE - 6;
-    private static final int DETAIL_Y = PANEL_Y + 26;
-    private static final int DETAIL_H = 50;
-    private static final int PROMPT_BOTTOM = PANEL_Y + 8;
-
-    /** How long "done" stands where the price was, after a trade. */
-    private static final int FLASH_STEPS = 60;
-
-    private static final String BOX_DARK = "ui/sunny/box_dark";
-    private static final String BOX_LIGHT = "ui/sunny/box_light";
-    private static final String LABEL = "ui/sunny/label";
-    private static final String CORNER = "ui/sunny/icons/selectbox_";
-
-    /** On the dark box. */
-    private static final Color CREAM = new Color(0xffe6c4ff);
-    private static final Color DIM = new Color(0xb89a78ff);
-    private static final Color GOLD = new Color(0xffad55ff);
-    /** On the light box and the label. */
-    private static final Color INK = new Color(0x2e1d16ff);
-    private static final Color SOFT = new Color(0x6b4a36ff);
-    private static final Color DENIED = new Color(0xa8443aff);
-    private static final Color DONE = new Color(0x4f7f34ff);
-    private static final Color LOCKED = new Color(0.45f, 0.42f, 0.46f, 1f);
-
-    private final Kagebi game;
     private final Counter counter;
     private final Tab[] tabs;
-    private final CameraController camera = new CameraController();
-    private BitmapFont font;
-
-    private final Array<Offer> offers = new Array<>();
-    private int tab;
-    private int focus;
-    private int flash;
+    private final String[] keys;
 
     public TradeScreen(Kagebi game, Counter counter) {
-        super(game.input());
-        this.game = game;
+        super(game);
         this.counter = counter;
         switch (counter) {
             case FARMER:
@@ -124,73 +64,88 @@ public class TradeScreen extends SimScreen {
                 tabs = new Tab[] {Tab.SELL, Tab.BUY, Tab.TOOLS, Tab.UPGRADES};
                 break;
         }
+        keys = new String[tabs.length];
+        for (int i = 0; i < tabs.length; i++) {
+            keys[i] = tabs[i].key;
+        }
     }
 
     /** Opens on the n-th tab, for {@code --screen counter}, which presses nothing. */
     TradeScreen onTab(int index) {
-        tab = Math.max(0, Math.min(tabs.length - 1, index));
+        openTab(index);
         return this;
     }
 
     @Override
-    public boolean isOpaque() {
-        return false;
+    protected String[] tabKeys() {
+        return keys;
     }
 
+    /** The name of who is trading. */
     @Override
-    public InputProcessor inputProcessor() {
-        return game.input();
+    protected String title() {
+        return game.i18n().get(counter == Counter.FARMER ? "npc.worker_farm.name"
+            : counter == Counter.COOK ? "npc.worker_kitchen.name"
+            : "npc." + Assets.Npc.HERBALIST + ".name");
     }
 
+    /** The pantry's room where things go into it, the farm's level where seed does. */
     @Override
-    public void show() {
-        game.input().clear();
-        font = game.skin().getFont("default");
-        camera.snapTo(Cfg.VIRT_W / 2f, Cfg.VIRT_H / 2f);
-        stock();
+    protected String aside(int tab) {
+        Tab current = tabs[tab];
+        Profile p = game.profile();
+        return current == Tab.BUY || current == Tab.KITCHEN
+            ? game.i18n().format("trade.pantry", Pantry.packed(p.village), Pantry.capacity(p, game.shop()))
+            : current == Tab.SEEDS ? game.i18n().format("trade.farm_level", Farm.level(game.village(), p.village))
+            : null;
     }
 
     // ---- the shelf ---------------------------------------------------------------
 
-    /** Fills the shelf for the current tab. Called again after every trade, which changes it. */
-    private void stock() {
-        offers.clear();
+    @Override
+    protected void stock(int tab, Array<Entry> into) {
         switch (tabs[tab]) {
             case SELL:
-                stockGoods();
+                stockGoods(into);
                 break;
             case BUY:
-                stockPotions();
+                stockPotions(into);
                 break;
             case TOOLS:
-                stockTools();
+                for (VillageCatalog.Tool tool : game.village().tools()) {
+                    into.add(new ToolOffer(tool));
+                }
                 break;
             case UPGRADES:
-                offers.add(new Shelf());
+                into.add(new Shelf());
                 break;
             case SEEDS:
-                stockSeeds();
+                for (VillageCatalog.Crop crop : game.village().crops()) {
+                    into.add(new SeedOffer(crop));
+                }
                 break;
             case KITCHEN:
-                stockMeals();
+                for (VillageCatalog.Recipe recipe : game.village().recipes()) {
+                    if (game.content().hasItem(recipe.item)) {
+                        into.add(new MealOffer(recipe));
+                    }
+                }
                 break;
             default:
                 break;
         }
-        focus = Math.max(0, Math.min(focus, offers.size - 1));
     }
 
-    private void stockGoods() {
-        VillageCatalog village = game.village();
-        for (VillageCatalog.Good good : village.goods()) {
+    private void stockGoods(Array<Entry> into) {
+        for (VillageCatalog.Good good : game.village().goods()) {
             if (game.profile().village.stock.get(good.id, 0) > 0) {
-                offers.add(new GoodOffer(good));
+                into.add(new GoodOffer(good));
             }
         }
     }
 
     /** What the dungeon's trader stocks, cheapest first: the herbalist sells at his prices. */
-    private void stockPotions() {
+    private void stockPotions(Array<Entry> into) {
         Array<ItemDef> sold = new Array<>();
         for (ItemDef item : game.content().allItems()) {
             if (item.forSale() && item.kind == ItemDef.Kind.CONSUMABLE) {
@@ -199,276 +154,8 @@ public class TradeScreen extends SimScreen {
         }
         sold.sort((a, b) -> a.price != b.price ? Integer.compare(a.price, b.price) : a.id.compareTo(b.id));
         for (ItemDef item : sold) {
-            offers.add(new PotionOffer(item));
+            into.add(new PotionOffer(item));
         }
-    }
-
-    private void stockTools() {
-        for (VillageCatalog.Tool tool : game.village().tools()) {
-            offers.add(new ToolOffer(tool));
-        }
-    }
-
-    private void stockSeeds() {
-        for (VillageCatalog.Crop crop : game.village().crops()) {
-            offers.add(new SeedOffer(crop));
-        }
-    }
-
-    private void stockMeals() {
-        for (VillageCatalog.Recipe recipe : game.village().recipes()) {
-            if (game.content().hasItem(recipe.item)) {
-                offers.add(new MealOffer(recipe));
-            }
-        }
-    }
-
-    // ---- simulation --------------------------------------------------------------
-
-    @Override
-    protected void step() {
-        if (flash > 0) {
-            flash--;
-        }
-        if (input().justPressed(GameAction.PAUSE) || input().justPressed(GameAction.INVENTORY)) {
-            game.audio().playSfx(Assets.SFX_CANCEL);
-            stack().pop();
-            return;
-        }
-        if (input().justPressed(GameAction.INTERACT) || input().justPressed(GameAction.ATTACK)) {
-            trade();
-            return;
-        }
-        move();
-    }
-
-    private void trade() {
-        Offer offer = selected();
-        if (offer == null || !offer.can()) {
-            game.audio().playSfx(Assets.SFX_CANCEL);
-            return;
-        }
-        if (!offer.act()) {
-            return;
-        }
-        flash = FLASH_STEPS;
-        game.audio().playSfx(Assets.SFX_ACCEPT);
-        Profile p = game.profile();
-        if (!game.saves().save(p)) {
-            Gdx.app.error("save", "profile not written; the trade is only in memory");
-        }
-        stock();
-    }
-
-    /**
-     * Left and right wrap along the shelf, up and down step between its rows, and
-     * running off the top or the bottom turns to the tab before or after.
-     */
-    private void move() {
-        int size = offers.size;
-        int row = size == 0 ? 0 : focus / COLUMNS;
-        int rows = Math.max(1, (size + COLUMNS - 1) / COLUMNS);
-        if (input().justPressed(GameAction.MOVE_RIGHT) && size > 0) {
-            focus = focus + 1 >= size ? 0 : focus + 1;
-        } else if (input().justPressed(GameAction.MOVE_LEFT) && size > 0) {
-            focus = focus == 0 ? size - 1 : focus - 1;
-        } else if (input().justPressed(GameAction.MOVE_DOWN)) {
-            if (row + 1 < rows) {
-                focus = Math.min(size - 1, focus + COLUMNS);
-            } else if (!turn(1)) {
-                return;
-            }
-        } else if (input().justPressed(GameAction.MOVE_UP)) {
-            if (row > 0) {
-                focus -= COLUMNS;
-            } else if (!turn(-1)) {
-                return;
-            }
-        } else {
-            return;
-        }
-        game.audio().playSfx(Assets.SFX_MOVE);
-    }
-
-    /** Turns to the next or previous tab; false for a counter with only one. */
-    private boolean turn(int by) {
-        if (tabs.length < 2) {
-            return false;
-        }
-        tab = (tab + by + tabs.length) % tabs.length;
-        focus = 0;
-        flash = 0;
-        stock();
-        return true;
-    }
-
-    private Offer selected() {
-        return focus >= 0 && focus < offers.size ? offers.get(focus) : null;
-    }
-
-    // ---- drawing -----------------------------------------------------------------
-
-    @Override
-    public void render(float delta) {
-        camera.apply();
-        SpriteBatch batch = game.batch();
-        batch.setProjectionMatrix(camera.camera().combined);
-        batch.begin();
-
-        game.skin().getDrawable("scrim").draw(batch, 0, 0, Cfg.VIRT_W, Cfg.VIRT_H);
-        game.skin().getDrawable(BOX_DARK).draw(batch, PANEL_X, PANEL_Y, PANEL_W, PANEL_H);
-
-        I18n t = game.i18n();
-        drawHeader(batch, t);
-        drawTabs(batch, t);
-        drawShelf(batch);
-        drawDetail(batch, t);
-
-        Offer offer = selected();
-        if (offer != null) {
-            Hud.prompt(batch, game.skin(), font, game.input().map().primary(GameAction.INTERACT),
-                       t.get(offer.verb()), PANEL_X + 8, PROMPT_BOTTOM, Align.left);
-        }
-        Hud.prompt(batch, game.skin(), font, game.input().map().primary(GameAction.PAUSE),
-                   t.get("common.back"), PANEL_X + PANEL_W - 8, PROMPT_BOTTOM, Align.right);
-
-        batch.setColor(Color.WHITE);
-        batch.end();
-    }
-
-    /** The name of who is trading, on the pack's label, and the purse opposite. */
-    private void drawHeader(SpriteBatch batch, I18n t) {
-        String name = t.get(counter == Counter.FARMER ? "npc.worker_farm.name"
-            : counter == Counter.COOK ? "npc.worker_kitchen.name"
-            : "npc." + Assets.Npc.HERBALIST + ".name");
-        float w = Hud.width(font, name) + 14;
-        int left = PANEL_X + 8;
-        game.skin().getDrawable(LABEL).draw(batch, left, TITLE_TOP - Hud.LINE, w, Hud.LINE);
-        batch.setColor(INK);
-        Hud.line(batch, font, name, left + 7, TITLE_TOP + 1);
-
-        String gold = String.valueOf(game.profile().gold);
-        int right = PANEL_X + PANEL_W - 9;
-        batch.setColor(GOLD);
-        Hud.right(batch, font, gold, right, TITLE_TOP);
-        batch.setColor(Color.WHITE);
-        TextureRegion coin = game.skin().getRegion(Assets.Ui.COIN);
-        batch.draw(coin, Math.round(right - Hud.width(font, gold) - coin.getRegionWidth() - 2),
-                   TITLE_TOP - Hud.LINE + 2);
-    }
-
-    /**
-     * The tabs, and on the far right what the shelf is measured against: the
-     * pantry's room where things go into it, the farm's level where seed does.
-     */
-    private void drawTabs(SpriteBatch batch, I18n t) {
-        int x = PANEL_X + 10;
-        for (int i = 0; i < tabs.length; i++) {
-            String label = t.get(tabs[i].key);
-            float w = Hud.width(font, label);
-            if (i == tab) {
-                // White first: the label before it left the batch tinted, and a
-                // nine-patch takes the batch's colour like any other drawing.
-                batch.setColor(Color.WHITE);
-                game.skin().getDrawable(BOX_LIGHT).draw(batch, x - 4, TAB_TOP - Hud.LINE - 1, w + 8, Hud.LINE + 3);
-            }
-            batch.setColor(i == tab ? INK : DIM);
-            Hud.line(batch, font, label, x, TAB_TOP);
-            x += Math.round(w) + 14;
-        }
-        Tab current = tabs[tab];
-        Profile p = game.profile();
-        String aside = current == Tab.BUY || current == Tab.KITCHEN
-            ? t.format("trade.pantry", Pantry.packed(p.village), Pantry.capacity(p, game.shop()))
-            : current == Tab.SEEDS ? t.format("trade.farm_level", Farm.level(game.village(), p.village))
-            : null;
-        if (aside != null) {
-            batch.setColor(DIM);
-            Hud.right(batch, font, aside, PANEL_X + PANEL_W - 10, TAB_TOP);
-        }
-        batch.setColor(Color.WHITE);
-    }
-
-    private void drawShelf(SpriteBatch batch) {
-        int left = (Cfg.VIRT_W - (COLUMNS * CELL + (COLUMNS - 1) * GAP)) / 2;
-        for (int i = 0; i < offers.size; i++) {
-            int x = left + (i % COLUMNS) * (CELL + GAP);
-            int y = GRID_TOP - CELL - (i / COLUMNS) * (CELL + GAP);
-            game.skin().getDrawable(BOX_LIGHT).draw(batch, x, y, CELL, CELL);
-            Offer offer = offers.get(i);
-            TextureRegion icon = offer.icon();
-            if (icon != null) {
-                // Darkened rather than hidden: what cannot be had yet is still
-                // worth knowing about.
-                batch.setColor(offer.can() ? Color.WHITE : LOCKED);
-                batch.draw(icon, x + (CELL - icon.getRegionWidth()) / 2, y + (CELL - icon.getRegionHeight()) / 2);
-            }
-            String pip = offer.pip();
-            if (pip != null) {
-                // Shadowed cream, because the count sits over the icon as much as
-                // over the cell, and ink vanished into the dark half of either.
-                batch.setColor(CREAM);
-                Hud.shadowed(batch, font, pip, x + CELL, y + 10, Align.right);
-            }
-            batch.setColor(Color.WHITE);
-            if (i == focus) {
-                drawCorners(batch, x, y);
-            }
-        }
-    }
-
-    /** The pack's four selection corners, just outside a cell. */
-    private void drawCorners(SpriteBatch batch, int x, int y) {
-        TextureRegion tl = region(CORNER + "tl");
-        TextureRegion tr = region(CORNER + "tr");
-        TextureRegion bl = region(CORNER + "bl");
-        TextureRegion br = region(CORNER + "br");
-        if (tl == null || tr == null || bl == null || br == null) {
-            game.skin().getDrawable(Assets.Ui.FOCUS).draw(batch, x - 2, y - 2, CELL + 4, CELL + 4);
-            return;
-        }
-        batch.draw(tl, x - 3, y + CELL + 3 - tl.getRegionHeight());
-        batch.draw(tr, x + CELL + 3 - tr.getRegionWidth(), y + CELL + 3 - tr.getRegionHeight());
-        batch.draw(bl, x - 3, y - 3);
-        batch.draw(br, x + CELL + 3 - br.getRegionWidth(), y - 3);
-    }
-
-    private void drawDetail(SpriteBatch batch, I18n t) {
-        int left = PANEL_X + 6;
-        int width = PANEL_W - 12;
-        game.skin().getDrawable(BOX_LIGHT).draw(batch, left, DETAIL_Y, width, DETAIL_H);
-        int text = left + 6;
-        int right = left + width - 6;
-        int top = DETAIL_Y + DETAIL_H - 3;
-
-        Offer offer = selected();
-        if (offer == null) {
-            batch.setColor(SOFT);
-            Hud.line(batch, font, t.get("trade.empty"), text, top);
-            batch.setColor(Color.WHITE);
-            return;
-        }
-        batch.setColor(INK);
-        Hud.line(batch, font, offer.name(), text, top);
-        String state = flash > 0 ? t.get("trade.done") : offer.state();
-        if (state != null) {
-            batch.setColor(flash > 0 ? DONE : offer.can() ? INK : DENIED);
-            Hud.right(batch, font, state, right, top);
-        }
-        String[] lines = {offer.description(), offer.more()};
-        batch.setColor(SOFT);
-        int line = 1;
-        for (String l : lines) {
-            if (l != null) {
-                Hud.line(batch, font, l, text, top - line * Hud.LINE);
-                line++;
-            }
-        }
-        batch.setColor(Color.WHITE);
-    }
-
-    private TextureRegion region(String name) {
-        return game.skin().has(name, TextureRegion.class) ? game.skin().getRegion(name) : null;
     }
 
     /**
@@ -486,53 +173,9 @@ public class TradeScreen extends SimScreen {
         return null;
     }
 
-    private String goodName(String goodId) {
-        VillageCatalog.Good good = game.village().good(goodId);
-        return good == null ? goodId : game.i18n().get(good.nameKey);
-    }
+    // ---- what can be on the counter --------------------------------------------------
 
-    @Override
-    public void resize(int width, int height) {
-        camera.resize(width, height);
-    }
-
-    // ---- what can be on a shelf ----------------------------------------------------
-
-    /** One thing on the shelf: its picture, its words, and what the key does. */
-    private abstract class Offer {
-        abstract TextureRegion icon();
-
-        abstract String name();
-
-        /** The first line under the name, or null. */
-        String description() {
-            return null;
-        }
-
-        /** A second line, or null. */
-        String more() {
-            return null;
-        }
-
-        /** On the name's line, hard right: a price, a level, a reason. */
-        abstract String state();
-
-        /** The number in the cell's corner, where an inventory keeps a count. */
-        String pip() {
-            return null;
-        }
-
-        /** Whether the key would do anything now. */
-        abstract boolean can();
-
-        /** Does it. True when a trade was made, and the save is to be written. */
-        abstract boolean act();
-
-        /** The word beside the key. */
-        abstract String verb();
-    }
-
-    private final class GoodOffer extends Offer {
+    private final class GoodOffer extends Entry {
         final VillageCatalog.Good good;
 
         GoodOffer(VillageCatalog.Good good) {
@@ -584,7 +227,7 @@ public class TradeScreen extends SimScreen {
         }
     }
 
-    private final class PotionOffer extends Offer {
+    private final class PotionOffer extends Entry {
         final ItemDef item;
 
         PotionOffer(ItemDef item) {
@@ -634,7 +277,7 @@ public class TradeScreen extends SimScreen {
         }
     }
 
-    private final class ToolOffer extends Offer {
+    private final class ToolOffer extends Entry {
         final VillageCatalog.Tool tool;
 
         ToolOffer(VillageCatalog.Tool tool) {
@@ -643,9 +286,7 @@ public class TradeScreen extends SimScreen {
 
         @Override
         TextureRegion icon() {
-            // The pack draws no pail; the basket the rancher gathers into stands in.
-            String name = "pail".equals(tool.id) ? "basket" : tool.id;
-            return region("ui/sunny/icons/" + name);
+            return toolIcon(tool);
         }
 
         @Override
@@ -692,7 +333,7 @@ public class TradeScreen extends SimScreen {
         }
     }
 
-    private final class SeedOffer extends Offer {
+    private final class SeedOffer extends Entry {
         final VillageCatalog.Crop crop;
 
         SeedOffer(VillageCatalog.Crop crop) {
@@ -751,7 +392,7 @@ public class TradeScreen extends SimScreen {
         }
     }
 
-    private final class MealOffer extends Offer {
+    private final class MealOffer extends Entry {
         final VillageCatalog.Recipe recipe;
         final ItemDef item;
 
@@ -818,7 +459,7 @@ public class TradeScreen extends SimScreen {
     }
 
     /** The herbalist's old shelf - upgrades and unlocks - one key away. */
-    private final class Shelf extends Offer {
+    private final class Shelf extends Entry {
         @Override
         TextureRegion icon() {
             return region("ui/sunny/icons/hammer");

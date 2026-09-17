@@ -82,6 +82,36 @@ class WorkshopsTest {
         assertEquals(eggs, again.stock.get("egg", 0), "the same save collects the same goods");
     }
 
+    /** The bar over a worker: empty as a unit is made, half at half a period, full while full. */
+    @Test
+    void progressRunsFromEachUnitToTheNextAndStaysFullWhileFull() {
+        v.clock = 100;
+        assertEquals(0f, Workshops.progress(cat, v, forest), 1e-6f);
+        v.clock = 105;
+        assertEquals(0.5f, Workshops.progress(cat, v, forest), 1e-6f);
+        v.clock = 110;
+        assertEquals(0f, Workshops.progress(cat, v, forest), 1e-6f, "a unit made, the next begun");
+        v.clock = 10_000;
+        assertEquals(1f, Workshops.progress(cat, v, forest), 1e-6f);
+    }
+
+    /** What is shown as a unit is made has to be what arrives when it is collected. */
+    @Test
+    void whatIsUpcomingIsExactlyWhatIsCollected() {
+        Workshops.ready(cat, v, ranch);
+        for (int round = 0; round < 20; round++) {
+            v.clock += 180;
+            int held = Workshops.ready(cat, v, ranch);
+            ObjectIntMap<String> promised = new ObjectIntMap<>();
+            for (int i = 0; i < held; i++) {
+                promised.getAndIncrement(Workshops.upcoming(cat, v, ranch, i), 0, 1);
+            }
+            assertEquals(null, Workshops.upcoming(cat, v, ranch, held), "nothing past the last one");
+            ObjectIntMap<String> got = Workshops.collect(cat, v, ranch);
+            assertEquals(promised, got, "round " + round);
+        }
+    }
+
     @Test
     void anOverfullShelfOrAStartInTheFutureIsBroughtBackToSense() {
         VillageState.Work work = Workshops.work(v, forest);

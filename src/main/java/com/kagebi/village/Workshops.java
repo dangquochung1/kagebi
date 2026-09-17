@@ -95,6 +95,33 @@ public final class Workshops {
     }
 
     /**
+     * How far along the next unit is: 0 the moment one was made, 1 as the next
+     * is. 1 while the workshop is full, which is what a full bar should say.
+     */
+    public static float progress(VillageCatalog cat, VillageState v, VillageCatalog.Workshop w) {
+        double until = untilNext(cat, v, w);
+        double period = period(cat, v, w);
+        if (until < 0 || period <= 0) {
+            return 1f;
+        }
+        return (float) Math.max(0, Math.min(1, 1 - until / period));
+    }
+
+    /**
+     * What the {@code index}-th unit now waiting will turn out to be when it is
+     * collected - the same roll {@link #collect} makes, so the picture shown as
+     * a unit is made is the good that arrives - or null past the last one.
+     */
+    public static String upcoming(VillageCatalog cat, VillageState v, VillageCatalog.Workshop w, int index) {
+        int held = ready(cat, v, w);
+        if (index < 0 || index >= held) {
+            return null;
+        }
+        Array<LootRoller.Drop> drops = LootRoller.roll(table(w), seed(w, work(v, w).made + index));
+        return drops.size == 0 ? null : drops.first().itemId;
+    }
+
+    /**
      * Takes everything waiting into the storehouse. Returns what it turned out to
      * be, by good, for the screen to show; empty if nothing was ready.
      */

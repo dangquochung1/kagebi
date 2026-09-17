@@ -128,6 +128,11 @@ public final class Assets {
         public static final String DEATH = S + "hit_and_impact/hit8.wav";
 
         public static final String COIN = S + "bonus/coin.wav";
+        /** A crop pulled out of its plot. */
+        public static final String GRASS = S + "elemental/grass.wav";
+        /** A fish breaking the surface at the fisher's line, and going back in. */
+        public static final String WATER = S + "elemental/water1.wav";
+        public static final String BUBBLE = S + "elemental/bubble.wav";
         public static final String PICKUP = S + "bonus/bonus.wav";
         public static final String HEAL = S + "bonus/bonus2.wav";
         public static final String KEY_GET = S + "bonus/bonus3.wav";

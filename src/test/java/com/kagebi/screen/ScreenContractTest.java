@@ -158,6 +158,9 @@ class ScreenContractTest {
             "trade.open", "trade.done", "trade.max", "trade.empty", "trade.held", "trade.seed",
             "trade.grows", "trade.farm_level", "trade.level", "trade.needs", "trade.amount",
             "trade.pantry", "trade.pantry_full", "trade.upgrades.name", "trade.upgrades.desc",
+            "bag.title", "bag.tab.items", "bag.tab.tools", "bag.tab.people", "bag.tab.carry",
+            "bag.tab.kit", "bag.ripens", "bag.tool_effect", "bag.makes", "bag.waiting", "bag.next",
+            "bag.full", "bag.farm", "bag.kit.name", "bag.kit.desc",
             // Advertised by World.promptKey(); the screens only look them up.
             "prompt.open_chest", "prompt.shop",
             "pause.title", "pause.resume", "pause.abandon", "pause.confirm", "pause.to_menu",

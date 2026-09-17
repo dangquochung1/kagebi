@@ -153,7 +153,7 @@ public final class IslandProps {
         float speed = parseFloat(properties.get("speed"), 1f);
         return new Prop(object.getAttribute("name", ""), object.getAttribute("type", ""),
                         properties, frames, durations, start, speed,
-                        x, y, width, height, rotation, foot);
+                        x, y, width, height, rotation, foot, flipH);
     }
 
     private static float parseFloat(String value, float otherwise) {
@@ -191,10 +191,16 @@ public final class IslandProps {
         public final float rotation;
         /** Where it stands, y up: the bottom row of its drawn pixels. */
         public final float foot;
+        /**
+         * Drawn mirrored. The pack's people face right as drawn, so a mirrored
+         * one faces left - which is the side a fisher's line is in the water.
+         */
+        public final boolean flipX;
 
         Prop(String name, String kind, ObjectMap<String, String> properties,
              TextureRegion[] frames, int[] durations, int startFrame, float speed,
-             float x, float y, float width, float height, float rotation, float foot) {
+             float x, float y, float width, float height, float rotation, float foot,
+             boolean flipX) {
             this.name = name;
             this.kind = kind;
             this.properties = properties;
@@ -217,6 +223,7 @@ public final class IslandProps {
             this.height = height;
             this.rotation = rotation;
             this.foot = foot;
+            this.flipX = flipX;
         }
 
         /** The middle of the picture, across: where a person in a frame stands. */
