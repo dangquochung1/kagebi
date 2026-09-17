@@ -57,6 +57,22 @@ class ScreenContractTest {
         assertTrue(missing.isEmpty(), "missing from npc.atlas: " + missing);
     }
 
+    /**
+     * Each thing that can be thrown flies as its own picture. Every throw used
+     * to be drawn with the kunai, so a shuriken bought for 350 gold looked
+     * exactly like the kunai it replaced.
+     */
+    @Test
+    void everyThrownProjectileHasAPictureOfItsOwn() {
+        Set<String> fx = regions("fx");
+        Set<String> seen = new HashSet<>();
+        for (String id : com.kagebi.data.ContentValidator.PROJECTILES) {
+            String region = Assets.Fx.projectile(id);
+            assertTrue(fx.contains(region), id + " -> " + region + " is missing from fx.atlas");
+            assertTrue(seen.add(region), id + " is drawn with the same picture as another projectile");
+        }
+    }
+
     @Test
     void theExitMarkerExists() {
         assertTrue(regions("fx").contains(Assets.Fx.EXIT),

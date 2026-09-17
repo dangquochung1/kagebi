@@ -307,6 +307,19 @@ class EntityWorldTest {
             "a hammer in the off hand would fly across the room as a kunai sprite");
     }
 
+    /**
+     * The shuriken's picture is a strip of spinning frames and the kunai's is
+     * one blade turned to its heading; drawing either the other way would put
+     * half a star on screen, or a blade spinning like a star.
+     */
+    @Test
+    void aShurikenSpinsAndAKunaiPointsWhereItFlies() {
+        assertTrue(EntityWorld.spins(32, 16), "the shuriken: two 16px frames");
+        assertFalse(EntityWorld.spins(14, 5), "the kunai: one 14x5 blade");
+        assertFalse(EntityWorld.spins(16, 16), "a single square frame has nothing to spin through");
+        assertFalse(EntityWorld.spins(0, 0));
+    }
+
     // ---- hit feedback ---------------------------------------------------------
 
     /**

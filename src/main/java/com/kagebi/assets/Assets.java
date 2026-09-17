@@ -482,6 +482,15 @@ public final class Assets {
         public static final String PROJECTILE_KUNAI = "fx/projectile/kunai";
         /** 32x16: two frames of a spinning star. */
         public static final String PROJECTILE_SHURIKEN = "fx/projectile/shuriken";
+
+        /**
+         * The picture of a thrown weapon's projectile, by the id its weapon
+         * names. A kunai for an id with no picture of its own: every throw
+         * used to be drawn as one, and a shuriken flew as a kunai.
+         */
+        public static String projectile(String id) {
+            return "shuriken".equals(id) ? PROJECTILE_SHURIKEN : PROJECTILE_KUNAI;
+        }
         /** A lingering area, for casters' clouds. Same radial glow, different use. */
         public static final String HAZARD_CLOUD = "fx/projectile/energyball";
 

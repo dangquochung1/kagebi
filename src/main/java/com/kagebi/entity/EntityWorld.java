@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectIntMap;
+import com.badlogic.gdx.utils.ObjectMap;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
 import com.kagebi.ai.AiBrain;
@@ -29,6 +30,7 @@ import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
 import com.kagebi.combat.Modifiers;
 import com.kagebi.data.ContentRegistry;
+import com.kagebi.data.ContentValidator;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.FloorDef;
 import com.kagebi.data.def.WeaponDef;
@@ -205,7 +207,12 @@ public final class EntityWorld implements World, AiContext {
     private TextureAtlas npcAtlas;
     private BitmapFont font;
     private TextureRegion pixel;
-    private TextureRegion kunaiRegion;
+    /**
+     * Thrown art by projectile id: a still picture turned to its heading, or a
+     * strip that spins in place. One or the other for each id, never both.
+     */
+    private final ObjectMap<String, TextureRegion> thrownStill = new ObjectMap<>();
+    private final ObjectMap<String, Anim> thrownSpin = new ObjectMap<>();
     private TextureRegion goldRegion;
     private TextureRegion heartRegion;
     private TextureRegion keyRegion;
@@ -1069,6 +1076,9 @@ public final class EntityWorld implements World, AiContext {
         int life = Math.max(1, Math.round(w.reach / THROW_SPEED / Cfg.STEP));
         int extra = Math.max(0, p.mods().throwExtra());
         sfx(Assets.Sfx.THROW);
+        String id = w.projectile == null ? "kunai" : w.projectile;
+        Anim spin = thrownSpin.get(id);
+        TextureRegion still = spin != null ? null : thrownStill.get(id, thrownStill.get("kunai"));
         for (int i = 0; i <= extra; i++) {
             // 0, then +/-1, +/-2 ... spread of about nine degrees a step.
             int rank = (i + 1) / 2;
@@ -1076,8 +1086,20 @@ public final class EntityWorld implements World, AiContext {
             float dx = p.facing.dx - p.facing.dy * spread;
             float dy = p.facing.dy + p.facing.dx * spread;
             projectiles.add(new Projectile(Faction.PLAYER, p.x, p.y, dx, dy,
-                THROW_SPEED, damage, w.knockback, life, null, kunaiRegion, crit));
+                THROW_SPEED, damage, w.knockback, life, spin, still, crit));
         }
+    }
+
+    /** Steps per frame of a spinning projectile: the shuriken's two frames turn it ten times a second. */
+    static final int SPIN_STEPS = 3;
+
+    /**
+     * Whether a projectile picture is a strip of square frames that spins in
+     * place, rather than one picture turned to its heading. The shuriken is
+     * two 16px frames side by side; the kunai is a single 14x5 blade.
+     */
+    static boolean spins(int width, int height) {
+        return height > 0 && width % height == 0 && width / height >= 2;
     }
 
     /**
@@ -1858,7 +1880,8 @@ public final class EntityWorld implements World, AiContext {
     private void resolveExtraRegions() {
         orbAnim = null;
         cloudAnim = null;
-        kunaiRegion = null;
+        thrownStill.clear();
+        thrownSpin.clear();
         torchAnim = null;
         sideTorchAnim = null;
         bannerAnim = null;
@@ -1869,7 +1892,18 @@ public final class EntityWorld implements World, AiContext {
             if (fxAtlas.findRegion(Assets.Fx.HAZARD_CLOUD) != null) {
                 cloudAnim = Anim.strip(fxAtlas, Assets.Fx.HAZARD_CLOUD, 8, true);
             }
-            kunaiRegion = fxAtlas.findRegion(Assets.Fx.PROJECTILE_KUNAI);
+            for (String id : ContentValidator.PROJECTILES) {
+                String name = Assets.Fx.projectile(id);
+                TextureRegion art = fxAtlas.findRegion(name);
+                if (art == null) {
+                    continue;
+                }
+                if (spins(art.getRegionWidth(), art.getRegionHeight())) {
+                    thrownSpin.put(id, Anim.strip(fxAtlas, name, SPIN_STEPS, true));
+                } else {
+                    thrownStill.put(id, art);
+                }
+            }
             torchAnim = loop(Assets.Prop.TORCH);
             sideTorchAnim = loop(Assets.Prop.SIDE_TORCH);
             bannerAnim = loop(Assets.Prop.BANNER);

@@ -43,7 +43,7 @@ import com.kagebi.village.Pantry;
  *   map       --page 1-5   the same, with the floor map expanded
  *   fight     --page 1-5   the first room of that floor that has enemies in it
  *   swing     --page 1-5   the same, swinging on a timer so a blade is visible
- *   throw     --page 1-5   the same with a kunai in the off hand, throwing
+ *   throw     --page 1-10  the same with a kunai in the off hand, throwing; 6-10 a shuriken
  *   treasure  --page 1-5   the first treasure room, for looking at a chest
  *   shop      --page 1-5   the first shop room, for looking at the shopkeeper
  *   trade     --page 1-5   the same, mid-purchase, with gold to spend
@@ -141,8 +141,10 @@ public final class Screens {
             case "throw":
                 // The off hand is empty on a fresh profile, so this hands one
                 // over: otherwise the throw could not be looked at until
-                // someone had banked 350 gold.
-                startRun(game, page).throwWeaponId = "kunai";
+                // someone had banked 350 gold. Pages past five are the same
+                // floors with a shuriken, which flew as a kunai for a long time.
+                startRun(game, page > 5 ? page - 5 : page).throwWeaponId =
+                    page > 5 ? "shuriken" : "kunai";
                 // The start room, not a fight: enemies chase, and a kunai that
                 // hits something a step after it leaves the hand cannot be
                 // photographed in flight at all.
