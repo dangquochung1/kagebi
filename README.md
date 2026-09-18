@@ -84,7 +84,7 @@ all. What the game loads is built from them into `assets/gfx/`, `assets/audio/`
 and `assets/atlas/`, and git ignores those too. A fresh clone has no pictures and
 no sound until the packs are in place and step 2 has run.
 
-**Asset packs:** [Google Drive]([PASTE_DRIVE_LINK_HERE](https://drive.google.com/drive/folders/1_bz4yVlaBx8Pcqx4OGdEqW91wBJRO0We?usp=sharing))
+**Asset packs:** [Google Drive]([https://drive.google.com/drive/folders/1_bz4yVlaBx8Pcqx4OGdEqW91wBJRO0We?usp=sharing])
 <!-- Replace PASTE_DRIVE_LINK_HERE above with the shared link to the packs. -->
 
 Unpack them so these folders sit in the repository, with exactly these names:
