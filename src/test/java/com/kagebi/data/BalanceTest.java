@@ -309,10 +309,21 @@ class BalanceTest {
         return sb.append('\n').toString();
     }
 
+    /**
+     * Every floor of the descent is tougher than the one above it.
+     *
+     * <p>Side stages are left out, and the reason is the whole point of them.
+     * The five numbered floors are read in order, each assumed to be reached
+     * with what the one above handed over; a side stage is entered cold at
+     * whatever strength the player already had, so it is balanced against the
+     * kit someone brings rather than against the floor before it in the file.
+     * Asserting the curve over both would force the cove to be harder than
+     * the Flame Core to satisfy arithmetic nobody plays.
+     */
     @Test
-    void hitPointsRiseEveryFloor() {
+    void hitPointsRiseEveryFloorOfTheDescent() {
         double previous = 0;
-        for (FloorDef f : reg.allFloors()) {
+        for (FloorDef f : descent()) {
             assertTrue(avgHp(f) > previous, "floor " + f.number + " is no tougher than the one above");
             previous = avgHp(f);
         }
@@ -321,7 +332,7 @@ class BalanceTest {
     @Test
     void theFiveStagesTogetherTakeTwentyFiveToFortyMinutes() {
         double total = 0;
-        for (FloorDef f : reg.allFloors()) {
+        for (FloorDef f : descent()) {
             total += seconds(f);
         }
         assertTrue(total >= 25 * 60 && total <= 40 * 60, "the five stages are "
@@ -347,12 +358,38 @@ class BalanceTest {
     }
 
     @Test
-    void eachFloorTakesLongerThanTheOneAbove() {
+    void eachFloorOfTheDescentTakesLongerThanTheOneAbove() {
         double previous = 0;
-        for (FloorDef f : reg.allFloors()) {
+        for (FloorDef f : descent()) {
             assertTrue(seconds(f) > previous, "floor " + f.number + " is shorter than the one above");
             previous = seconds(f);
         }
+    }
+
+    /**
+     * A side stage is still a stage: it must be worth playing and must not
+     * outstay a sitting, even though it sits outside the curve above.
+     */
+    @Test
+    void everySideStageIsAStageLong() {
+        for (FloorDef f : reg.allFloors()) {
+            if (!f.side) {
+                continue;
+            }
+            assertTrue(seconds(f) >= 4 * 60,
+                "side stage " + f.number + " is " + seconds(f) / 60 + " minutes, barely a detour");
+        }
+    }
+
+    /** The five numbered floors of the descent, in order, side stages left out. */
+    private static java.util.List<FloorDef> descent() {
+        java.util.List<FloorDef> out = new java.util.ArrayList<>();
+        for (FloorDef f : reg.allFloors()) {
+            if (!f.side) {
+                out.add(f);
+            }
+        }
+        return out;
     }
 
     /**

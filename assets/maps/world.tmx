@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="20" height="11" tilewidth="16" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="6">
+<map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="20" height="11" tilewidth="16" tileheight="16" infinite="0" nextlayerid="6" nextobjectid="7">
  <tileset firstgid="1" name="floor" tilewidth="16" tileheight="16" tilecount="572" columns="22">
   <image source="../gfx/tiles/overworld/tilesetfloor.png" width="352" height="416" />
  </tileset>
@@ -48,10 +48,10 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,733,734,0,0,0,0,0,
 0,0,0,0,0,0,0,0,622,623,815,0,0,757,758,0,0,0,0,0,
 0,0,0,816,0,0,0,0,646,647,0,0,0,0,0,0,709,710,0,0,
-839,0,838,0,0,0,0,0,670,671,0,0,0,0,0,0,733,734,0,0,
-637,638,837,637,638,0,0,0,0,625,626,0,0,0,0,0,757,758,0,0,
-661,662,0,661,662,0,0,0,0,649,650,845,813,0,0,815,0,0,0,0,
-685,686,816,685,686,818,821,0,0,673,674,0,0,841,0,0,0,0,820,839
+709,710,0,0,0,0,0,0,670,671,0,0,0,0,0,0,733,734,0,0,
+733,734,0,0,0,0,0,0,0,625,626,0,0,0,0,0,757,758,0,0,
+757,758,0,0,0,0,0,0,0,649,650,845,813,0,0,815,0,0,0,0,
+813,0,816,0,0,818,821,0,0,673,674,0,0,841,0,0,0,0,820,839
 </data>
  </layer>
  <layer id="4" name="overhead" width="20" height="11">
@@ -75,5 +75,6 @@
   <object id="3" name="3" type="STAGE" x="168" y="56" />
   <object id="4" name="4" type="STAGE" x="232" y="120" />
   <object id="5" name="5" type="STAGE" x="280" y="72" />
+  <object id="6" name="6" type="STAGE" x="56" y="136" />
  </objectgroup>
 </map>

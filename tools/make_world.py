@@ -41,7 +41,9 @@ WIDTH, HEIGHT = 20, 11
 # The shape is a trail from the village side to the far corner, bending down
 # through the middle so no two nodes share a row - two markers level with each
 # other read as alternatives rather than as a sequence.
-NODES = [(2, 4), (6, 6), (10, 3), (14, 7), (17, 4)]
+# Stage 6 is the last pair, and it is deliberately off the trail: a side stage
+# that sat in line with the five would read as a sixth step of the descent.
+NODES = [(2, 4), (6, 6), (10, 3), (14, 7), (17, 4), (3, 8)]
 
 # What stands beside each node, as (tileset, tile, w, h, dx, dy) from the node.
 # One landmark each, because the node marker is the thing to look at and a
@@ -55,6 +57,7 @@ LANDMARKS = [
     ("house",  TORII, 3, 2, -1,  2),   # 3 broken shrine: its gate still stands
     ("nature", ROCK,  2, 3,  2, -1),   # 4 cursed depths
     ("nature", ROCK,  2, 3, -4, -1),   # 5 flame core
+    ("nature", ROCK,  2, 3, -3, -1),   # 6 the drowned cove: rocks at the water
 ]
 
 

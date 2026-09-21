@@ -34,6 +34,16 @@ public final class Boss extends Enemy {
 
     /** 1-based. Reaches {@code def.phases} and stops. */
     private int phase = 1;
+    /**
+     * Past {@code def.enrageAt}, once and for good.
+     *
+     * <p>The cheap cousin of a phase change, for a boss that has no {@code
+     * trans} strip to play: no interruption, no invulnerable window, just a
+     * boss that is suddenly worse. Stage 6's three bodies use it at 40%,
+     * because a chain of three already has two transformations in it and a
+     * third pause in the middle of each would be all pause and no fight.
+     */
+    private boolean enraged;
     private boolean transforming;
     private int transformSteps;
 
@@ -51,6 +61,10 @@ public final class Boss extends Enemy {
 
     public boolean transforming() {
         return transforming;
+    }
+
+    public boolean enraged() {
+        return enraged;
     }
 
     /**
@@ -96,6 +110,12 @@ public final class Boss extends Enemy {
                 && hp <= maxHp * nextThreshold()) {
             beginTransformation();
             return;
+        }
+        if (alive() && !enraged && def.enrageAt > 0f && hp <= maxHp * def.enrageAt) {
+            enraged = true;
+            speedMult *= 1f + PHASE_SPEED_STEP;
+            damageMult *= 1f + PHASE_DAMAGE_STEP;
+            brain().onEnrage(this, ctx);
         }
         super.simulate(ctx);
     }

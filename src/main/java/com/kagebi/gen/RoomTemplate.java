@@ -11,10 +11,18 @@ import com.badlogic.gdx.utils.Array;
  * nothing a sealed-door sprite cannot do at runtime. So the generator picks any
  * template for any position and the screen covers the doors that lead nowhere.
  *
- * <p>Rooms are a fixed {@link #WIDTH} by {@link #HEIGHT} tiles so the camera can
- * snap to one room at a time with no scrolling, the way Binding of Isaac does.
+ * <p>Rooms are {@link #WIDTH} by {@link #HEIGHT} tiles by default, so the camera
+ * snaps to one room at a time with no scrolling, the way Binding of Isaac does.
  * That is what makes a 320x180 screen workable: a scrolling camera in a space
  * this small shows almost nothing of the room the player is fighting in.
+ *
+ * <p>A template may nonetheless declare its own size, and {@link #width} and
+ * {@link #height} are what everything downstream must read - the constants are
+ * the default a .tmx gets for saying nothing, not a promise. Stage 6's boss
+ * arena is 40x22, four screens, and there the camera does follow and the
+ * screen fades between rooms instead of sliding. Nothing else is bigger: one
+ * screen per room is still the rule, and the arena is the exception that
+ * earns it.
  */
 public final class RoomTemplate {
 
@@ -46,6 +54,10 @@ public final class RoomTemplate {
     public static final int DOOR_Y = (HEIGHT - DOOR_SPAN) / 2;
 
     public final String id;
+    /** Tiles across, from the .tmx. {@link #WIDTH} for every room but the arena. */
+    public final int width;
+    /** Tiles down, from the .tmx. {@link #HEIGHT} for every room but the arena. */
+    public final int height;
     /** Which floors may use it: the biome name from {@code FloorDef.biome}. */
     public final String biome;
     /** Kinds this layout suits. A boss arena is not a shop. */
@@ -56,11 +68,45 @@ public final class RoomTemplate {
 
     public RoomTemplate(String id, String biome, Array<RoomKind> kinds,
                         String path, Array<SpawnPoint> spawns) {
+        this(id, biome, kinds, path, spawns, WIDTH, HEIGHT);
+    }
+
+    public RoomTemplate(String id, String biome, Array<RoomKind> kinds,
+                        String path, Array<SpawnPoint> spawns,
+                        int width, int height) {
         this.id = id;
         this.biome = biome;
         this.kinds = kinds;
         this.path = path;
         this.spawns = spawns;
+        this.width = width;
+        this.height = height;
+    }
+
+    public int pixelWidth() {
+        return width * 16;
+    }
+
+    public int pixelHeight() {
+        return height * 16;
+    }
+
+    /** First tile column of the top and bottom openings, in this room. */
+    public int doorX() {
+        return (width - DOOR_SPAN) / 2;
+    }
+
+    /** First tile row of the left and right openings, in this room. */
+    public int doorY() {
+        return (height - DOOR_SPAN) / 2;
+    }
+
+    /**
+     * Whether this room is exactly one screen, which is what lets the camera
+     * sit still in it and the screen slide between it and its neighbours.
+     */
+    public boolean oneScreen() {
+        return width == WIDTH && height == HEIGHT;
     }
 
     public boolean suits(RoomKind kind) {

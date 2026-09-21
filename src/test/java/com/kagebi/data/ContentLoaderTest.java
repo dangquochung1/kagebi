@@ -40,12 +40,12 @@ class ContentLoaderTest {
     @Test
     void shippedContentLoadsAndPassesEveryCheck() {
         ContentRegistry reg = real();
-        assertEquals(22, reg.allEnemies().size, "enemies");
+        assertEquals(30, reg.allEnemies().size, "enemies");
         assertEquals(7, reg.allWeapons().size, "weapons");
         assertEquals(24, reg.allRelics().size, "relics");
         assertEquals(23, reg.allItems().size, "items");
-        assertEquals(14, reg.allLootTables().size, "loot tables");
-        assertEquals(5, reg.allFloors().size, "floors");
+        assertEquals(17, reg.allLootTables().size, "loot tables");
+        assertEquals(6, reg.allFloors().size, "floors");
     }
 
     @Test

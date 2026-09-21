@@ -25,6 +25,17 @@ public enum GameAction {
     USE_ITEM("action.use_item", Keys.Q, Keys.C),
 
     INVENTORY("action.inventory", Keys.TAB, Keys.I),
+    /**
+     * The kit badge in the village, which used to be reachable only by mouse.
+     *
+     * <p>Its own action rather than a spare gameplay key. The village runs a
+     * real EntityWorld - the player walks, swings and drinks there like
+     * anywhere else - so Q, K and J are all already spoken for, and binding
+     * one of them to a menu would mean the menu opening when someone meant to
+     * use a potion. F is free, and being an action means it appears in the
+     * controls screen and can be moved like everything else.
+     */
+    LOADOUT("action.loadout", Keys.F, Keys.B),
     MAP("action.map", Keys.M, -1),
     // The village only: the island is thirty screens of map, and the mouse
     // wheel does the same thing.

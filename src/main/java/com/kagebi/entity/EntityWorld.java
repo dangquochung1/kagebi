@@ -159,6 +159,19 @@ public final class EntityWorld implements World, AiContext {
     private final Array<Marker> markers = new Array<>();
     private final Array<Decor> decor = new Array<>();
     private final Array<DamagePop> pops = new Array<>();
+
+    /**
+     * One-shot effects: an animation, a place, and nothing else.
+     *
+     * <p>Modelled on {@link #pops} rather than on the entity list. A burst of
+     * flame is not an actor - it has no body, no faction and nothing can hit
+     * it - and making it one would put it in the depth sort and in every
+     * sweep that looks for {@code removed}. It is scenery that finishes.
+     */
+    private final Array<OneShot> oneShots = new Array<>();
+
+    /** Named fx regions, sliced once per room. Looked up by brains, by name. */
+    private final ObjectMap<String, Anim> namedFx = new ObjectMap<>();
     private final Array<Entity> drawList = new Array<>();
 
     /**
@@ -432,6 +445,7 @@ public final class EntityWorld implements World, AiContext {
         markers.clear();
         decor.clear();
         pops.clear();
+        oneShots.clear();
         hitstop = 0;
         shake = 0f;
         descendRequested = false;
@@ -510,6 +524,12 @@ public final class EntityWorld implements World, AiContext {
         for (int i = 0; i < markers.size; i++) {
             markers.get(i).step(this);
         }
+        for (int i = oneShots.size - 1; i >= 0; i--) {
+            oneShots.get(i).steps++;
+            if (oneShots.get(i).done()) {
+                oneShots.removeIndex(i);
+            }
+        }
         for (int i = pops.size - 1; i >= 0; i--) {
             pops.get(i).step();
             if (pops.get(i).done()) {
@@ -574,6 +594,7 @@ public final class EntityWorld implements World, AiContext {
                 p.draw(batch);
             }
         }
+        drawOneShots(batch, false);
 
         drawList.clear();
         drawList.add(player);
@@ -609,6 +630,7 @@ public final class EntityWorld implements World, AiContext {
                 p.draw(batch);
             }
         }
+        drawOneShots(batch, true);
 
         // Last, and in world space: a number or a bar hidden behind the sprite
         // it describes is worse than not drawing it, because the player sees a
@@ -619,6 +641,57 @@ public final class EntityWorld implements World, AiContext {
         if (font != null) {
             for (DamagePop pop : pops) {
                 pop.draw(batch, font);
+            }
+        }
+    }
+
+    /**
+     * An animation playing itself out at a point, then gone.
+     *
+     * <p>{@code overhead} picks which of the two render passes draws it: an
+     * impact on the floor belongs under the actors so they stand in it, and a
+     * burst around a body belongs over them.
+     */
+    private static final class OneShot {
+        final Anim anim;
+        final float x;
+        final float y;
+        final boolean overhead;
+        int steps;
+
+        OneShot(Anim anim, float x, float y, boolean overhead) {
+            this.anim = anim;
+            this.x = x;
+            this.y = y;
+            this.overhead = overhead;
+        }
+
+        /**
+         * One pass and gone, whether or not the strip is a loop.
+         *
+         * <p>Not {@code anim.finished}, which is false forever for a looping
+         * one - and every named effect is sliced looping, because a hazard has
+         * to keep drawing for the whole of its linger. So the summon fireballs
+         * never expired: three of them per enrage, left burning in the arena
+         * for the rest of the fight. A one-shot is one pass by definition, and
+         * that is a property of this list rather than of the strip it borrows.
+         */
+        boolean done() {
+            return anim == null || steps >= anim.durationSteps();
+        }
+
+        void draw(SpriteBatch batch) {
+            TextureRegion f = anim.frame(Dir.DOWN, steps);
+            if (f != null) {
+                batch.draw(f, x - f.getRegionWidth() / 2f, y - f.getRegionHeight() / 2f);
+            }
+        }
+    }
+
+    private void drawOneShots(SpriteBatch batch, boolean overhead) {
+        for (OneShot fx : oneShots) {
+            if (fx.overhead == overhead) {
+                fx.draw(batch);
             }
         }
     }
@@ -697,13 +770,13 @@ public final class EntityWorld implements World, AiContext {
         if (x < DOOR_MARGIN && room.hasDoor(Dir.LEFT)) {
             return Dir.LEFT;
         }
-        if (x > RoomTemplate.PIXEL_WIDTH - DOOR_MARGIN && room.hasDoor(Dir.RIGHT)) {
+        if (x > roomPixelWidth() - DOOR_MARGIN && room.hasDoor(Dir.RIGHT)) {
             return Dir.RIGHT;
         }
         if (y < DOOR_MARGIN && room.hasDoor(Dir.DOWN)) {
             return Dir.DOWN;
         }
-        if (y > RoomTemplate.PIXEL_HEIGHT - DOOR_MARGIN && room.hasDoor(Dir.UP)) {
+        if (y > roomPixelHeight() - DOOR_MARGIN && room.hasDoor(Dir.UP)) {
             return Dir.UP;
         }
         return null;
@@ -947,6 +1020,27 @@ public final class EntityWorld implements World, AiContext {
         return player.alive();
     }
 
+    /**
+     * The current room's width in pixels.
+     *
+     * <p>Off the collision grid rather than off {@code RoomTemplate}'s
+     * constants, because stage 6's boss arena is 40x22 and every wall, door
+     * and corner below has to be the arena's rather than a screen's. The grid
+     * is handed over in {@link #enterRoom} before anything is placed in the
+     * room, so it is set by the time any of this runs; the fallback is for the
+     * AI tests, which step a world that was never given a room.
+     */
+    private float roomPixelWidth() {
+        return collision != null
+            ? collision.width() * CollisionGrid.TILE : RoomTemplate.PIXEL_WIDTH;
+    }
+
+    /** The current room's height in pixels. See {@link #roomPixelWidth()}. */
+    private float roomPixelHeight() {
+        return collision != null
+            ? collision.height() * CollisionGrid.TILE : RoomTemplate.PIXEL_HEIGHT;
+    }
+
     @Override
     public CollisionGrid collision() {
         return collision;
@@ -977,10 +1071,167 @@ public final class EntityWorld implements World, AiContext {
     }
 
     @Override
+    public void placeHazard(Enemy from, float x, float y, int damage, int armSteps,
+                            int lifeSteps, String fx) {
+        // A hazard is something lying on the ground burning, so it is drawn
+        // with the puddle rather than with the comet that would have carried
+        // it: fire_spell stretched into a 22x16 box is a smear, and a wall of
+        // five of them read as five smears. burstOf hands anything that is not
+        // one of the cove's spells straight back, so every other caster is
+        // untouched.
+        String art = Assets.Fx.burstOf(fx);
+        Projectile p = Projectile.hazard(Faction.ENEMY, x, y, damage, armSteps,
+            lifeSteps, fxOr(art, cloudAnim));
+        if (!java.util.Objects.equals(art, fx)) {
+            p.drawAs(Projectile.BURST_W, Projectile.BURST_H);
+        }
+        projectiles.add(p);
+    }
+
+    @Override
+    public void fireProjectile(Enemy from, float dirX, float dirY, float speed,
+                               int damage, int lifeSteps, String fx) {
+        Projectile p = new Projectile(Faction.ENEMY, from.x, from.y, dirX, dirY, speed,
+            damage, SHOT_KNOCKBACK, lifeSteps, fxOr(fx, orbAnim), null, false);
+        if (Assets.Fx.aimed(fx)) {
+            p.aimed();
+        }
+        projectiles.add(p);
+    }
+
+    @Override
+    public void homingProjectile(Enemy from, float dirX, float dirY, float speed,
+                                 int damage, int lifeSteps, int homeSteps,
+                                 float turnRate, String fx) {
+        Projectile p = new Projectile(Faction.ENEMY, from.x, from.y, dirX, dirY, speed,
+            damage, SHOT_KNOCKBACK, lifeSteps, fxOr(fx, orbAnim), null, false);
+        if (Assets.Fx.aimed(fx)) {
+            p.aimed();
+        }
+        projectiles.add(p.homing(homeSteps, turnRate));
+    }
+
+    @Override
+    public void lobProjectile(Enemy from, float toX, float toY, int damage,
+                              int flightSteps, int lingerSteps, String fx) {
+        projectiles.add(Projectile.lob(Faction.ENEMY, from.x, from.y, toX, toY,
+            damage, flightSteps, lingerSteps,
+            fxOr(fx, orbAnim), fxOr(Assets.Fx.burstOf(fx), cloudAnim)));
+    }
+
+    @Override
+    public void rainSpell(Enemy from, float x, float y, int damage,
+                          int fallSteps, int lingerSteps, String fx) {
+        projectiles.add(Projectile.fall(Faction.ENEMY, x, y, damage,
+            fallSteps, lingerSteps,
+            fxOr(fx, orbAnim), fxOr(Assets.Fx.burstOf(fx), cloudAnim)));
+    }
+
+    @Override
+    public void spawnFx(String fx, float x, float y, boolean overhead) {
+        Anim anim = fxOr(fx, null);
+        if (anim != null) {
+            oneShots.add(new OneShot(anim, x, y, overhead));
+        }
+    }
+
+    /**
+     * The animation a brain named, or a fallback.
+     *
+     * <p>Every miss falls back rather than failing. A brain names regions as
+     * strings because it has no atlas, so a build whose art has not been
+     * packed yet must still be playable - the attack lands, it simply looks
+     * like the generic orb while it does.
+     */
+    private Anim fxOr(String name, Anim fallback) {
+        if (name == null) {
+            return fallback;
+        }
+        Anim found = namedFx.get(name);
+        return found != null ? found : fallback;
+    }
+
+    @Override
+    public Enemy summon(String enemyId, float x, float y, boolean dormant) {
+        if (content == null || enemyId == null || !content.hasEnemy(enemyId)) {
+            return null;
+        }
+        Enemy child = buildEnemy(content.enemy(enemyId));
+        if (child == null) {
+            return null;
+        }
+        placeInRoom(child, x, y);
+        child.dormant = dormant;
+        child.dormantSteps = dormant ? SUMMON_SLEEP : 0;
+        child.brain().onSpawn(child);
+        if (!dormant) {
+            child.setState(com.kagebi.ai.AiState.CHASE);
+        }
+        // Queued, not added: this is called from inside the loop over enemies,
+        // and hostilesAlive() counts the queue - so the room does not blink
+        // cleared between one body dying and the next one arriving, which is
+        // the whole reason a boss can be a chain of them.
+        spawnQueue.add(child);
+        return child;
+    }
+
+    /**
+     * How long a summoned body lies still while the effect that called it plays.
+     *
+     * <p>Twenty steps, a third of a second: the fireball strip is eight frames
+     * at nine steps each, so the body is up before the ball has finished
+     * fading, which is what makes it read as having come out of it.
+     */
+    public static final int SUMMON_SLEEP = 20;
+
+    /**
+     * Puts a body down somewhere it can actually be reached.
+     *
+     * <p>A brain picks the point - a ring around itself, a spread either side
+     * of a corpse - and knows nothing about the walls, because {@code ai} is
+     * given the collision grid to move against and no room size at all. A
+     * ring of adds around a boss standing near the top of the arena therefore
+     * lands half of them outside it, where nothing can be hit and the room can
+     * never be cleared. That is exactly what FullRunTest found: two slimes at
+     * y 393 in a room 352 tall.
+     *
+     * <p>Clamped into the room, then walked towards its centre until it is out
+     * of the wall. Towards the centre rather than in any free direction,
+     * because the centre is where the fight is and a body squeezed into a
+     * corner pocket would be reachable but pointless.
+     */
+    private void placeInRoom(Enemy e, float x, float y) {
+        float w = roomPixelWidth();
+        float h = roomPixelHeight();
+        float margin = Math.max(e.bodyW, e.bodyH);
+        e.x = Math.max(margin, Math.min(w - margin, x));
+        e.y = Math.max(margin, Math.min(h - margin, y));
+        if (collision == null) {
+            return;
+        }
+        float cx = w / 2f;
+        float cy = h / 2f;
+        for (int i = 0; i < PLACE_TRIES; i++) {
+            if (!collision.overlaps(e.x - e.bodyW / 2f, e.y - e.bodyH / 2f, e.bodyW, e.bodyH)) {
+                return;
+            }
+            e.x += (cx - e.x) * PLACE_PULL;
+            e.y += (cy - e.y) * PLACE_PULL;
+        }
+        // Still stuck after walking most of the way in: the centre itself is
+        // the last resort, and every room has open floor there.
+        e.x = cx;
+        e.y = cy;
+    }
+
+    /** How far towards the centre each attempt moves, and how many it gets. */
+    private static final float PLACE_PULL = 0.2f;
+    private static final int PLACE_TRIES = 12;
+
+    @Override
     public void spawnCopy(Enemy parent, float x, float y, int hp) {
         Enemy child = new Enemy(parent.def, parent.brain(), parent.sprites);
-        child.x = x;
-        child.y = y;
+        placeInRoom(child, x, y);
         child.maxHp = hp;
         child.hp = hp;
         child.generation = parent.generation + 1;
@@ -996,6 +1247,22 @@ public final class EntityWorld implements World, AiContext {
 
     public Player player() {
         return player;
+    }
+
+    /**
+     * The living boss in this room, or null.
+     *
+     * <p>The first one found, which is the only one: nothing in the game puts
+     * two in a room, and stage 6's chain of five is five bodies one after
+     * another rather than five at once.
+     */
+    public Enemy boss() {
+        for (Enemy e : enemies) {
+            if (e.def.boss && e.alive()) {
+                return e;
+            }
+        }
+        return null;
     }
 
     /** Every enemy in the room, dying ones included; the resolver skips the dead. */
@@ -1149,8 +1416,8 @@ public final class EntityWorld implements World, AiContext {
     }
 
     private void placePlayer(Room room, Dir enteredFrom) {
-        float px = RoomTemplate.PIXEL_WIDTH / 2f;
-        float py = RoomTemplate.PIXEL_HEIGHT / 2f;
+        float px = roomPixelWidth() / 2f;
+        float py = roomPixelHeight() / 2f;
         SpawnPoint entry = null;
         String side = enteredFrom == null ? null : enteredFrom.name().toLowerCase();
         for (SpawnPoint s : room.template.spawns) {
@@ -1169,14 +1436,44 @@ public final class EntityWorld implements World, AiContext {
             // Step in from the door rather than onto it, or the screen would
             // immediately read the player as standing in a doorway again. The
             // same arithmetic as the placeholder the screen was written against.
-            px += enteredFrom.dx * (RoomTemplate.PIXEL_WIDTH / 2f - 32f);
-            py += enteredFrom.dy * (RoomTemplate.PIXEL_HEIGHT / 2f - 32f);
+            px += enteredFrom.dx * (roomPixelWidth() / 2f - 32f);
+            py += enteredFrom.dy * (roomPixelHeight() / 2f - 32f);
         }
         if (enteredFrom != null) {
             face = enteredFrom.opposite();
         }
         player.placeAt(px, py, face);
     }
+
+    /**
+     * The enemy a spawn point asks for: a named one, the floor's boss, or a roll.
+     *
+     * <p>The tag {@code boss} is not an id and never was - it is the word the
+     * map writes to mean "the boss of whatever floor this room turns out to be
+     * on", because a room template is shared by every floor that uses its
+     * biome and cannot know which. It used to fall through to the pool, so
+     * every boss room in the game quietly opened with one extra trash mob
+     * standing on the mark the boss was meant to occupy, and the boss itself
+     * arrived through the fallback at the room's centre. The Drowned Cove's
+     * arena is where that showed: a slime wandering a boss chain.
+     */
+    private EnemyDef enemyFor(String tag) {
+        if (tag == null) {
+            return rollFromPool();
+        }
+        if (content.hasEnemy(tag)) {
+            return content.enemy(tag);
+        }
+        if (BOSS_TAG.equals(tag)) {
+            FloorDef floor = floorDef();
+            return floor != null && floor.hasBoss() && content.hasEnemy(floor.boss)
+                ? content.enemy(floor.boss) : null;
+        }
+        return rollFromPool();
+    }
+
+    /** What a template writes on the spawn its floor's boss should stand on. */
+    public static final String BOSS_TAG = "boss";
 
     /**
      * Fills a room with what its template says is in it.
@@ -1197,8 +1494,7 @@ public final class EntityWorld implements World, AiContext {
             switch (s.kind) {
                 case ENEMY:
                     if (spawnEnemies) {
-                        EnemyDef def = s.tag != null && content.hasEnemy(s.tag)
-                            ? content.enemy(s.tag) : rollFromPool();
+                        EnemyDef def = enemyFor(s.tag);
                         if (def != null && !(def.boss && bossSpawned)) {
                             spawnEnemy(def, s.x, s.y);
                             bossSpawned |= def.boss;
@@ -1235,7 +1531,7 @@ public final class EntityWorld implements World, AiContext {
             FloorDef floor = floorDef();
             if (floor != null && floor.hasBoss() && content.hasEnemy(floor.boss)) {
                 spawnEnemy(content.enemy(floor.boss),
-                    RoomTemplate.PIXEL_WIDTH / 2f, RoomTemplate.PIXEL_HEIGHT * 0.62f);
+                    roomPixelWidth() / 2f, roomPixelHeight() * 0.62f);
             }
         }
     }
@@ -1255,7 +1551,7 @@ public final class EntityWorld implements World, AiContext {
      * and the log line would fire once per room for the whole run.
      */
     private void addDecor(SpawnPoint s) {
-        boolean side = s.x < Cfg.TILE || s.x > RoomTemplate.PIXEL_WIDTH - Cfg.TILE;
+        boolean side = s.x < Cfg.TILE || s.x > roomPixelWidth() - Cfg.TILE;
         Anim anim;
         if ("banner".equals(s.tag)) {
             anim = bannerAnim;
@@ -1270,7 +1566,7 @@ public final class EntityWorld implements World, AiContext {
         // Phase from the position, not from a counter, so the same room always
         // flickers the same way and a screenshot of it is reproducible.
         int phase = ((s.x * 7 + s.y * 13) % anim.frameCount()) * Decor.FLICKER_STEPS;
-        boolean flip = side && s.x > RoomTemplate.PIXEL_WIDTH / 2;
+        boolean flip = side && s.x > roomPixelWidth() / 2;
         decor.add(new Decor(anim, s.x, s.y, phase, flip));
     }
 
@@ -1304,8 +1600,14 @@ public final class EntityWorld implements World, AiContext {
         }
     }
 
-    /** Places an enemy. Public so a test, or a debug console, can populate a room. */
-    public Enemy spawnEnemy(EnemyDef def, float x, float y) {
+    /**
+     * One enemy, built and scaled but not placed and not in the room yet.
+     *
+     * <p>Split out from {@link #spawnEnemy} for {@link #summon}, which must
+     * put its result on the spawn queue rather than into {@code enemies}: it
+     * is called from inside the loop over that array.
+     */
+    private Enemy buildEnemy(EnemyDef def) {
         AiBrain brain = AiBrains.createOrFallback(def.brain);
         if (!AiBrains.knows(def.brain)) {
             log("enemy '" + def.id + "' names unknown brain '" + def.brain
@@ -1320,9 +1622,15 @@ public final class EntityWorld implements World, AiContext {
                 ActorSprites.transformation(actors, Assets.Actor.bossIdOf(def.sprite)))
             : new Enemy(def, brain, sprites);
         scaleHealth(e, def.boss);
+        return e;
+    }
+
+    /** Places an enemy. Public so a test, or a debug console, can populate a room. */
+    public Enemy spawnEnemy(EnemyDef def, float x, float y) {
+        Enemy e = buildEnemy(def);
         e.x = x;
         e.y = y;
-        brain.onSpawn(e);
+        e.brain().onSpawn(e);
         enemies.add(e);
         return e;
     }
@@ -1880,6 +2188,7 @@ public final class EntityWorld implements World, AiContext {
     private void resolveExtraRegions() {
         orbAnim = null;
         cloudAnim = null;
+        namedFx.clear();
         thrownStill.clear();
         thrownSpin.clear();
         torchAnim = null;
@@ -1902,6 +2211,16 @@ public final class EntityWorld implements World, AiContext {
                     thrownSpin.put(id, Anim.strip(fxAtlas, name, SPIN_STEPS, true));
                 } else {
                     thrownStill.put(id, art);
+                }
+            }
+            // Named effects, sliced once. Nine steps a frame on an eight
+            // frame strip is about 1.2 seconds, which is how long a spell
+            // lies burning; the strip is the whole life of the hazard rather
+            // than a loop played over it.
+            namedFx.clear();
+            for (String name : Assets.Fx.NAMED) {
+                if (fxAtlas.findRegion(name) != null) {
+                    namedFx.put(name, Anim.strip(fxAtlas, name, 9, true));
                 }
             }
             torchAnim = loop(Assets.Prop.TORCH);

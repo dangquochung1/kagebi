@@ -37,22 +37,23 @@ import com.kagebi.village.Pantry;
  *   bag       --page 1-5   the bag over the village, on that tab
  *   counter   --page 1-6   a trading counter: the herbalist's four tabs, the farmer, the cook
  *   home      --page 1-2   inside the house: on the doormat, or on the rug by the table
- *   world     --page 1-5   the world map, open to that stage and focused on it
- *   stage     --page 1-5   the same, with that stage's panel and difficulty row
- *   cleared   --page 1-5   the stage-clear screen, for that stage
+ *   world     --page 1-6   the world map, open to that stage and focused on it
+ *   stage     --page 1-6   the same, with that stage's panel and difficulty row
+ *   cleared   --page 1-6   the stage-clear screen, for that stage
  *   talk      --page 1-3   the village, mid-conversation with that villager
  *   store     --page 1-4   the herbalist's stall, over a profile N runs deep
  *   unlocks   --page 1-4   the same, on its second tab
- *   dungeon   --page 1-5   the start room of that floor
- *   map       --page 1-5   the same, with the floor map expanded
- *   fight     --page 1-5   the first room of that floor that has enemies in it
- *   swing     --page 1-5   the same, swinging on a timer so a blade is visible
+ *   dungeon   --page 1-6   the start room of that floor
+ *   map       --page 1-6   the same, with the floor map expanded
+ *   fight     --page 1-6   the first room of that floor that has enemies in it
+ *   swing     --page 1-6   the same, swinging on a timer so a blade is visible
  *   throw     --page 1-10  the same with a kunai in the off hand, throwing; 6-10 a shuriken
- *   treasure  --page 1-5   the first treasure room, for looking at a chest
- *   shop      --page 1-5   the first shop room, for looking at the shopkeeper
- *   trade     --page 1-5   the same, mid-purchase, with gold to spend
+ *   boss      --page 3,5,6 the boss arena of a floor that has one
+ *   treasure  --page 1-6   the first treasure room, for looking at a chest
+ *   shop      --page 1-6   the first shop room, for looking at the shopkeeper
+ *   trade     --page 1-6   the same, mid-purchase, with gold to spend
  *   slide                  halfway through the first room transition
- *   exit      --page 1-5   standing on that floor's way down
+ *   exit      --page 1-6   standing on that floor's way down
  *   pause                  the pause menu over floor 1
  *   inventory              the inventory over floor 1
  *   victory, gameover      the end screens, over a sample run
@@ -166,6 +167,13 @@ public final class Screens {
                 // photographed in flight at all.
                 return new GameScreen[] {
                     new DungeonScreen(game).openIn(RoomKind.START).throwing()};
+            case "boss":
+                // The one room no other flag reaches. Stage 6's boss is five
+                // bodies with two untouchable intermissions between them, and
+                // none of it can be looked at without either playing a whole
+                // stage to it or opening the arena directly.
+                startRun(game, page);
+                return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.BOSS)};
             case "treasure":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.TREASURE)};
@@ -257,7 +265,7 @@ public final class Screens {
         if (p.runs > 0 || p.gold > 0) {
             return;
         }
-        p.clearedStages = Math.max(0, Math.min(5, stage - 1));
+        p.clearedStages = Math.max(0, Math.min(6, stage - 1));
         p.deepestFloor = Math.max(p.deepestFloor, p.clearedStages);
     }
 

@@ -18,8 +18,11 @@ import com.kagebi.Dir;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.ShopCatalog;
+import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.FloorDef;
 import com.kagebi.entity.DemoInput;
+import com.kagebi.entity.Boss;
+import com.kagebi.entity.Enemy;
 import com.kagebi.entity.EntityWorld;
 import com.kagebi.entity.World;
 import com.kagebi.gen.CollisionGrid;
@@ -115,6 +118,21 @@ public class DungeonScreen extends SimScreen {
     private Dir slideDir;
     private TiledMap slideFrom;
     private final IntArray slideFromSealed = new IntArray();
+
+    /**
+     * Steps left of the wide shot on entering a room bigger than the screen.
+     *
+     * <p>Stage 6's arena is four screens. At 1x the player sees a quarter of
+     * it and a boss that is somewhere else, which is not a fight starting but
+     * a room failing to say what is in it. So it opens on the whole arena and
+     * eases in, and the fight begins when the camera arrives.
+     *
+     * <p>The wide shot is free: fitZoom of 640x352 is exactly 2, an integer on
+     * the camera's own ladder, and applyAt already rounds to the zoom grid -
+     * so there is no shimmer and no half-pixel anywhere in it.
+     */
+    private int reveal;
+    private static final int REVEAL_STEPS = 90;
 
     // Fade between floors; the action runs at the dark midpoint.
     private int fade;
@@ -328,6 +346,80 @@ public class DungeonScreen extends SimScreen {
                             5, 7, 0, 0, new String[0], new int[0], 0, 0, null);
     }
 
+    /**
+     * Whether clearing this floor ends the game rather than the stage.
+     *
+     * <p>Not simply the highest number any more. A side stage sits past the
+     * descent in the numbering but outside it in the fiction, so finishing one
+     * must not roll the credits; the win belongs to the deepest floor that is
+     * actually on the way down.
+     */
+    private boolean isLastFloor(int number) {
+        int deepest = 0;
+        for (FloorDef f : game.content().allFloors()) {
+            if (!f.side) {
+                deepest = Math.max(deepest, f.number);
+            }
+        }
+        if (deepest == 0) {
+            return number >= floorCount();
+        }
+        FloorDef here = game.content().floor(number);
+        return here != null && !here.side && number >= deepest;
+    }
+
+    /**
+     * Keeps the boss bar in step with whatever is alive in the room.
+     *
+     * <p>Hidden while the boss cannot be hurt. Stage 6's chain spends sixteen
+     * seconds as a ball nobody can touch, and a full bar sitting there through
+     * it would say the fight had stalled rather than that it had moved on.
+     */
+    private void updateBossBar() {
+        // Through the concrete type: World is the interface the hub and the
+        // tests share, and it has no business knowing what an Enemy is. Same
+        // shortcut notes/b.md takes for descendRequested and shopRequested.
+        Enemy boss = world instanceof EntityWorld ? ((EntityWorld) world).boss() : null;
+        if (boss == null || boss.invulnerable()) {
+            hud.noBoss();
+            return;
+        }
+        String[] chain = bossChain();
+        int at = 0;
+        for (int i = 0; i < chain.length; i++) {
+            if (chain[i].equals(boss.def.id)) {
+                at = i;
+                break;
+            }
+        }
+        hud.boss(game.i18n().get(boss.def.nameKey),
+                 boss.hp / (float) Math.max(1, boss.maxHp),
+                 at + 1, chain.length,
+                 boss instanceof Boss && ((Boss) boss).enraged());
+    }
+
+    /**
+     * The bodies of this floor's boss, in the order they are fought.
+     *
+     * <p>Walked from {@code evolvesInto}, skipping the links nobody can hurt.
+     * An orb has one hit point because nothing can ever take it off - which
+     * makes it exactly the thing not to count when telling the player how far
+     * through the fight they are.
+     */
+    private String[] bossChain() {
+        FloorDef floor = game.content().floor(run.floor);
+        Array<String> out = new Array<>();
+        String id = floor == null ? null : floor.boss;
+        while (id != null && game.content().hasEnemy(id)) {
+            EnemyDef def = game.content().enemy(id);
+            if (def.maxHp > 1) {
+                out.add(id);
+            }
+            id = def.evolvesInto;
+        }
+        return out.toArray(String.class);
+    }
+
     private int floorCount() {
         int n = game.content().allFloors().size;
         return n > 0 ? n : DEFAULT_FLOORS;
@@ -368,7 +460,29 @@ public class DungeonScreen extends SimScreen {
         }
         hud.closeMap();
         playRoomMusic();
+
+        // A room bigger than the screen opens on the whole of itself. The
+        // camera is already at the fit, so the ease is inward, and the world
+        // is held still until it arrives - see the reveal branch in step().
+        float fit = CameraController.fitZoom(roomW, roomH);
+        if (fit > 1f) {
+            camera.zoomBy(ALL_THE_WAY, fit);
+            camera.snapZoom();
+            reveal = REVEAL_STEPS;
+        } else if (camera.targetZoom() != 1f) {
+            camera.zoomBy(-ALL_THE_WAY, 1f);
+            camera.snapZoom();
+            reveal = 0;
+        }
     }
+
+    /**
+     * More notches than any zoom ladder has, which is how to say "as far as
+     * this room goes" without knowing how many rungs it offers. zoomBy clamps
+     * to the ladder it builds for the fit, so this lands exactly on the fit
+     * going out and exactly on 1x coming back.
+     */
+    private static final int ALL_THE_WAY = 8;
 
     /**
      * Closes every doorway that has no room behind it: the open tiles on that
@@ -435,6 +549,17 @@ public class DungeonScreen extends SimScreen {
         }
         if (slide > 0) {
             slide--;
+            return;
+        }
+        if (reveal > 0) {
+            // The world is not stepped through the wide shot, the way it is
+            // not stepped through a slide: the boss should not be halfway
+            // across the arena by the time the player can act.
+            reveal--;
+            camera.stepZoom();
+            if (reveal == 0) {
+                camera.zoomBy(-1, CameraController.fitZoom(roomW, roomH));
+            }
             return;
         }
         if (ended) {
@@ -553,14 +678,33 @@ public class DungeonScreen extends SimScreen {
         unlocked = Hud.CARD_STEPS;
     }
 
+    /**
+     * Moves to the next room: sliding between two screens, fading otherwise.
+     *
+     * <p>The slide offsets the outgoing map by one room and assumes that is
+     * one screen. It is wrong twice over for the arena - the two maps are
+     * different sizes, so the old one leaves a gap behind it, and a 640px
+     * slide in 24 steps is a very fast pan across a lot of empty floor. A
+     * fade says the same thing and is right at any size.
+     */
     private void startSlide(Dir door, Room next) {
-        slideFrom = map;
-        slideFromSealed.clear();
-        slideFromSealed.addAll(sealed);
-        slideDir = door;
-        slide = SLIDE_STEPS;
+        boolean sliding = oneScreen(run.room) && oneScreen(next);
+        if (sliding) {
+            slideFrom = map;
+            slideFromSealed.clear();
+            slideFromSealed.addAll(sealed);
+            slideDir = door;
+            slide = SLIDE_STEPS;
+        }
         enter(next, door.opposite());
+        if (!sliding) {
+            fade = FADE_STEPS;
+        }
         game.audio().playSfx(Assets.SFX_DOOR);
+    }
+
+    private static boolean oneScreen(Room room) {
+        return room == null || room.template == null || room.template.oneScreen();
     }
 
     /**
@@ -579,7 +723,7 @@ public class DungeonScreen extends SimScreen {
         game.audio().playSfx(Assets.SFX_ACCEPT);
         ended = true;
         run.victory = true;
-        final boolean last = run.floor >= floorCount();
+        final boolean last = isLastFloor(run.floor);
         fade = FADE_STEPS * 2;
         fadeAction = () -> stack().push(last ? new VictoryScreen(game)
                                              : new StageClearScreen(game));
@@ -616,7 +760,9 @@ public class DungeonScreen extends SimScreen {
     public void render(float delta) {
         SpriteBatch batch = game.batch();
         if (failure == null) {
+            camera.stepZoom();
             camera.shake(world.shake());
+            updateBossBar();
             // Snapped to the room, which is what follow() does for any map no
             // larger than the screen. A template that is larger scrolls rather
             // than being cropped, which is the better failure.

@@ -45,6 +45,7 @@ public final class RoomCatalog {
 
     private static RoomTemplate read(String biome, FileHandle file) {
         XmlReader.Element map = new XmlReader().parse(file);
+        int width = map.getIntAttribute("width", RoomTemplate.WIDTH);
         int height = map.getIntAttribute("height", RoomTemplate.HEIGHT);
         int tileHeight = map.getIntAttribute("tileheight", 16);
 
@@ -68,7 +69,8 @@ public final class RoomCatalog {
 
         String id = biome + "/" + file.nameWithoutExtension();
         return new RoomTemplate(id, biome, kindsFor(file.nameWithoutExtension()),
-                                Assets.ROOMS_DIR + biome + "/" + file.name(), spawns);
+                                Assets.ROOMS_DIR + biome + "/" + file.name(), spawns,
+                                width, height);
     }
 
     private static SpawnPoint.Kind kindOf(String type) {

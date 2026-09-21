@@ -39,6 +39,11 @@ At the Flame Core, one of the six will have to choose.
 - **Go down.** Five stages, picked from a world map and played one at a time.
   A stage starts at full health, banks its own gold, and opens the next one when
   it is cleared. The difficulty is chosen per stage.
+- **Or go sideways.** The Drowned Cove is a sixth stage that is not part of the
+  descent: it is open from the first run rather than one past the last stage
+  cleared, and clearing it does not end the game. Three slimes that each have
+  to be answered differently, and a boss that is three bodies with two things
+  to dodge between them.
 - **Keep the village.** Kagemura is an island of people, goblins and skeletons:
   - Plant and pick the farm's plots.
   - Collect what the woodcutter, the rancher, the fisher and the goblin miner
@@ -99,6 +104,10 @@ _raw/
 assets/packs/
   homeassets/        Top-Down Character Home
   miniworld/         Sunnyside World
+  dungeon6/          CraftPix Dungeon Tileset      the Drowned Cove's rooms
+  slimes6/           CraftPix Slime Enemies        its three slimes
+  bosses6/           CraftPix Pirate Characters    its boss, all three bodies
+  bossfx6/           CraftPix Fire & Water Spells  the boss's spells
 ```
 
 Where a pack has a public page, that is where it comes from. Each keeps its
@@ -111,6 +120,7 @@ author's terms:
 | Raven Fantasy Icons (Free) | [clockwork-raven.itch.io](https://clockwork-raven.itch.io/) | see the page |
 | SunnyLand Music | [ansimuz.itch.io](https://ansimuz.itch.io/) | CC0 |
 | Sunnyside World | [danieldiggle.itch.io](https://danieldiggle.itch.io/sunnyside) | see the page |
+| Dungeon Tileset, Slime Enemies, Pirate Characters, Fire &amp; Water Spells | [craftpix.net](https://craftpix.net/) | [file licence](https://craftpix.net/file-licenses/) — usable in a game, not redistributable |
 | Enemy Animations Set, Top-Down Character Home | unknown | unknown |
 
 ### 2. Build the art and sound
@@ -192,22 +202,24 @@ harvest   --page 1-3   the village mid-effect: goods flying from the woodcutter,
 bag       --page 1-5   the bag over the village, on that tab
 counter   --page 1-6   a trading counter: the herbalist's four tabs, the farmer, the cook
 home      --page 1-2   inside the house: on the doormat, or on the rug by the table
-world     --page 1-5   the world map, open to that stage and focused on it
-stage     --page 1-5   the same, with that stage's panel and its difficulty row
-cleared   --page 1-5   the stage-clear screen, for that stage
+world     --page 1-6   the world map, open to that stage and focused on it
+stage     --page 1-6   the same, with that stage's panel and its difficulty row
+cleared   --page 1-6   the stage-clear screen, for that stage
 talk      --page 1-3   the village, mid-conversation with that villager
 store     --page 1-4   the herbalist's upgrade shelf, over a profile N runs deep
 unlocks   --page 1-4   the same, on its second tab
-dungeon   --page 1-5   the start room of that stage
-map       --page 1-5   the same, with the floor map expanded
-fight     --page 1-5   the first room of that floor that has enemies in it
-swing     --page 1-5   the same, swinging on a timer so a blade is visible
+dungeon   --page 1-6   the start room of that stage
+map       --page 1-6   the same, with the floor map expanded
+fight     --page 1-6   the first room of that floor that has enemies in it
+swing     --page 1-6   the same, swinging on a timer so a blade is visible
 throw     --page 1-10  the same with a kunai in the off hand, throwing; 6-10 a shuriken
-treasure  --page 1-5   the first treasure room, for looking at a chest
-shop      --page 1-5   the first shop room, for looking at the shopkeeper
-trade     --page 1-5   the same, mid-purchase, with gold to spend
+boss      --page 3,5,6 the boss arena of a floor that has one, from the first
+                       step of the fight
+treasure  --page 1-6   the first treasure room, for looking at a chest
+shop      --page 1-6   the first shop room, for looking at the shopkeeper
+trade     --page 1-6   the same, mid-purchase, with gold to spend
 slide                  halfway through the first room transition
-exit      --page 1-5   standing on that floor's way down
+exit      --page 1-6   standing on that floor's way down
 pause, inventory       those overlays over floor 1
 victory, gameover      the end screens, over a sample run
 credits   --page 1-4   the roll, starting at that section
@@ -266,7 +278,7 @@ Only `build_assets.py` and `pack_atlas.py` are needed to play from a fresh clone
 The rest regenerate files that are already committed, and are for changing them.
 
 ```powershell
-python tools/make_maps.py      # regenerate the 104 room .tmx files
+python tools/make_maps.py      # regenerate the 129 room .tmx files
 python tools/make_island.py    # rebuild the island village from the Sunnyside pack, keeping its decor layer
 python tools/make_village.py   # rebuild the inside of the house from its art pack
 python tools/make_world.py     # lay out the world map again, keeping its decor layer
@@ -283,7 +295,8 @@ assets/          art, audio, fonts, maps, and the JSON the game is balanced in
   data/          enemies, weapons, relics, items, floors, upgrades, loot tables, village.json
   i18n/          vi.json + en.json (interface), content.*.json (names and flavour)
   maps/          village.tmx (make_island.py), home.tmx (make_village.py), world.tmx, rooms/
-  packs/         Sunnyside World and Top-Down Character Home, untracked (step 1)
+  packs/         Sunnyside World, Top-Down Character Home and the Drowned Cove's
+                 four CraftPix packs, all untracked (step 1)
   gfx/ audio/ atlas/   built by the tools, untracked (step 2)
 src/main/java/com/kagebi/
   screen/        every screen, plus Screens.java which the --screen flag reads

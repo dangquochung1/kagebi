@@ -165,7 +165,13 @@ ATLASES = {
         "roots": [("player", os.path.join(GFX, "actors", "player")),
                   ("monsters", os.path.join(GFX, "actors", "monsters")),
                   ("bosses", os.path.join(GFX, "actors", "bosses")),
-                  ("depths", os.path.join(GFX, "actors", "depths"))],
+                  ("depths", os.path.join(GFX, "actors", "depths")),
+                  # Stage 6's cast, in namespaces of its own. Folding these
+                  # into monsters/ and bosses/ would be tidier to read and
+                  # would break ActorRegionsTest, which counts exactly 66
+                  # monster sheets and asserts every one of them is 64x64.
+                  ("slimes", os.path.join(GFX, "actors", "slimes")),
+                  ("bosses6", os.path.join(GFX, "actors", "bosses6"))],
         # The combined player sheet repeats every frame the separate files
         # already carry, and at 256x544 it is the single largest image here.
         "exclude_files": ["player/ninjagreen/spritesheet"],
@@ -173,7 +179,11 @@ ATLASES = {
         # drop shadow under every actor is what stops a top-down sprite looking
         # like a sticker on the floor.
         "extra_images": [(os.path.join(GFX, "actors", "shadow.png"), "shadow")],
-        "size": 2048,
+        # 4096 since stage 6: its three slimes and three bosses are 64px cells
+        # in four-column directional sheets, which is about 4.2M pixels on top
+        # of what was here - more than a 2048 page holds in total, and this
+        # packer fails rather than opening a second page.
+        "size": 4096,
     },
     "npc": {
         "roots": [("npc", os.path.join(GFX, "actors", "npc"))],

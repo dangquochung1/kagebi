@@ -149,7 +149,9 @@ public final class ContentLoader {
             f.integer("windupSteps"), f.integer("activeSteps"), f.integer("recoverSteps"),
             f.integer("cooldownSteps"), f.number("knockbackResist"), f.integer("hurtInvulnSteps"),
             f.string("lootTable"), f.integer("goldMin"), f.integer("goldMax"),
-            f.bool("boss", false), f.integerOr("phases", 1), f.bool("flying", false));
+            f.bool("boss", false), f.integerOr("phases", 1), f.bool("flying", false),
+            f.stringOr("evolvesInto", null), f.stringsOr("summons"),
+            f.numberOr("enrageAt", 0f), f.stringOr("projectile", null));
         f.done();
         return d;
     }
@@ -221,7 +223,7 @@ public final class ContentLoader {
             f.integer("treasureRooms"), f.integer("shopRooms"),
             f.strings("enemies"), f.integers("enemyWeights"),
             f.integer("packMin"), f.integer("packMax"),
-            f.stringOr("boss", null));
+            f.stringOr("boss", null), f.bool("side", false));
         f.done();
         return d;
     }

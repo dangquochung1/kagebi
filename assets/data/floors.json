@@ -110,6 +110,41 @@
       "enemyWeights": [18,       18,        22,       14,          10,        18],
       "packMin": 4, "packMax": 6,
       "boss": "tengured"
+    },
+    {
+      // The Drowned Cove, and the first stage that is not part of the
+      // descent. "side" is the whole difference: the world map opens it from
+      // the first run instead of one past the last one cleared, and clearing
+      // it gives the stage-clear screen rather than the ending, which still
+      // belongs to floor 5.
+      //
+      // Numbered 6 because ContentRegistry walks floors from 1 and stops at
+      // the first gap, so a side stage cannot sit outside the numbering. It
+      // reads as sixth on the map and as optional everywhere else.
+      "number": 6, "nameKey": "floor.6", "descKey": "floor.6.desc",
+      "biome": "cove", "side": true,
+      // 39_boat and 40_crypt were both unused. The first is the only track in
+      // the set that sounds like water under stone, and the second is the
+      // only one that escalates without being MUSIC_FINAL, which floor 5 has
+      // and should keep.
+      "music": "39_boat.ogg", "ambient": "ambient/wave.wav",
+      "bossMusic": "40_crypt.ogg",
+      "roomsMin": 14, "roomsMax": 17,
+      "treasureRooms": 2, "shopRooms": 1,
+      // Weighted to average 37.1 hit points: 44*44 + 36*32 + 26*24, over 100.
+      // Well under floor 5's 84.7 on purpose - the cove is entered at
+      // whatever strength the player brought rather than at the end of four
+      // floors of relics - but not the 22.6 the first cut had, which made the
+      // whole stage 3.2 minutes. BalanceTest.everySideStageIsAStageLong is
+      // the floor under that.
+      "enemies":      ["slimespike", "slimetide", "slimeember"],
+      "enemyWeights": [44,           32,          24],
+      "packMin": 4, "packMax": 6,
+      // Only the first body of the chain is named. The other four are reached
+      // through it, and ContentValidator follows evolvesInto to see that they
+      // are placed - naming them here instead would put the boss's later
+      // bodies in the floor's ordinary rooms.
+      "boss": "pirateleader"
     }
   ]
 }

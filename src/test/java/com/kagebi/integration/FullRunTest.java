@@ -154,6 +154,60 @@ class FullRunTest {
     }
 
     /**
+     * The weapon a run set out with is the weapon it has in every room.
+     *
+     * <p>Written for a report that an axe chosen before stage 6 was an axe in
+     * the first two rooms and a katana from the third on. Nothing in the code
+     * can do that - {@code EntityWorld.enterRoom} re-reads
+     * {@code run.weaponId} on every entry and {@code Player.setWeapon} is
+     * called from nowhere else, so a weapon cannot change unless the run's
+     * own field does, and only two screens write it. But "I read the code and
+     * it cannot happen" is worth exactly nothing to somebody who watched it
+     * happen, so this walks a real floor with a real axe and looks in every
+     * room, which is worth something either way: if it passes, the report was
+     * a stale build, and if the mechanism is ever introduced it fails here
+     * rather than in a player's stage-6 run.
+     *
+     * <p>Both halves matter. The def is what the swing is made of and the art
+     * is what the player sees, and a bug that swapped only the second would be
+     * invisible to an assertion about the first.
+     */
+    @Test
+    void theWeaponAtTheDoorIsTheWeaponInEveryRoom() {
+        RunState run = new RunState(20260912L, Assets.Actor.DEFAULT_CHARACTER,
+                                    "axe", UNKILLABLE);
+        EntityWorld world = new EntityWorld(null, content, run, null);
+        Bot bot = new Bot(world);
+
+        for (int number = 1; number <= content.allFloors().size; number++) {
+            FloorDef def = floorDef(number);
+            FloorLayout layout = new FloorGenerator(rooms).generate(def, floorSeed(run, number));
+            run.floor = number;
+            run.layout = layout;
+            List<Room> path = pathTo(layout.start(), layout.exit());
+            assertNotNull(path, "floor " + number + ": no path to the stairs");
+
+            int index = 0;
+            for (Room room : path) {
+                index++;
+                run.room = room;
+                run.hp = run.maxHp;
+                world.enterRoom(room, grid(room), null);
+                assertEquals("axe", run.weaponId,
+                    "floor " + number + " room " + index + ": the run's own weapon changed");
+                assertNotNull(world.player().weapon(), "floor " + number + " room " + index);
+                assertEquals("axe", world.player().weapon().id,
+                    "floor " + number + " room " + index + " (" + room.template.id
+                    + "): went in with an axe, came out holding "
+                    + world.player().weapon().id);
+                bot.clearRoom(ROOM_BUDGET);
+                assertEquals("axe", world.player().weapon().id,
+                    "floor " + number + " room " + index + ": the weapon changed mid-fight");
+            }
+        }
+    }
+
+    /**
      * Every boss the content names can actually be killed.
      *
      * <p>Separate from the run above because the run can skip it:

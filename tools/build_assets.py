@@ -335,6 +335,14 @@ def build_licenses():
          "SproutLands-NonCommercial.txt"),
         (os.path.join(RAW, "_fonts/Pixeloid_Font_1_0/License.txt"),
          "PixeloidFont-OFL.txt"),
+        # The Drowned Cove's four packs. All four carry the same Craftpix file
+        # licence, which is not CC0: it allows use in a game and forbids
+        # redistributing the art itself, which is why they sit in the
+        # gitignored assets/packs/ rather than in the repository.
+        (os.path.join(PACKS, "dungeon6/license.txt"), "Craftpix-Dungeon6.txt"),
+        (os.path.join(PACKS, "slimes6/License.txt"), "Craftpix-Slimes6.txt"),
+        (os.path.join(PACKS, "bosses6/license.txt"), "Craftpix-Bosses6.txt"),
+        (os.path.join(PACKS, "bossfx6/license.txt"), "Craftpix-BossFx6.txt"),
     ]
     ensure(os.path.abspath(dst))
     for src, name in pairs:
@@ -377,6 +385,24 @@ def enforce_tile_grid():
             stats["rerouted_to_props"] += 1
 
 
+def build_cove():
+    """The Drowned Cove: stage 6's tileset, slimes, bosses and skill effects.
+
+    Its own module, because none of its four packs is shaped like anything
+    else in the pipeline - one wants a transpose, one a 1:10 downscale and a
+    palette cut, and none of them is a strip of frames the way the dungeon
+    pack is. See tools/build_cove.py.
+    """
+    print("drowned cove")
+    if not os.path.isdir(os.path.join(PACKS, "dungeon6")):
+        print("  ! missing source: %s" % os.path.join(PACKS, "dungeon6"))
+        stats["missing_sources"] += 1
+        return
+    if not DRY:
+        import build_cove as cove
+        stats["missing_sources"] += len(cove.build(report=print))
+
+
 def build_sunnyside():
     """The island village's images, from the Sunnyside World pack.
 
@@ -399,8 +425,8 @@ def build_sunnyside():
 
 
 STEPS = [build_player, build_actors, build_tiles, build_depth_actors,
-         build_ui_fx_items, build_audio, build_licenses, enforce_tile_grid,
-         build_sunnyside]
+         build_ui_fx_items, build_audio, build_licenses, build_cove,
+         enforce_tile_grid, build_sunnyside]
 
 
 def main():

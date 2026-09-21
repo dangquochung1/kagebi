@@ -599,7 +599,7 @@ public class HubScreen extends SimScreen {
             openBag();
             return;
         }
-        if (clicked(BADGE_X, BADGE_Y, BADGE)) {
+        if (input().justPressed(GameAction.LOADOUT) || clicked(BADGE_X, BADGE_Y, BADGE)) {
             openLoadout();
             return;
         }
@@ -1245,6 +1245,13 @@ public class HubScreen extends SimScreen {
         game.skin().getDrawable(Assets.Ui.CELL).draw(batch, BADGE_X, BADGE_Y, BADGE, BADGE);
         TextureRegion frame = badgeIdle.frame(Dir.DOWN, steps());
         batch.draw(frame, BADGE_X + (BADGE - 32) / 2f, BADGE_Y + (BADGE - 32) / 2f);
+        // The key under it, exactly as the bag beside it has always had one.
+        // Without this the badge was the only thing on the screen that could
+        // be opened but said nothing about how - it had to be clicked, on a
+        // screen the player is otherwise driving entirely from the keyboard.
+        Hud.prompt(batch, game.skin(), font,
+                   game.input().map().primary(GameAction.LOADOUT), "",
+                   BADGE_X + BADGE / 2f, BADGE_Y - Hud.LINE + 4);
     }
 
     /** The bag, beside the badge: the pack's basket, with the key that opens it under it. */

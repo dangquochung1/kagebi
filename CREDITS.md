@@ -13,6 +13,10 @@ below was obtained free. Licences are reproduced verbatim in `LICENSES/`.
 | [Raven Fantasy Icons (Free)](https://clockwork-raven.itch.io/) | Caio / Clockwork Raven Studios | No licence file shipped — see the itch.io page | Loot, relic and equipment icons |
 | Top-Down Character Home | *unknown — pack shipped no licence or attribution* | Unknown | The player's house: its walls, windows and roof in the village, and the rooms inside |
 | [Sunnyside World](https://danieldiggle.itch.io/sunnyside) | Daniel Diggle | No licence file shipped — see the itch.io page | The island village: its land, buildings, trees and animals, and the villagers and their work animations |
+| [Dungeon Tileset](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The Drowned Cove's stone, water, fire and traps |
+| [Slime Enemy Sprites](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The Drowned Cove's three slimes |
+| [Pirate Characters](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The Drowned Captain, and the two things he becomes |
+| [Fire and Water Spell Effects](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The cove boss's spells, balls and arrows |
 
 ## Audio
 
@@ -38,6 +42,13 @@ project's own showcase room by `tools/make_island.py`; the pack itself stays
 out of git (`assets/packs/miniworld/`, under `assets/packs/` in `.gitignore`), and only the images the game loads
 are derived from it. As with the house, this row and the `credits.sunnyside.*`
 strings are the places to correct if its terms turn out to need more.
+
+The four CraftPix packs share one licence, and it is not CC0: it allows the
+art in a game and forbids redistributing the art itself. So they sit in
+`assets/packs/{dungeon6,slimes6,bosses6,bossfx6}/`, which `.gitignore` already
+excludes, and only what `tools/build_cove.py` derives from them reaches
+`assets/gfx/` — which is itself derived and untracked. The licence text each
+one ships is copied into `LICENSES/Craftpix-*.txt` by `build_assets.py`.
 
 Pixeloid ships without the 32 Vietnamese letters that stack a tone mark on a
 circumflex or breve. `tools/make_font.py` synthesises them from the font's own

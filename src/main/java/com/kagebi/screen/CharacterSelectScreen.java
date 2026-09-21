@@ -93,6 +93,17 @@ public class CharacterSelectScreen extends SimScreen {
     private static final Color SOFT = new Color(0x46503cff);
     private static final Color LOCKED = new Color(0.32f, 0.30f, 0.36f, 1f);
     private static final Color DANGER = new Color(0xd94a3aff);
+    /**
+     * The cell under whatever the other row is holding.
+     *
+     * <p>The chosen item still has to be visible from the row the cursor is
+     * not on - a player standing on the weapons must be able to see which
+     * ninja they are about to take. But it must not look like a second
+     * cursor, which is what a second ring did however much it was dimmed. So
+     * the cursor is the only ring on the screen, and being chosen is said with
+     * the cell instead: a warmer, lighter slot that reads as filled.
+     */
+    private static final Color PICKED = new Color(1.25f, 1.05f, 0.62f, 1f);
 
     private final Kagebi game;
     private final CameraController camera = new CameraController();
@@ -107,6 +118,18 @@ public class CharacterSelectScreen extends SimScreen {
 
     private int character;
     private int weapon;
+
+    /**
+     * Which row the one cursor is on: 0 the ninjas, 1 the weapons.
+     *
+     * <p>There used to be no cursor at all, only two independent selections -
+     * left and right moved the ninja, up and down moved the weapon, and both
+     * rows wore a bright ring the whole time. Two rings means two cursors, and
+     * two cursors means the player has to work out which of them their next
+     * key press is going to move. One ring moves; the other row shows what it
+     * is holding, in a colour that says "chosen" rather than "here".
+     */
+    private int row;
 
     /** Editing the run that exists, rather than building a new one. */
     private boolean loadout;
@@ -222,6 +245,15 @@ public class CharacterSelectScreen extends SimScreen {
         return weapons.isEmpty() ? null : weapons.first();
     }
 
+    /**
+     * One cursor, two rows.
+     *
+     * <p>Left and right walk the row it is on; down and up move between rows.
+     * That is the arrangement every other grid of cells in this game uses, and
+     * the one a player assumes on sight - which is why the old scheme, where
+     * up and down silently cycled a row the cursor was not visibly on, read as
+     * the screen not responding.
+     */
     @Override
     protected void step() {
         int dx = 0;
@@ -231,18 +263,22 @@ public class CharacterSelectScreen extends SimScreen {
             dx = -1;
         }
         if (dx != 0) {
-            character = Math.floorMod(character + dx, Assets.Actor.CHARACTERS.length);
+            if (row == 0) {
+                character = Math.floorMod(character + dx, Assets.Actor.CHARACTERS.length);
+            } else if (weapons.size > 0) {
+                weapon = Math.floorMod(weapon + dx, weapons.size);
+            }
             game.audio().playSfx(Assets.SFX_MOVE);
         }
 
-        int dy = 0;
-        if (input().justPressed(GameAction.MOVE_UP)) {
-            dy = -1;
-        } else if (input().justPressed(GameAction.MOVE_DOWN)) {
-            dy = 1;
-        }
-        if (dy != 0 && weapons.size > 0) {
-            weapon = Math.floorMod(weapon + dy, weapons.size);
+        // Down onto the weapons, up back to the ninjas. No wrapping: two rows
+        // that wrap into each other are a ring, and a ring of two is a toggle
+        // the player cannot tell the direction of.
+        if (input().justPressed(GameAction.MOVE_DOWN) && row == 0 && weapons.size > 0) {
+            row = 1;
+            game.audio().playSfx(Assets.SFX_MOVE);
+        } else if (input().justPressed(GameAction.MOVE_UP) && row == 1) {
+            row = 0;
             game.audio().playSfx(Assets.SFX_MOVE);
         }
 
@@ -330,7 +366,7 @@ public class CharacterSelectScreen extends SimScreen {
         int left = (Cfg.VIRT_W - total) / 2;
         for (int i = 0; i < count; i++) {
             int x = left + i * (CELL + GAP);
-            game.skin().getDrawable(Assets.Ui.CELL).draw(batch, x, PORTRAIT_BOTTOM, CELL, CELL);
+            cell(batch, i == character, row == 0, x, PORTRAIT_BOTTOM, CELL, CELL);
             // The selected ninja turns slowly on the spot, showing all four
             // sides of the sheet; the rest face the camera. Motion is what the
             // eye goes to, so this is the selection cue as much as the ring is.
@@ -341,7 +377,7 @@ public class CharacterSelectScreen extends SimScreen {
             batch.setColor(unlockedCharacter(i) ? Color.WHITE : LOCKED);
             batch.draw(frame, x + (CELL - 32) / 2, PORTRAIT_BOTTOM + (CELL - 32) / 2);
             batch.setColor(Color.WHITE);
-            if (i == character) {
+            if (i == character && row == 0) {
                 game.skin().getDrawable(Assets.Ui.FOCUS)
                     .draw(batch, x - 2, PORTRAIT_BOTTOM - 2, CELL + 4, CELL + 4);
             }
@@ -381,17 +417,17 @@ public class CharacterSelectScreen extends SimScreen {
         drawOffHand(batch, offHandX);
         for (int i = 0; i < weapons.size; i++) {
             int x = left + i * (WEAPON_CELL + WEAPON_GAP);
-            game.skin().getDrawable(Assets.Ui.CELL)
-                .draw(batch, x, WEAPON_BOTTOM, WEAPON_CELL, WEAPON_CELL);
+            cell(batch, i == weapon, row == 1, x, WEAPON_BOTTOM, WEAPON_CELL, WEAPON_CELL);
             TextureRegion icon = game.skin().getRegion(Assets.Ui.weaponIcon(weapons.get(i)));
             batch.setColor(unlockedWeapon(i) ? Color.WHITE : LOCKED);
             batch.draw(icon,
                 x + (WEAPON_CELL - icon.getRegionWidth()) / 2,
                 WEAPON_BOTTOM + (WEAPON_CELL - icon.getRegionHeight()) / 2);
             batch.setColor(Color.WHITE);
-            if (i == weapon) {
+            if (i == weapon && row == 1) {
                 game.skin().getDrawable(Assets.Ui.FOCUS)
-                    .draw(batch, x - 2, WEAPON_BOTTOM - 2, WEAPON_CELL + 4, WEAPON_CELL + 4);
+                    .draw(batch, x - 2, WEAPON_BOTTOM - 2,
+                          WEAPON_CELL + 4, WEAPON_CELL + 4);
             }
         }
         if (weapons.size > 0) {
@@ -410,6 +446,21 @@ public class CharacterSelectScreen extends SimScreen {
             Hud.centred(batch, font, line, Cfg.VIRT_W / 2f, WEAPON_BOTTOM - 4);
             batch.setColor(Color.WHITE);
         }
+    }
+
+    /**
+     * One slot. Lit when it holds this row's pick and the cursor is elsewhere.
+     *
+     * <p>The row the cursor is on says which is chosen with the ring, so it
+     * needs nothing here; lighting both would be saying it twice.
+     */
+    private void cell(SpriteBatch batch, boolean chosen, boolean cursorHere,
+                      int x, int y, int w, int h) {
+        if (chosen && !cursorHere) {
+            batch.setColor(PICKED);
+        }
+        game.skin().getDrawable(Assets.Ui.CELL).draw(batch, x, y, w, h);
+        batch.setColor(Color.WHITE);
     }
 
     /**

@@ -81,6 +81,18 @@ public class Enemy extends Entity {
      * one thing it exists not to do.
      */
     public boolean dormant;
+    /**
+     * Steps of dormancy left, or 0 for "until something says otherwise".
+     *
+     * <p>Two things sleep, for opposite reasons. An ambusher sleeps until the
+     * player walks into its range, which is a condition and not a clock, so it
+     * uses 0 and wakes itself. A summoned body sleeps for exactly as long as
+     * the effect that called it takes to play - and that one has to be a clock,
+     * because nothing else in the room is watching it. Without this it would
+     * sleep forever: dormant is harmless and still, so a boss calling for help
+     * would fill the arena with statues.
+     */
+    public int dormantSteps;
 
     /** 0 for a spawned enemy, 1 for a splitter's offspring, which does not split again. */
     public int generation;
@@ -230,6 +242,10 @@ public class Enemy extends Entity {
         }
 
         applyShove(ctx.collision());
+        if (dormantSteps > 0 && --dormantSteps == 0) {
+            dormant = false;
+            setState(AiState.CHASE);
+        }
         if (distractSteps > 0) {
             // Skipped here rather than inside each brain, so a smoke bomb works
             // on all fourteen of them and on the fifteenth nobody has written.
@@ -420,6 +436,13 @@ public class Enemy extends Entity {
         }
         if (sprites.hurt != null && state == AiState.HURT) {
             return ActorSprites.frameOf(sprites.hurt, facing, stateSteps, 12);
+        }
+        if (moving && state == AiState.CHASE && sprites.run != null) {
+            // A second gait, for the bodies whose art has one. Chasing is the
+            // only state that means it: a wanderer strolling and a slime
+            // closing on the player move at the same speed but do not read the
+            // same, and the packs that ship a run cycle drew it for this.
+            return sprites.run.frame(facing, animSteps);
         }
         return (moving ? sprites.walk : sprites.idle).frame(facing, animSteps);
     }

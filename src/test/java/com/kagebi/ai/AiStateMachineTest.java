@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,32 @@ class AiStateMachineTest {
                 return TestDefs.enemy("giantfrog2").brain("boss_frog").hp(900).contact(12)
                     .attack(22, 72).speed(46).aggro(999).timing(30, 18, 36, 60).resist(1f)
                     .invuln(6).boss(1, "bosses/giantfrog2/idle", 40).build();
+            case "burster":
+                return TestDefs.enemy("slimetide").brain("burster").hp(36).contact(4)
+                    .attack(7, 84).speed(34).aggro(150).timing(26, 4, 22, 70)
+                    .invuln(10).build();
+            case "bomber":
+                return TestDefs.enemy("slimeember").brain("bomber").hp(26).contact(3)
+                    .attack(16, 18).speed(62).aggro(160).timing(34, 6, 10, 40)
+                    .invuln(8).build();
+            // The three bodies of stage 6, with their real active windows: the
+            // combo and the barrage both lay their blows out across one, so a
+            // shorter one here would test a move that does not exist.
+            case "boss_pirateleader":
+                return TestDefs.enemy("pirateleader").brain("boss_pirateleader").hp(200)
+                    .contact(12).attack(24, 26).speed(58).aggro(999)
+                    .timing(28, 190, 34, 54).resist(1f).invuln(5)
+                    .boss(1, "bosses6/pirateleader/idle", 64).build();
+            case "boss_piratezombie":
+                return TestDefs.enemy("piratezombie").brain("boss_piratezombie").hp(180)
+                    .contact(10).attack(20, 30).speed(52).aggro(999)
+                    .timing(26, 96, 32, 50).resist(1f).invuln(5)
+                    .boss(1, "bosses6/piratezombie/idle", 64).build();
+            case "boss_squidman":
+                return TestDefs.enemy("squidman").brain("boss_squidman").hp(180)
+                    .contact(12).attack(22, 28).speed(56).aggro(999)
+                    .timing(26, 96, 30, 46).resist(1f).invuln(5)
+                    .boss(1, "bosses6/squidman/idle", 64).build();
             default:
                 return TestDefs.enemy("generic").brain(brain).hp(600).contact(10)
                     .attack(16, 40).speed(40).aggro(999).timing(24, 12, 24, 40).resist(1f)
@@ -118,6 +145,8 @@ class AiStateMachineTest {
     @ValueSource(strings = {
         "chaser", "wanderer", "shooter", "charger", "stationary", "hopper", "flyer",
         "orbiter", "ambusher", "splitter", "caster", "boss", "boss_frog", "boss_tengu",
+        "burster", "bomber",
+        "boss_pirateleader", "boss_piratezombie", "boss_squidman",
     })
     void noStateOutlivesItsDefAndEveryBrainFights(String id) {
         EnemyDef def = defFor(id);
@@ -154,8 +183,13 @@ class AiStateMachineTest {
 
         assertTrue(longest.getOrDefault(AiState.WINDUP, 0) <= def.windupSteps,
             id + ": windup outlived " + def.windupSteps + ": " + longest);
-        assertTrue(longest.getOrDefault(AiState.ATTACK, 0) <= Math.max(1, def.activeSteps),
-            id + ": attack outlived " + def.activeSteps + ": " + longest);
+        // Against what the brain declares, not against the def's one number.
+        // A boss sizes each move for itself - a swing and a three-blow combo
+        // cannot share a length - and says so in longestActiveSteps; every
+        // other brain returns def.activeSteps, so this is unchanged for them.
+        int ceiling = AiBrains.createOrFallback(def.brain).longestActiveSteps(def);
+        assertTrue(longest.getOrDefault(AiState.ATTACK, 0) <= ceiling,
+            id + ": attack outlived the " + ceiling + " its brain declares: " + longest);
         assertTrue(longest.getOrDefault(AiState.RECOVER, 0) <= def.recoverSteps,
             id + ": recovery outlived " + def.recoverSteps + ": " + longest);
         assertTrue(longest.getOrDefault(AiState.HURT, 0) <= 12,
@@ -218,6 +252,126 @@ class AiStateMachineTest {
         assertEquals(AiState.IDLE, e.state(), "rescued rather than left standing forever");
         assertEquals(BaseBrain.WEDGE_LIMIT, inWindup, "and rescued at the limit, not before");
         assertFalse(e.attack().busy());
+    }
+
+    /**
+     * The orb is left out of the sweep above on purpose, and checked here.
+     *
+     * <p>It has no windup, no active window and no hitbox: it is an
+     * intermission, and the sweep asserts that a brain attacks at least three
+     * times in four thousand steps, which this one never does. What it
+     * promises instead is exactly this - untouchable the whole way, raining,
+     * and then over on time and not a step later, because a fight that waited
+     * for an orb that never expired would never end at all.
+     */
+    @Test
+    void theOrbIsUntouchableRainsAndEndsOnTime() {
+        EnemyDef def = TestDefs.enemy("fireorb").brain("boss_orb").hp(1).contact(0)
+            .attack(14, 1).speed(0).aggro(999).timing(1, 1, 1, 1).resist(1f)
+            .boss(1, "bosses6/fireorb/idle", 32).build();
+        FakeArena arena = new FakeArena();
+        Enemy orb = spawn(def, 160f, 88f);
+
+        for (int t = 0; t < OrbBrain.LIFE_STEPS - 1; t++) {
+            arena.step(orb);
+            assertTrue(orb.invulnerable(), "touchable on step " + t);
+            assertTrue(orb.alive(), "died early on step " + t);
+        }
+        assertTrue(arena.hazards.size() >= 8,
+            "only " + arena.hazards.size() + " spells fell in eight seconds");
+        assertEquals(List.of(), arena.strikeStates, "an orb never swings at anything");
+
+        // One more step past its life, and it should be gone.
+        arena.step(orb);
+        arena.step(orb);
+        assertFalse(orb.alive(), "the orb outlived its eight seconds");
+    }
+
+    /**
+     * A barrage chases; a volley does not.
+     *
+     * <p>The difference is the whole of the move. A line of arrows down one
+     * fixed heading is answered once, by stepping aside, and then ignored -
+     * which is what was reported as it looking stiff. A volley is a fan and
+     * has to stay straight or the three arrows converge into one.
+     */
+    @Test
+    void aBarrageHomesAndAVolleyFliesStraight() {
+        EnemyDef def = TestDefs.enemy("piratezombie").brain("boss_piratezombie")
+            .hp(180).contact(10).attack(20, 30).speed(52).aggro(999)
+            .timing(26, 14, 32, 50).resist(1f)
+            .boss(1, "bosses6/piratezombie/idle", 64).build();
+        FakeArena arena = new FakeArena();
+        Enemy boss = spawn(def, 160f, 88f);
+
+        boolean sawBarrage = false;
+        boolean sawVolley = false;
+        for (int t = 0; t < 60 * 60 && !(sawBarrage && sawVolley); t++) {
+            int homedBefore = arena.homing;
+            int shotsBefore = arena.shots;
+            movePlayer(arena, t);
+            arena.step(boss);
+            if (arena.homing > homedBefore) {
+                sawBarrage = true;
+            } else if (arena.shots > shotsBefore) {
+                sawVolley = true;
+            }
+        }
+        assertTrue(sawBarrage, "the zombie never fired a homing barrage");
+        assertTrue(sawVolley, "the zombie never fired a straight volley");
+    }
+
+    /**
+     * The two intermissions ask opposite questions, and do it differently.
+     *
+     * <p>Worth pinning because the difference is invisible in a screenshot and
+     * easy to lose: both are a ball hanging in the middle of a room throwing
+     * water or fire about. One aims at the player, so the answer is to keep
+     * moving; the other throws the same ring outward whatever the player does,
+     * so the answer is to stand still somewhere it has been. If the second
+     * ever quietly became the first, the fight would still work and would stop
+     * being two ideas.
+     */
+    @Test
+    void theFireOrbAimsAndTheWaterOrbDoesNot() {
+        FakeArena rain = new FakeArena();
+        Enemy fire = spawn(orbDef("boss_orb"), 160f, 88f);
+        for (int t = 0; t < OrbBrain.DROP_INTERVAL * 4; t++) {
+            rain.step(fire);
+        }
+        assertTrue(rain.hazards.size() >= 3, "the fire orb dropped nothing");
+        assertEquals(0, rain.lobs, "the fire orb should drop, not throw");
+        // Out of the sky, not out of the floor. placeHazard puts burning
+        // ground down where it is asked and blinks it as a warning first,
+        // which is right for a wall of fire laid along a facing and wrong for
+        // rain: on screen it read as something climbing up out of the stone.
+        // rainSpell drops it from a height and the fall is the warning.
+        assertEquals(rain.hazards.size(), rain.rained,
+            "every spell of a rain should fall, not be placed");
+
+        FakeArena tide = new FakeArena();
+        Enemy water = spawn(orbDef("boss_orb_tide"), 160f, 88f);
+        for (int t = 0; t < OrbBrain.DROP_INTERVAL * 4; t++) {
+            tide.step(water);
+        }
+        assertTrue(tide.lobs >= OrbBrain.FOUNTAIN_ARMS * 3,
+            "the water orb threw only " + tide.lobs + " arcs");
+
+        // Aimed where the player is, against thrown around itself.
+        for (float[] at : rain.hazards) {
+            assertTrue(Math.hypot(at[0] - rain.px, at[1] - rain.py) <= OrbBrain.DROP_RADIUS + 1,
+                "a fire spell fell nowhere near the player");
+        }
+        for (float[] at : tide.hazards) {
+            assertTrue(Math.hypot(at[0] - water.x, at[1] - water.y) <= OrbBrain.FOUNTAIN_MAX + 1,
+                "a water arc landed outside its own fountain");
+        }
+    }
+
+    private static EnemyDef orbDef(String brain) {
+        return TestDefs.enemy("orb").brain(brain).hp(1).contact(0)
+            .attack(14, 1).aggro(999).timing(1, 1, 1, 1).resist(1f)
+            .boss(1, "bosses6/fireorb/idle", 32).build();
     }
 
     @Test

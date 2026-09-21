@@ -72,6 +72,10 @@ public class CreditsScreen extends SimScreen {
         {Style.BY, "credits.sunnyside.by"},
         {Style.FOR, "credits.sunnyside.for"},
         {Style.GAP, null},
+        {Style.NAME, "credits.cove.name"},
+        {Style.BY, "credits.cove.by"},
+        {Style.FOR, "credits.cove.for"},
+        {Style.GAP, null},
 
         {Style.HEAD, "credits.audio"},
         {Style.NAME, "credits.ninja.name"},

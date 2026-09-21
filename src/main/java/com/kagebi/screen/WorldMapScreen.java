@@ -57,6 +57,10 @@ public class WorldMapScreen extends SimScreen {
      */
     static final int[][] NODE_AT = {
         {40, 104}, {104, 72}, {168, 120}, {232, 56}, {280, 104},
+        // Stage 6, low and left of the trail rather than past the end of it.
+        // The five are a sequence; the cove is a side stage, and a node in
+        // line with the others would say it is the step after the Flame Core.
+        {56, 40},
     };
 
     // The detail panel, centred. 200x128 is the largest box that still leaves
@@ -144,7 +148,18 @@ public class WorldMapScreen extends SimScreen {
      * hit a wall on stage four actually needs.
      */
     static boolean unlocked(int stage, int clearedStages) {
-        return stage >= 1 && stage <= clearedStages + 1;
+        return unlocked(stage, clearedStages, false);
+    }
+
+    /**
+     * As above, except that a side stage is open from the first run.
+     *
+     * <p>A side stage is not on the descent, so there is nothing for it to be
+     * one past: gating it behind stage five would make a stage that exists to
+     * be played whenever into the last thing anyone reaches.
+     */
+    static boolean unlocked(int stage, int clearedStages, boolean side) {
+        return stage >= 1 && (side || stage <= clearedStages + 1);
     }
 
     /**
@@ -199,7 +214,7 @@ public class WorldMapScreen extends SimScreen {
         if (focusOnShow) {
             focus = Math.max(0, Math.min(count() - 1, focusWanted));
         }
-        panelOpen = panelOnShow && unlocked(focus + 1, game.profile().clearedStages);
+        panelOpen = panelOnShow && isOpen(focus + 1);
         game.audio().playMusic(Assets.MUSIC_VILLAGE);
     }
 
@@ -216,6 +231,11 @@ public class WorldMapScreen extends SimScreen {
         if (map != null) {
             map.dispose();
         }
+    }
+
+    /** Whether this stage may be played, with its own def consulted. */
+    private boolean isOpen(int stage) {
+        return unlocked(stage, game.profile().clearedStages, floor(stage).side);
     }
 
     private int count() {
@@ -302,7 +322,7 @@ public class WorldMapScreen extends SimScreen {
         if (input().justPressed(GameAction.INTERACT) || input().justPressed(GameAction.ATTACK)) {
             if (panelOpen) {
                 play();
-            } else if (unlocked(focus + 1, game.profile().clearedStages)) {
+            } else if (isOpen(focus + 1)) {
                 panelOpen = true;
                 game.audio().playSfx(Assets.SFX_ACCEPT);
             } else {
@@ -363,7 +383,7 @@ public class WorldMapScreen extends SimScreen {
             int[] at = nodes[Math.min(i, nodes.length - 1)];
             int x = at[0] - NODE / 2;
             int y = at[1] - NODE / 2;
-            boolean open = unlocked(i + 1, p.clearedStages);
+            boolean open = isOpen(i + 1);
             game.skin().getDrawable(Assets.Ui.CELL).draw(batch, x, y, NODE, NODE);
             // Locked nodes are darkened, never hidden: the shape of what is
             // still ahead is half of what a map is for. The shop shelf and the
@@ -388,7 +408,7 @@ public class WorldMapScreen extends SimScreen {
     /** The focused stage's name, in the rows the map does not reach. */
     private void drawHeader(SpriteBatch batch) {
         I18n t = game.i18n();
-        boolean open = unlocked(focus + 1, game.profile().clearedStages);
+        boolean open = isOpen(focus + 1);
         String name = t.get(floor(focus + 1).nameKey);
         String label = open ? name : name + " - " + t.get("common.locked");
         batch.setColor(Color.WHITE);

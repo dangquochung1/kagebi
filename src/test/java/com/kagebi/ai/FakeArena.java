@@ -34,6 +34,11 @@ final class FakeArena implements AiContext {
     int shots;
     final List<float[]> hazards = new ArrayList<>();
     int copies;
+    int lobs;
+    int homing;
+    int rained;
+    int effects;
+    final List<String> summoned = new ArrayList<>();
 
     private final Object playerToken = new Object();
 
@@ -93,7 +98,67 @@ final class FakeArena implements AiContext {
     }
 
     @Override
+    public void fireProjectile(Enemy from, float dirX, float dirY, float speed,
+                               int damage, int lifeSteps, String fx) {
+        fireProjectile(from, dirX, dirY, speed, damage, lifeSteps);
+    }
+
+    @Override
+    public void placeHazard(Enemy from, float x, float y, int damage, int armSteps,
+                            int lifeSteps, String fx) {
+        placeHazard(from, x, y, damage, armSteps, lifeSteps);
+    }
+
+    /**
+     * Counted as a hazard where it lands, because that is what it becomes.
+     *
+     * <p>The arc itself is Projectile's business and is tested there; what a
+     * brain is responsible for is choosing the point, so that is what the
+     * arena records.
+     */
+    @Override
+    public void lobProjectile(Enemy from, float toX, float toY, int damage,
+                              int flightSteps, int lingerSteps, String fx) {
+        lobs++;
+        hazards.add(new float[] {toX, toY});
+    }
+
+    /**
+     * Recorded as a shot, and separately as a homing one.
+     *
+     * <p>The steering itself belongs to Projectile and is asserted there. What
+     * a brain decides is whether a shot homes at all, which is the only thing
+     * worth pinning from here.
+     */
+    @Override
+    public void homingProjectile(Enemy from, float dirX, float dirY, float speed,
+                                 int damage, int lifeSteps, int homeSteps,
+                                 float turnRate, String fx) {
+        homing++;
+        fireProjectile(from, dirX, dirY, speed, damage, lifeSteps);
+    }
+
+    /** Counted where it lands, as a hazard is: the fall is Projectile's business. */
+    @Override
+    public void rainSpell(Enemy from, float x, float y, int damage,
+                          int fallSteps, int lingerSteps, String fx) {
+        rained++;
+        hazards.add(new float[] {x, y});
+    }
+
+    @Override
     public void spawnCopy(Enemy parent, float x, float y, int hp) {
         copies++;
+    }
+
+    @Override
+    public Enemy summon(String enemyId, float x, float y, boolean dormant) {
+        summoned.add(enemyId);
+        return null;
+    }
+
+    @Override
+    public void spawnFx(String fx, float x, float y, boolean overhead) {
+        effects++;
     }
 }

@@ -112,7 +112,87 @@ public final class Hud {
         drawHearts(batch, run, screenH);
         drawPurse(batch, run, screenH);
         drawMap(batch, run, screenW, screenH);
+        drawBossBar(batch, screenW, screenH);
         batch.setColor(Color.WHITE);
+    }
+
+    // ---- the boss bar ------------------------------------------------------
+
+    /** Width of the boss bar, and the thickness of its filled strip. */
+    public static final int BOSS_BAR_W = 140;
+    public static final int BOSS_BAR_H = 4;
+    /** Rows between the bar and the bottom of the screen. */
+    public static final int BOSS_BAR_Y = 16;
+
+    private static final Color BOSS_TROUGH = new Color(0x1a1016ff);
+    private static final Color BOSS_FILL = new Color(0xc8443cff);
+    private static final Color BOSS_FILL_ENRAGED = new Color(0xe8a63cff);
+
+    private String bossName;
+    private float bossFraction;
+    private int bossBody;
+    private int bossBodies;
+    private boolean bossEnraged;
+
+    /**
+     * Tells the HUD what the room's boss is doing, or that there is none.
+     *
+     * <p>Pushed in by the screen rather than pulled from the world, so that
+     * {@code ui} keeps knowing nothing about {@code entity} - the same reason
+     * every other number here arrives on a {@link RunState}.
+     *
+     * @param body which body of a chain this is, 1-based, and how many there
+     *             are in it. A boss that is only itself passes 1 and 1, and
+     *             the counter is left off.
+     */
+    public void boss(String name, float fraction, int body, int bodies, boolean enraged) {
+        this.bossName = name;
+        this.bossFraction = Math.max(0f, Math.min(1f, fraction));
+        this.bossBody = body;
+        this.bossBodies = bodies;
+        this.bossEnraged = enraged;
+    }
+
+    public void noBoss() {
+        this.bossName = null;
+    }
+
+    /**
+     * A bar across the bottom of the screen while a boss is alive.
+     *
+     * <p>Bosses used to share the 14-pixel bar every trash mob wears over its
+     * head, which hides itself ninety steps after the last hit. In a room the
+     * size of the screen that is enough; in stage 6's arena, four screens
+     * across, it is a detail on a sprite that is often not even in shot. And
+     * it cannot say which of three bodies is being fought, which is the one
+     * thing that fight has to communicate - without it, killing the Drowned
+     * Captain and watching him stand back up reads as the game cheating.
+     *
+     * <p>At the bottom because the top is already hearts and the minimap, and
+     * because a boss is usually the thing in the upper half of a room being
+     * walked towards.
+     */
+    private void drawBossBar(SpriteBatch batch, int screenW, int screenH) {
+        if (bossName == null || pixel == null) {
+            return;
+        }
+        int x = (screenW - BOSS_BAR_W) / 2;
+        int y = BOSS_BAR_Y;
+
+        batch.setColor(BOSS_TROUGH);
+        batch.draw(pixel, x - 1, y - 1, BOSS_BAR_W + 2, BOSS_BAR_H + 2);
+        batch.setColor(bossEnraged ? BOSS_FILL_ENRAGED : BOSS_FILL);
+        int filled = Math.round(BOSS_BAR_W * bossFraction);
+        if (filled > 0) {
+            batch.draw(pixel, x, y, filled, BOSS_BAR_H);
+        }
+        batch.setColor(Color.WHITE);
+
+        String label = bossBodies > 1
+            ? bossName + "  " + bossBody + "/" + bossBodies : bossName;
+        // Centred over the bar, which is itself centred on the screen.
+        float textX = x + (BOSS_BAR_W - width(font, label)) / 2f;
+        line(batch, font, label, textX, y + BOSS_BAR_H + 2 + LINE);
     }
 
     /**

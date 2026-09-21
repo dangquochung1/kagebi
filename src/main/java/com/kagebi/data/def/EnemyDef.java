@@ -58,6 +58,48 @@ public final class EnemyDef {
     /** Ignores floor hazards and pits. */
     public final boolean flying;
 
+    /**
+     * What this turns into when it dies, or null for most things.
+     *
+     * <p>The whole of stage 6's boss lives in this field. Pirate Leader
+     * summons a fireball, the fireball summons Pirate Zombie, and so on to
+     * Squidman - five defs with five health bars, rather than one bar cut into
+     * slices. Written here rather than in five Java brains so the chain is
+     * legible in the file that balances it, and so ContentValidator can walk
+     * it: a link that names nothing, or names a loop, is a build failure.
+     */
+    public final String evolvesInto;
+
+    /**
+     * Ids this may call into the room when it is cornered, or empty.
+     *
+     * <p>Only read by the brain that has a reason to; it is here so that
+     * {@code ContentValidator.orphans} can see that these enemies do appear
+     * on a floor, through whoever summons them.
+     */
+    public final String[] summons;
+
+    /**
+     * Health fraction at which a boss turns nasty, or 0 for never.
+     *
+     * <p>Not {@link #phases}, deliberately. A phase change plays a {@code
+     * trans} strip and the validator refuses a def whose art has none - which
+     * is right for tengured, whose transformation is the only place the story
+     * is told without a line of text, and wrong for a body that simply starts
+     * fighting harder at 40%. This is the second kind.
+     */
+    public final float enrageAt;
+
+    /**
+     * The fx region this fires, or null for the generic orb.
+     *
+     * <p>notes/b.md asked for this: "enemies.json names inkball, sporecloud
+     * and flamewave in comments but there is no field for them, so every shot
+     * looks the same". Stage 6 needed six different-looking shots, so here it
+     * is - a name from {@code Assets.Fx}, resolved by the world.
+     */
+    public final String projectile;
+
     public EnemyDef(String id, String nameKey, String sprite, int cell,
                     int maxHp, int contactDamage, int attackDamage, float moveSpeed,
                     String brain, float aggroRange, float attackRange,
@@ -65,6 +107,21 @@ public final class EnemyDef {
                     int cooldownSteps, float knockbackResist, int hurtInvulnSteps,
                     String lootTable, int goldMin, int goldMax,
                     boolean boss, int phases, boolean flying) {
+        this(id, nameKey, sprite, cell, maxHp, contactDamage, attackDamage, moveSpeed,
+             brain, aggroRange, attackRange, windupSteps, activeSteps, recoverSteps,
+             cooldownSteps, knockbackResist, hurtInvulnSteps, lootTable, goldMin,
+             goldMax, boss, phases, flying, null, new String[0], 0f, null);
+    }
+
+    public EnemyDef(String id, String nameKey, String sprite, int cell,
+                    int maxHp, int contactDamage, int attackDamage, float moveSpeed,
+                    String brain, float aggroRange, float attackRange,
+                    int windupSteps, int activeSteps, int recoverSteps,
+                    int cooldownSteps, float knockbackResist, int hurtInvulnSteps,
+                    String lootTable, int goldMin, int goldMax,
+                    boolean boss, int phases, boolean flying,
+                    String evolvesInto, String[] summons, float enrageAt,
+                    String projectile) {
         this.id = id;
         this.nameKey = nameKey;
         this.sprite = sprite;
@@ -88,6 +145,10 @@ public final class EnemyDef {
         this.boss = boss;
         this.phases = phases;
         this.flying = flying;
+        this.evolvesInto = evolvesInto;
+        this.summons = summons == null ? new String[0] : summons;
+        this.enrageAt = enrageAt;
+        this.projectile = projectile;
     }
 
     @Override

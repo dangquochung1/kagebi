@@ -64,7 +64,10 @@ public final class ContentValidator {
     /** Every brain the ai package must provide. See notes/d.md section 2. */
     public static final Set<String> BRAINS = Set.of(
         "chaser", "hopper", "wanderer", "flyer", "shooter", "charger",
-        "ambusher", "orbiter", "splitter", "caster", "boss_frog", "boss_tengu");
+        "ambusher", "orbiter", "splitter", "caster", "burster", "bomber",
+        "boss_frog", "boss_tengu",
+        "boss_pirateleader", "boss_orb", "boss_orb_tide",
+        "boss_piratezombie", "boss_squidman");
 
     /**
      * Folder names under {@code assets/maps/rooms/}. Procgen generated the
@@ -72,7 +75,7 @@ public final class ContentValidator {
      * a floor naming any other would find no rooms at all.
      */
     public static final Set<String> BIOMES = Set.of(
-        "ruins", "ruins_green", "ruins_orange", "depths");
+        "ruins", "ruins_green", "ruins_orange", "depths", "cove");
 
     /**
      * Projectile ids a thrown weapon may name. Enemies fire others too, but
@@ -237,6 +240,31 @@ public final class ContentValidator {
         if (e.boss != e.brain.startsWith("boss_")) {
             c.fail(w, e.boss ? "is a boss but its brain '" + e.brain + "' is not a boss brain"
                              : "is not a boss but uses boss brain '" + e.brain + "'");
+        }
+        if (e.evolvesInto != null) {
+            if (!reg.hasEnemy(e.evolvesInto)) {
+                c.fail(w, "evolvesInto '" + e.evolvesInto + "', which does not exist");
+            } else if (!reg.enemy(e.evolvesInto).boss) {
+                // Otherwise the successor is also in some floor's enemies
+                // array, and the generator scatters copies of the boss's next
+                // body through the ordinary rooms of the floor.
+                c.fail(w, "evolvesInto '" + e.evolvesInto + "', which is not a boss");
+            } else if (!e.boss) {
+                c.fail(w, "evolvesInto '" + e.evolvesInto + "' but is not a boss itself");
+            }
+        }
+        for (String add : e.summons) {
+            if (!reg.hasEnemy(add)) {
+                c.fail(w, "summons '" + add + "', which does not exist");
+            } else if (reg.enemy(add).boss) {
+                c.fail(w, "summons '" + add + "', which is a boss");
+            }
+        }
+        if (e.enrageAt < 0f || e.enrageAt >= 1f) {
+            c.fail(w, "enrageAt " + e.enrageAt + " - a fraction of maximum health, under 1");
+        }
+        if (e.enrageAt > 0f && !e.boss) {
+            c.fail(w, "enrageAt " + e.enrageAt + " - only a boss enrages");
         }
         if (e.phases < 1 || (!e.boss && e.phases != 1)) {
             c.fail(w, "phases " + e.phases + " - only a boss may have more than one");
@@ -409,15 +437,65 @@ public final class ContentValidator {
      */
     private static void orphans(Check c, ContentRegistry reg) {
         Set<String> placed = new HashSet<>();
+        java.util.Deque<String> todo = new java.util.ArrayDeque<>();
         for (FloorDef f : reg.allFloors()) {
-            placed.addAll(java.util.Arrays.asList(f.enemies));
-            if (f.boss != null) {
-                placed.add(f.boss);
+            for (String id : f.enemies) {
+                if (placed.add(id)) {
+                    todo.add(id);
+                }
+            }
+            if (f.boss != null && placed.add(f.boss)) {
+                todo.add(f.boss);
+            }
+        }
+        // Then everything those can put in the room themselves, and so on. A
+        // boss that turns into another body, and a body that calls for help,
+        // are both on the floor as far as the player is concerned; they are
+        // simply reached through something else rather than placed by the
+        // generator. Walking that graph here is what lets stage 6's chain of
+        // five bodies live in enemies.json instead of in five Java brains.
+        while (!todo.isEmpty()) {
+            String id = todo.poll();
+            if (!reg.hasEnemy(id)) {
+                continue;               // already reported against its namer
+            }
+            EnemyDef e = reg.enemy(id);
+            if (e.evolvesInto != null && placed.add(e.evolvesInto)) {
+                todo.add(e.evolvesInto);
+            }
+            for (String add : e.summons) {
+                if (placed.add(add)) {
+                    todo.add(add);
+                }
             }
         }
         for (EnemyDef e : reg.allEnemies()) {
             if (!placed.contains(e.id)) {
                 c.fail("enemy '" + e.id + "'", "appears on no floor");
+            }
+        }
+        chains(c, reg);
+    }
+
+    /**
+     * No chain of bodies runs forever.
+     *
+     * <p>A boss that evolves back into something earlier in its own chain is a
+     * fight with no end: each body summons the next on death, so a loop is a
+     * room that can never be cleared and a stage that can never be left. It
+     * costs four lines to refuse it here and it would cost a playtest to find
+     * it otherwise.
+     */
+    private static void chains(Check c, ContentRegistry reg) {
+        for (EnemyDef start : reg.allEnemies()) {
+            Set<String> seen = new HashSet<>();
+            String at = start.id;
+            while (at != null && reg.hasEnemy(at)) {
+                if (!seen.add(at)) {
+                    c.fail("enemy '" + start.id + "'", "evolves in a loop, through '" + at + "'");
+                    break;
+                }
+                at = reg.enemy(at).evolvesInto;
             }
         }
     }

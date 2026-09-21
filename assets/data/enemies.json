@@ -263,6 +263,55 @@
       "knockbackResist": 0.80, "hurtInvulnSteps": 16,
       "lootTable": "elite", "goldMin": 26, "goldMax": 44
     },
+    {
+      // ---- the Drowned Cove -------------------------------------------
+      //
+      // Three slimes with three ways of reaching the player, because a floor
+      // whose whole roster closes to arm's length teaches nothing the first
+      // five have not already taught. Between them they cover the three
+      // answers the game has: stand somewhere else, get out of the ring, and
+      // kill it before it arrives.
+      //
+      // Their art is a directional set - one sheet per animation, all four
+      // facings - so unlike the 16px monsters they have a real hurt, a real
+      // death and a run cycle. The cell is 64 because the attack frames need
+      // the width; the bodies inside are about a quarter of that.
+      "id": "slimespike", "nameKey": "enemy.slimespike.name",
+      "sprite": "slimes/slimespike/idle", "cell": 64,
+      // The cove's floor mob, and the one that reads as ordinary so the other
+      // two read as strange. It swings rather than bumping, which is what the
+      // spike burst in its attack sheet is drawn as.
+      "maxHp": 44, "contactDamage": 5, "attackDamage": 9, "moveSpeed": 40,
+      "brain": "chaser", "aggroRange": 110, "attackRange": 16,
+      "windupSteps": 18, "activeSteps": 8, "recoverSteps": 18, "cooldownSteps": 34,
+      "knockbackResist": 0.15, "hurtInvulnSteps": 10,
+      "lootTable": "trash_f6", "goldMin": 5, "goldMax": 10
+    },
+    {
+      "id": "slimetide", "nameKey": "enemy.slimetide.name",
+      "sprite": "slimes/slimetide/idle", "cell": 64,
+      // Bursts a ring rather than aiming a shot, so the dodge is a distance
+      // and not a direction. Softest of the three: dangerous at the range it
+      // wants to hold, and helpless once that range is closed.
+      "maxHp": 36, "contactDamage": 4, "attackDamage": 7, "moveSpeed": 34,
+      "brain": "burster", "aggroRange": 150, "attackRange": 84,
+      "windupSteps": 26, "activeSteps": 4, "recoverSteps": 22, "cooldownSteps": 70,
+      "knockbackResist": 0.0, "hurtInvulnSteps": 10,
+      "lootTable": "trash_f6", "goldMin": 6, "goldMax": 11
+    },
+    {
+      "id": "slimeember", "nameKey": "enemy.slimeember.name",
+      "sprite": "slimes/slimeember/idle", "cell": 64,
+      // Fast, fragile, and dangerous to kill in the wrong place: it blows up
+      // whether it reaches the player or dies trying. The softest thing on the
+      // floor at 26, four swings of a starting katana, which is the whole
+      // bargain - kill it early and far, or pay for killing it late and near.
+      "maxHp": 26, "contactDamage": 3, "attackDamage": 16, "moveSpeed": 62,
+      "brain": "bomber", "aggroRange": 160, "attackRange": 18,
+      "windupSteps": 34, "activeSteps": 6, "recoverSteps": 10, "cooldownSteps": 40,
+      "knockbackResist": 0.0, "hurtInvulnSteps": 8,
+      "lootTable": "trash_f6", "goldMin": 6, "goldMax": 12
+    },
 
     // ================= BOSSES =========================================
 
@@ -302,6 +351,115 @@
       "knockbackResist": 1.0, "hurtInvulnSteps": 5,
       "lootTable": "boss_f5", "goldMin": 150, "goldMax": 250,
       "boss": true, "phases": 2, "flying": true
+    },
+    {
+      // ---- the Drowned Cove's boss: one fight, five bodies -------------
+      //
+      //   pirateleader -> fireorb -> piratezombie -> waterorb -> squidman
+      //
+      // Five defs rather than one with phases, because each body has its own
+      // full health bar - the player is told three times that they have won
+      // something, and three times that it was not enough. `phases` cuts one
+      // bar into slices and plays a trans strip between them, which is
+      // tengured's fight and needs art these packs do not ship.
+      //
+      // Each link names the next in `evolvesInto` and its brain summons it on
+      // death, so the chain is readable here rather than spelled out across
+      // five Java classes. ContentValidator walks it: a link that names
+      // nothing that exists, or names a loop, fails the build.
+      //
+      // 560 across the three bodies, against tengured's 880 on one. The whole
+      // chain has to fit inside FullRunTest's two minutes of a bot swinging a
+      // starting katana, and sixteen seconds of that are the two orbs, which
+      // cannot be hurt at all.
+      "id": "pirateleader", "nameKey": "enemy.pirateleader.name",
+      "sprite": "bosses6/pirateleader/idle", "cell": 64,
+      // Melee only, on purpose. He has a charge, a swing, and a combo that
+      // walks the player backwards; everything he does he does by arriving.
+      // The two bodies after him are both ranged, so he is what they are an
+      // escalation from.
+      "maxHp": 200, "contactDamage": 12, "attackDamage": 24, "moveSpeed": 58,
+      "brain": "boss_pirateleader", "aggroRange": 999, "attackRange": 26,
+      // activeSteps is the SWING, and only the swing. It carried the combo's
+      // 190 until the combo learned to ask for its own window - and every
+      // ordinary swing he threw stood open for those 190 steps too, which is
+      // over three seconds of one animation and was reported as the chém
+      // being broken. See BossBrain.activeSteps: each move now names its own.
+      "windupSteps": 28, "activeSteps": 16, "recoverSteps": 34, "cooldownSteps": 54,
+      "knockbackResist": 1.0, "hurtInvulnSteps": 5,
+      "lootTable": "nothing", "goldMin": 0, "goldMax": 0,
+      "boss": true, "evolvesInto": "fireorb"
+    },
+    {
+      "id": "fireorb", "nameKey": "enemy.fireorb.name",
+      // No body of its own: build_cove.py writes the fireball strip a second
+      // time as a four-column actor sheet, because ActorSprites only ever
+      // reads the actors atlas and an orb has to stand in the room like
+      // anything else the player can see.
+      "sprite": "bosses6/fireorb/idle", "cell": 32,
+      // Untouchable, immobile, and on a timer - OrbBrain grants it i-frames
+      // longer than it can live and kills it itself when its eight seconds
+      // are up. The hit points are what the bar would show if anything could
+      // ever take one off it.
+      "maxHp": 1, "contactDamage": 0, "attackDamage": 14, "moveSpeed": 0,
+      "brain": "boss_orb", "aggroRange": 999, "attackRange": 1,
+      "windupSteps": 1, "activeSteps": 1, "recoverSteps": 1, "cooldownSteps": 1,
+      "knockbackResist": 1.0, "hurtInvulnSteps": 0,
+      "lootTable": "nothing", "goldMin": 0, "goldMax": 0,
+      "boss": true, "evolvesInto": "piratezombie",
+      "projectile": "fx/skill6/fire_spell"
+    },
+    {
+      "id": "piratezombie", "nameKey": "enemy.piratezombie.name",
+      "sprite": "bosses6/piratezombie/idle", "cell": 64,
+      // The same fight at range: a three-arrow fan, a barrage down one line,
+      // and a wall of burning ground that cuts the arena in half. At 40% it
+      // slows, drops a wave of fire, and calls in three ember slimes - which
+      // is why `summons` names one the floor already has rather than
+      // something new, so the player already knows what a bomber does.
+      "maxHp": 180, "contactDamage": 10, "attackDamage": 20, "moveSpeed": 52,
+      "brain": "boss_piratezombie", "aggroRange": 999, "attackRange": 30,
+      // 96 was the barrage's length worn by every move, so a three-arrow fan
+      // left the boss standing still for a second and a half after the arrows
+      // had gone. The barrage asks for its own window now.
+      "windupSteps": 26, "activeSteps": 14, "recoverSteps": 32, "cooldownSteps": 50,
+      "knockbackResist": 1.0, "hurtInvulnSteps": 5,
+      "lootTable": "nothing", "goldMin": 0, "goldMax": 0,
+      "boss": true, "evolvesInto": "waterorb", "enrageAt": 0.4,
+      "summons": ["slimeember"],
+      "projectile": "fx/skill6/fire_arrow"
+    },
+    {
+      "id": "waterorb", "nameKey": "enemy.waterorb.name",
+      "sprite": "bosses6/waterorb/idle", "cell": 32,
+      // boss_orb_tide, not boss_orb: the fire orb drops spells on wherever the
+      // player is, so the answer is to keep moving. This one throws the same
+      // ring of arcs outward every turn regardless, so the answer is to stand
+      // where it has already been. Two intermissions, and the second one
+      // punishes the habit the first one taught.
+      "maxHp": 1, "contactDamage": 0, "attackDamage": 14, "moveSpeed": 0,
+      "brain": "boss_orb_tide", "aggroRange": 999, "attackRange": 1,
+      "windupSteps": 1, "activeSteps": 1, "recoverSteps": 1, "cooldownSteps": 1,
+      "knockbackResist": 1.0, "hurtInvulnSteps": 0,
+      "lootTable": "nothing", "goldMin": 0, "goldMax": 0,
+      "boss": true, "evolvesInto": "squidman",
+      "projectile": "fx/skill6/water_spell"
+    },
+    {
+      "id": "squidman", "nameKey": "enemy.squidman.name",
+      "sprite": "bosses6/squidman/idle", "cell": 64,
+      // The last body, and the only one that pays out. Its ring is the
+      // fight's closing idea: hazards on every side but one, so the answer is
+      // to read the floor rather than the boss. At 40% it rains water and
+      // calls in tide slimes, whose own rings then overlap its.
+      "maxHp": 180, "contactDamage": 12, "attackDamage": 22, "moveSpeed": 56,
+      "brain": "boss_squidman", "aggroRange": 999, "attackRange": 28,
+      "windupSteps": 26, "activeSteps": 14, "recoverSteps": 30, "cooldownSteps": 46,
+      "knockbackResist": 1.0, "hurtInvulnSteps": 5,
+      "lootTable": "boss_f6", "goldMin": 140, "goldMax": 230,
+      "boss": true, "enrageAt": 0.4,
+      "summons": ["slimetide"],
+      "projectile": "fx/skill6/water_arrow"
     }
   ]
 }

@@ -86,7 +86,7 @@ public abstract class BaseBrain implements AiBrain {
                 if (self.stateSteps() >= self.def.windupSteps) {
                     // The active window is owned by an AttackState so that one
                     // swing cannot hit the same target on every step of it.
-                    self.attack().begin(0, Math.max(1, self.def.activeSteps), 0, 0);
+                    self.attack().begin(0, Math.max(1, activeSteps(self)), 0, 0);
                     onAttackStart(self, ctx);
                     self.setState(AiState.ATTACK);
                 }
@@ -167,6 +167,21 @@ public abstract class BaseBrain implements AiBrain {
         self.telegraph(ctx.collision(), ctx.playerX(), ctx.playerY(), self.def.windupSteps);
     }
 
+    /**
+     * How long this enemy's active window runs, in steps.
+     *
+     * <p>The def's number, for everything with one attack. A boss has several,
+     * and they are not the same length: a swing is a third of a second and a
+     * flurry of three blows is three, so one number shared between them has to
+     * be wrong for one of them. It was wrong for the swing - the Drowned
+     * Captain's def carried the combo's 190 steps, so every ordinary swing of
+     * his stood open for over three seconds and read as the animation being
+     * broken. See {@code BossBrain.activeSteps}.
+     */
+    protected int activeSteps(Enemy self) {
+        return self.def.activeSteps;
+    }
+
     /** Once, as the active window opens. Default: lock the direction of the strike. */
     protected void onAttackStart(Enemy self, AiContext ctx) {
         lockAim(self, ctx.playerX(), ctx.playerY());
@@ -179,7 +194,7 @@ public abstract class BaseBrain implements AiBrain {
             ctx.strike(meleeBox(self), self.attack());
             return;
         }
-        float speed = LUNGE_DISTANCE / (Math.max(1, self.def.activeSteps) * com.kagebi.Cfg.STEP);
+        float speed = LUNGE_DISTANCE / (Math.max(1, activeSteps(self)) * com.kagebi.Cfg.STEP);
         self.moveDir(ctx.collision(), self.aimX, self.aimY, speed);
         ctx.strike(bodyBox(self, self.def.contactDamage), self.attack());
     }

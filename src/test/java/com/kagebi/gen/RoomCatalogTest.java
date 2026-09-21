@@ -54,7 +54,7 @@ class RoomCatalogTest {
      * back to borrowed rooms, which only shows up as the wrong tileset.
      */
     private static final Set<String> BIOMES =
-        Set.of("ruins", "ruins_green", "ruins_orange", "depths");
+        Set.of("ruins", "ruins_green", "ruins_orange", "depths", "cove");
 
     private static final String[] LAYERS = {
         TiledRooms.GROUND, TiledRooms.DRESSING, TiledRooms.DECOR,
@@ -63,6 +63,16 @@ class RoomCatalogTest {
 
     private static final int W = RoomTemplate.WIDTH;
     private static final int H = RoomTemplate.HEIGHT;
+
+    /**
+     * The one room that is not one screen: stage 6's boss arena, 40x22.
+     *
+     * <p>Pinned as an exception rather than dropped as a rule. Every check
+     * below now reads each room's own size, so a 30x17 room would pass all of
+     * them silently; this is what still says a room bigger than the screen is
+     * a decision, and it is the list to add to if there is ever a second one.
+     */
+    private static final Set<String> OVERSIZED = Set.of("cove/boss_01");
     /** Tiled keeps flip and rotation flags in the top four bits of a gid. */
     private static final int GID_MASK = 0x0FFFFFFF;
 
@@ -138,15 +148,22 @@ class RoomCatalogTest {
     // ---- shape -------------------------------------------------------------
 
     @Test
-    void everyRoomIsTwentyByEleven() {
+    void everyRoomIsTwentyByElevenBarTheOneArena() {
         for (Map.Entry<String, Tmx> e : files.entrySet()) {
             Tmx m = e.getValue();
-            assertEquals(W, m.width, e.getKey());
-            assertEquals(H, m.height, e.getKey());
-            assertEquals(16, m.tileWidth, e.getKey());
-            assertEquals(16, m.tileHeight, e.getKey());
+            String id = e.getKey();
+            if (OVERSIZED.contains(id)) {
+                assertEquals(40, m.width, id);
+                assertEquals(22, m.height, id);
+            } else {
+                assertEquals(W, m.width, id);
+                assertEquals(H, m.height, id);
+            }
+            assertEquals(16, m.tileWidth, id);
+            assertEquals(16, m.tileHeight, id);
             for (Map.Entry<String, int[]> layer : m.layers.entrySet()) {
-                assertEquals(W * H, layer.getValue().length, e.getKey() + " layer " + layer.getKey());
+                assertEquals(m.width * m.height, layer.getValue().length,
+                    id + " layer " + layer.getKey());
             }
         }
     }
@@ -257,7 +274,7 @@ class RoomCatalogTest {
     void allFourDoorwaysAreOpen() {
         for (Map.Entry<String, Tmx> e : files.entrySet()) {
             boolean[][] solid = e.getValue().solid();
-            for (int[] c : doorCells()) {
+            for (int[] c : doorCells(e.getValue())) {
                 assertFalse(solid[c[1]][c[0]], e.getKey() + ": doorway blocked at " + c[0] + "," + c[1]);
             }
         }
@@ -269,8 +286,9 @@ class RoomCatalogTest {
         // a preview; only a flood fill tells them apart.
         for (Map.Entry<String, Tmx> e : files.entrySet()) {
             boolean[][] solid = e.getValue().solid();
-            int[] start = doorCells().get(0);
-            boolean[][] seen = new boolean[H][W];
+            int w = e.getValue().width, h = e.getValue().height;
+            int[] start = doorCells(e.getValue()).get(0);
+            boolean[][] seen = new boolean[h][w];
             Deque<int[]> todo = new ArrayDeque<>();
             seen[start[1]][start[0]] = true;
             todo.add(start);
@@ -279,14 +297,14 @@ class RoomCatalogTest {
                 int[][] steps = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
                 for (int[] s : steps) {
                     int x = c[0] + s[0], y = c[1] + s[1];
-                    if (x >= 0 && y >= 0 && x < W && y < H && !solid[y][x] && !seen[y][x]) {
+                    if (x >= 0 && y >= 0 && x < w && y < h && !solid[y][x] && !seen[y][x]) {
                         seen[y][x] = true;
                         todo.add(new int[] {x, y});
                     }
                 }
             }
-            for (int y = 0; y < H; y++) {
-                for (int x = 0; x < W; x++) {
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
                     assertTrue(solid[y][x] || seen[y][x],
                         e.getKey() + ": floor at " + x + "," + y + " cannot be reached");
                 }
@@ -322,7 +340,8 @@ class RoomCatalogTest {
                     continue;   // wall dressing; see the test below
                 }
                 int tx = (int) Math.floor(o.x / 16), ty = (int) Math.floor(o.y / 16);
-                assertTrue(tx >= 0 && ty >= 0 && tx < W && ty < H, e.getKey() + ": " + o + " outside the room");
+                assertTrue(tx >= 0 && ty >= 0 && tx < e.getValue().width && ty < e.getValue().height,
+                    e.getKey() + ": " + o + " outside the room");
                 assertFalse(solid[ty][tx], e.getKey() + ": " + o + " is inside a wall or a prop");
             }
         }
@@ -351,13 +370,14 @@ class RoomCatalogTest {
                 }
                 found++;
                 int tx = (int) Math.floor(o.x / 16), ty = (int) Math.floor(o.y / 16);
-                assertTrue(tx >= 0 && ty >= 0 && tx < W && ty < H,
+                int w = e.getValue().width, h = e.getValue().height;
+                assertTrue(tx >= 0 && ty >= 0 && tx < w && ty < h,
                     e.getKey() + ": " + o + " outside the room");
-                assertTrue(tx == 0 || ty == 0 || tx == W - 1 || ty == H - 1,
+                assertTrue(tx == 0 || ty == 0 || tx == w - 1 || ty == h - 1,
                     e.getKey() + ": " + o + " is not on the perimeter");
                 assertTrue(solid[ty][tx],
                     e.getKey() + ": " + o + " hangs on open floor, so the player walks through it");
-                for (int[] door : doorCells()) {
+                for (int[] door : doorCells(e.getValue())) {
                     assertFalse(door[0] == tx && door[1] == ty,
                         e.getKey() + ": " + o + " blocks a doorway");
                 }
@@ -387,10 +407,10 @@ class RoomCatalogTest {
                 }
             }
             assertEquals(Set.of("UP", "DOWN", "LEFT", "RIGHT"), entries.keySet(), t.id);
-            assertTrue(entries.get("UP").y > RoomTemplate.PIXEL_HEIGHT - edge, t.id + " UP " + entries.get("UP"));
+            assertTrue(entries.get("UP").y > t.pixelHeight() - edge, t.id + " UP " + entries.get("UP"));
             assertTrue(entries.get("DOWN").y < edge, t.id + " DOWN " + entries.get("DOWN"));
             assertTrue(entries.get("LEFT").x < edge, t.id + " LEFT " + entries.get("LEFT"));
-            assertTrue(entries.get("RIGHT").x > RoomTemplate.PIXEL_WIDTH - edge, t.id + " RIGHT " + entries.get("RIGHT"));
+            assertTrue(entries.get("RIGHT").x > t.pixelWidth() - edge, t.id + " RIGHT " + entries.get("RIGHT"));
         }
     }
 
@@ -428,14 +448,23 @@ class RoomCatalogTest {
 
     // ---- helpers ----------------------------------------------------------
 
-    /** The twelve tiles of the four openings, in Tiled's y-down rows. */
-    private static List<int[]> doorCells() {
+    /**
+     * The twelve tiles of the four openings, in Tiled's y-down rows.
+     *
+     * <p>Centred on the room's own width and height by the same arithmetic
+     * RoomTemplate.doorX() and doorY() use, so this fails if those two ever
+     * drift from what the generator writes - which is the point of asserting
+     * it against the files rather than against the constants.
+     */
+    private static List<int[]> doorCells(Tmx m) {
+        int doorX = (m.width - RoomTemplate.DOOR_SPAN) / 2;
+        int doorY = (m.height - RoomTemplate.DOOR_SPAN) / 2;
         List<int[]> cells = new ArrayList<>();
         for (int i = 0; i < RoomTemplate.DOOR_SPAN; i++) {
-            cells.add(new int[] {RoomTemplate.DOOR_X + i, 0});
-            cells.add(new int[] {RoomTemplate.DOOR_X + i, H - 1});
-            cells.add(new int[] {0, RoomTemplate.DOOR_Y + i});
-            cells.add(new int[] {W - 1, RoomTemplate.DOOR_Y + i});
+            cells.add(new int[] {doorX + i, 0});
+            cells.add(new int[] {doorX + i, m.height - 1});
+            cells.add(new int[] {0, doorY + i});
+            cells.add(new int[] {m.width - 1, doorY + i});
         }
         return cells;
     }

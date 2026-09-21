@@ -359,7 +359,52 @@ public final class Assets {
         }
 
         /** Bosses ship one strip per animation, at a size specific to each. */
-        public static String boss(String id, String animation) {
+        /**
+     * Stage 6's slimes: one four-column directional sheet per animation, at
+     * their own cell. A namespace of their own rather than a sixty-seventh
+     * folder under monsters/, because every sheet there is 64x64 at 16px and
+     * ActorRegionsTest counts and measures them.
+     */
+    public static String slime(String id, String animation) {
+        return "slimes/" + id + "/" + animation;
+    }
+
+    /** {@code slimes/slimetide/idle} -> {@code slimetide}, else null. */
+    public static String slimeIdOf(String spriteRegion) {
+        return familyIdOf(spriteRegion, "slimes/");
+    }
+
+    /**
+     * Stage 6's bosses, in the same shape as the slimes: four-column
+     * directional sheets, unlike the single-facing strips every boss in
+     * {@link #boss} ships.
+     */
+    public static String boss6(String id, String animation) {
+        return "bosses6/" + id + "/" + animation;
+    }
+
+    /** {@code bosses6/squidman/idle} -> {@code squidman}, else null. */
+    public static String boss6IdOf(String spriteRegion) {
+        return familyIdOf(spriteRegion, "bosses6/");
+    }
+
+    private static String familyIdOf(String spriteRegion, String prefix) {
+        if (spriteRegion == null || !spriteRegion.startsWith(prefix)) {
+            return null;
+        }
+        int slash = spriteRegion.indexOf('/', prefix.length());
+        return slash < 0 ? null : spriteRegion.substring(prefix.length(), slash);
+    }
+
+    /**
+     * The animations a directional set is probed for, in the order
+     * ActorSprites fills its fields. A missing one is simply null, so a body
+     * that ships no run cycle walks everywhere.
+     */
+    public static final String[] SET_ANIMS =
+        {"idle", "walk", "run", "attack", "hurt", "death"};
+
+    public static String boss(String id, String animation) {
             return "bosses/" + id + "/" + animation;
         }
 
@@ -498,6 +543,87 @@ public final class Assets {
         }
         /** A lingering area, for casters' clouds. Same radial glow, different use. */
         public static final String HAZARD_CLOUD = "fx/projectile/energyball";
+
+        /*
+         * The Drowned Cove's six. All 32px square frames in a single row, so
+         * Anim.strip slices them without help, and all drawn pointing right
+         * where they have a heading - the same convention PROJECTILE_KUNAI
+         * follows, because Projectile rotates by atan2 of its velocity.
+         *
+         * Ball, spell and arrow are three different jobs, not three sizes of
+         * the same one: a ball is the orb a dead boss becomes, a spell is what
+         * rains down and lies burning, and an arrow is aimed.
+         */
+        public static final String FIRE_BALL = "fx/skill6/fire_ball";
+        public static final String FIRE_SPELL = "fx/skill6/fire_spell";
+        public static final String FIRE_ARROW = "fx/skill6/fire_arrow";
+        public static final String WATER_BALL = "fx/skill6/water_ball";
+        public static final String WATER_SPELL = "fx/skill6/water_spell";
+        public static final String WATER_ARROW = "fx/skill6/water_arrow";
+
+        /*
+         * What a spell leaves where it lands: a pool of fire or of water that
+         * burns down and fades. Not from the spell pack at all - these are the
+         * death strips of the cove's own ember and tide slimes, re-emitted as
+         * fx by build_cove.py, which is why they sit beside the spells here
+         * rather than in Actor. A spell that simply stopped being drawn on
+         * impact read as switched off; a slime dissolving into a burning
+         * puddle is an impact, and the art for it was already converted.
+         */
+        public static final String FIRE_BURST = "fx/skill6/fire_burst";
+        public static final String WATER_BURST = "fx/skill6/water_burst";
+
+        /**
+         * The puddle a given spell leaves behind, or the spell itself.
+         *
+         * <p>A lob and a fall both draw one thing on the way and another where
+         * it lands, and only the caller's {@code EnemyDef.projectile} names
+         * the first. Rather than a second field on every def that never varies
+         * independently, the pairing lives here: fire lands as fire, water as
+         * water, and anything else lands as itself.
+         */
+        public static String burstOf(String spell) {
+            if (FIRE_SPELL.equals(spell) || FIRE_BALL.equals(spell)
+                    || FIRE_ARROW.equals(spell)) {
+                return FIRE_BURST;
+            }
+            if (WATER_SPELL.equals(spell) || WATER_BALL.equals(spell)
+                    || WATER_ARROW.equals(spell)) {
+                return WATER_BURST;
+            }
+            return spell;
+        }
+
+        /**
+         * Every fx region a brain may name, so the world can slice them once
+         * per room instead of on every shot.
+         *
+         * <p>A brain names a region as a String because it has no atlas and no
+         * GL context - that is the whole reason {@code ai} can be unit-tested
+         * at the real fixed step. This array is the bridge, and being an array
+         * rather than a lookup by literal is what lets ActorRegionsTest assert
+         * that every one of them is actually packed.
+         */
+        /**
+         * The ones drawn pointing somewhere, which must be turned to face it.
+         *
+         * <p>A ball is a ball from every side and is drawn as it is. An arrow
+         * or a comet is not: fanned three ways unrotated, all three point
+         * right and only the middle one looks aimed. Projectile already turns
+         * a single image to its heading; this is what says an animated one
+         * should be turned too.
+         */
+        public static boolean aimed(String region) {
+            return FIRE_SPELL.equals(region) || FIRE_ARROW.equals(region)
+                || WATER_SPELL.equals(region) || WATER_ARROW.equals(region);
+        }
+
+        public static final String[] NAMED = {
+            FIRE_BALL, FIRE_SPELL, FIRE_ARROW,
+            WATER_BALL, WATER_SPELL, WATER_ARROW,
+            FIRE_BURST, WATER_BURST,
+            HAZARD_CLOUD, PROJECTILE_ORB,
+        };
 
         private Fx() {}
     }

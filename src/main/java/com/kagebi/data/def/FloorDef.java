@@ -13,7 +13,7 @@ package com.kagebi.data.def;
  */
 public final class FloorDef {
 
-    /** 1 to 5. Floor 0 is the village hub, which is not procedural. */
+    /** 1 upwards. Floor 0 is the village hub, which is not procedural. */
     public final int number;
     public final String nameKey;
     /**
@@ -50,11 +50,36 @@ public final class FloorDef {
     /** Boss enemy id, or null on a floor with no boss. */
     public final String boss;
 
+    /**
+     * A stage off the main descent: open from the start, and not the ending.
+     *
+     * <p>The five numbered floors are a sequence - each opens the next, and
+     * clearing the deepest one is the win. A side stage is neither. It exists
+     * so content can be added without renumbering the descent or moving where
+     * the story ends, which is what floor 6, the Drowned Cove, is.
+     *
+     * <p>Two screens read it: the world map, which unlocks it regardless of
+     * what has been cleared, and the dungeon, which must not show the victory
+     * screen for finishing it.
+     */
+    public final boolean side;
+
     public FloorDef(int number, String nameKey, String descKey, String biome,
                     String music, String ambient, String bossMusic,
                     int roomsMin, int roomsMax,
                     int treasureRooms, int shopRooms, String[] enemies,
                     int[] enemyWeights, int packMin, int packMax, String boss) {
+        this(number, nameKey, descKey, biome, music, ambient, bossMusic,
+             roomsMin, roomsMax, treasureRooms, shopRooms, enemies, enemyWeights,
+             packMin, packMax, boss, false);
+    }
+
+    public FloorDef(int number, String nameKey, String descKey, String biome,
+                    String music, String ambient, String bossMusic,
+                    int roomsMin, int roomsMax,
+                    int treasureRooms, int shopRooms, String[] enemies,
+                    int[] enemyWeights, int packMin, int packMax, String boss,
+                    boolean side) {
         this.number = number;
         this.nameKey = nameKey;
         this.descKey = descKey;
@@ -71,6 +96,7 @@ public final class FloorDef {
         this.packMin = packMin;
         this.packMax = packMax;
         this.boss = boss;
+        this.side = side;
     }
 
     public boolean hasBoss() {

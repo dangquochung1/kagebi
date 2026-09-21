@@ -178,6 +178,11 @@ final class Fields {
         return out;
     }
 
+    /** An optional string array: missing is empty, not an error. */
+    String[] stringsOr(String name) {
+        return json.get(name) == null ? new String[0] : strings(name);
+    }
+
     int[] integers(String name) {
         JsonValue v = get(name, true);
         if (v == null) {

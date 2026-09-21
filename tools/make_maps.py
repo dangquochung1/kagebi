@@ -32,6 +32,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TILES = os.path.join(ROOT, "assets", "gfx", "tiles", "overworld")
 RUINS_TILES = os.path.join(ROOT, "assets", "gfx", "tiles", "ruins")
 DEPTHS_TILES = os.path.join(ROOT, "assets", "gfx", "tiles", "depths")
+COVE_TILES = os.path.join(ROOT, "assets", "gfx", "tiles", "cove")
+#: The pack's own sample map. Read for its <animation> nodes, which are
+#: authored against the same Tiled_files grid build_cove.py copies, so the
+#: tile ids in it are ours unchanged.
+COVE_SAMPLE = os.path.join(ROOT, "assets", "packs", "dungeon6",
+                           "Tiled_files", "Dungeon1.tmx")
 OUT = os.path.join(ROOT, "assets", "maps")
 
 TILE = 16
@@ -309,13 +315,32 @@ TORII = (0, 5)                       # 3x2 shrine gate
 
 # 20 x 11 tiles is 320 x 176 px: see gen/RoomTemplate for why the camera snaps
 # per room rather than scrolling, and why this is the grid that fits.
-ROOM_W, ROOM_H = 20, 11
+#: The default grid, and what set_room_size puts back after the one room
+#: that is not this size. ROOM_W and ROOM_H are rebound; these are not.
+DEFAULT_W, DEFAULT_H = 20, 11
+
+ROOM_W, ROOM_H = DEFAULT_W, DEFAULT_H
 DOOR_SPAN = 3                       # tiles of opening in the middle of a wall
 
 # The opening in each wall, in tile coordinates measured y-DOWN from the top,
 # which is the space both Layer and Tiled's object layer use.
 DOOR_X = range((ROOM_W - DOOR_SPAN) // 2, (ROOM_W + DOOR_SPAN) // 2)   # 8,9,10
 DOOR_Y = range((ROOM_H - DOOR_SPAN) // 2, (ROOM_H + DOOR_SPAN) // 2)   # 4,5,6
+
+
+def set_room_size(w, h):
+    """Rebind the grid every painter, layout and check below reads.
+
+    Fifty-odd places take ROOM_W and ROOM_H as module constants, which is the
+    right shape for a script that made one size of room. Stage 6's boss arena
+    is 40x22 and it is the only exception there will be, so it is cheaper to
+    rebind the grid around one room than to thread a size through all of them.
+    make_room sets it per room and puts it back; nothing here is concurrent.
+    """
+    global ROOM_W, ROOM_H, DOOR_X, DOOR_Y
+    ROOM_W, ROOM_H = w, h
+    DOOR_X = range((w - DOOR_SPAN) // 2, (w + DOOR_SPAN) // 2)
+    DOOR_Y = range((h - DOOR_SPAN) // 2, (h + DOOR_SPAN) // 2)
 
 # Two tiles of clear floor behind every doorway. Without it a room can be
 # generated whose only path out of a door is diagonal, and the player snags on
@@ -838,6 +863,363 @@ def scatter_bones(dressing, d, solid, rng):
             dressing.put(x, y, d.gid(*rng.choice(usable)))
 
 
+# --------------------------------------------------------------------------
+# The Drowned Cove (stage 6)
+# --------------------------------------------------------------------------
+#
+# Coordinates read off assets/gfx/tiles/cove/walls_floor.png, a 17x29 grid,
+# and cross-checked against the pack's own Dungeon1.tmx: its Floor layer is
+# 307 tiles of (2,8) and its Walls layer 117 of (2,2), which is how those two
+# were chosen rather than by eye.
+#
+# The wall art is a 3x5 stamp at columns 1-3, rows 1-5. Rows 1-3 are the dark
+# TOP of a thick wall seen from above; rows 4-5 are the brick face that wall
+# shows to the south. So a room's far wall (y=0, drawn at the top of the
+# screen) is the brick face, and its near wall (y=H-1) is the top surface with
+# its rim - the player looks down at the near wall and at the face of the far
+# one, which is the same trick every other biome here plays.
+
+#: The pack draws two floors: a light slab at (2,8) and this darker surface,
+#: and its own sample map lays 253 tiles of the dark one over 307 of the light.
+#: The dark one is the base here because every floor overlay in the pack -
+#: the joints below, and the whole of cracks_floor.png - is drawn at exactly
+#: this tone (90,103,125) and at the light floor's (128,138,163) they read as
+#: darker tiles laid on top rather than as the same stone, worn.
+COVE_FLOOR = (12, 14)
+COVE_FRAME = {
+    "tl": (1, 4), "top": (2, 4), "tr": (3, 4),       # far wall: brick face
+    "left": (1, 2), "right": (3, 2),                  # side walls: top surface
+    "bl": (1, 1), "bottom": (2, 1), "br": (3, 1),     # near wall: top + rim
+}
+#: Free-standing obstacles. The dark surface for everything but the last row,
+#: which shows its face - the same rule paint_depths uses, for the same reason:
+#: a corner tile mid-floor carries the black outside-the-room field and reads
+#: as a hole rather than as a wall end.
+COVE_BLOCK_RIM = (2, 1)
+COVE_BLOCK_TOP = (2, 2)
+COVE_BLOCK_FACE = (2, 4)
+
+#: Single-tile obstacles from Objects.png (24x9): vases, pots and a barrel.
+#: All are drawn as standalone objects filling their own tile, so collision
+#: matches what the player sees.
+COVE_POTS = [(12, 5), (13, 5), (14, 5), (15, 5), (16, 5), (17, 5), (18, 5)]
+
+#: Flagstone joints, from walls_floor. The cove's floor tile is one flat slab -
+#: 307 of the pack's own sample map are the same one - so without a grain over
+#: it a room reads as a sheet of grey. These two are drawn on transparency and
+#: are the pack's own way of breaking it up.
+#: One variant, laid on EVERY open tile rather than several sprinkled about.
+#:
+#: This tile is a flagstone seam drawn on transparency, and it is designed to
+#: butt up against copies of itself: laid solid it makes a continuous course
+#: of stone across the whole floor, which is what the pack's own art is for.
+#: Scattered at one tile in five - which is how this started - the same tile
+#: reads as random scratches gouged in a blank grey sheet, because a seam with
+#: nothing to join to is not a seam. Mixing the two transparent variants
+#: breaks the course for the same reason, so there is only one.
+COVE_JOINT = (10, 13)
+
+#: Braziers and torches, from fire.png (11x18).
+#:
+#: The sheet is four objects across and six animation frames down, each object
+#: a 3x3 block: a lit bowl in the middle tile and its glow spilling into the
+#: eight around it. The coordinates here are the top-left of frame zero, and
+#: the pack's own <animation> nodes - lifted whole by cove_animations - carry
+#: every one of those nine tiles through the other five frames, so a stamp of
+#: frame zero is a fire that burns.
+#:
+#: This is the single biggest thing the cove was missing. Its rooms were lit
+#: by the Pixel Dungeon torch marker, a 16px flame on a wall, because that is
+#: what every other biome uses; the reference this stage was built from is a
+#: room full of standing fires throwing orange light across grey stone, and
+#: the pack ships exactly that and it was going unused.
+#: Only the two big ones. The sheet also draws a candle and a wall torch, and
+#: both were tried and both are wrong here for the same two reasons: their
+#: flame is two or three pixels of light inside the same wide grey halo the
+#: braziers get, so on a floor this colour they read as a dirty patch with a
+#: spark in it - and they sit three columns apart while their halos are wider
+#: than three columns, so a 3x3 stamp of the torch drags in the right-hand
+#: crescent of the candle beside it. Those stray crescents were visible in the
+#: arena as grey half-discs lying on the floor with no fire in them.
+COVE_FIRES = {
+    "brazier": (5, 0),
+    "bowl": (8, 0),
+}
+COVE_FIRE_SPAN = 3
+#: Fires per room, per 220 tiles of floor - one normal room's worth.
+#:
+#: Scaled by area rather than fixed, because the arena is four rooms in one
+#: and four fires spread across it left most of it as dark as before. A room
+#: is lit by how much of it is within reach of a flame, not by how many flames
+#: are in it.
+COVE_FIRE_PER_ROOM = 4
+
+
+def cove_fire_count():
+    return max(COVE_FIRE_PER_ROOM,
+               round(COVE_FIRE_PER_ROOM * (ROOM_W * ROOM_H) / (DEFAULT_W * DEFAULT_H)))
+#: Piles of coin per normal room, scaled by area like the fires. Enough to
+#: warm the floor, few enough that it reads as scenery rather than as loot.
+COVE_GOLD_PER_ROOM = 5
+
+
+def cove_gold_count():
+    return max(COVE_GOLD_PER_ROOM,
+               round(COVE_GOLD_PER_ROOM * (ROOM_W * ROOM_H) / (DEFAULT_W * DEFAULT_H)))
+
+#: Loose coin, from objects.png. Dressing, not props: gold is a thing to walk
+#: over, and a knee-high pile that stopped the player would be a wall painted
+#: yellow. It is also the only warm colour on a cove floor, which is most of
+#: why it is here - the rooms read as grey because they were grey.
+COVE_GOLD = [(15, 1), (16, 1), (13, 7), (14, 7)]
+
+#: Cracks and stains for the far wall's brick face, from cracks_walls.png
+#: (8x32). Its top half is drawn to sit on a vertical surface, which is what
+#: the room's y=0 row is; laid on the floor - which is where the first pass
+#: tried to put them - they read as scratches hanging in mid-air.
+COVE_WALL_CRACKS = [(x, y) for y in range(0, 6) for x in range(8)]
+COVE_WALL_CRACK_RATE = 0.30
+
+#: Worn flagstones, from the bottom three rows of cracks_floor.png (8x15).
+#:
+#: Two false starts are worth recording. The sheet's TOP half is wall cracks,
+#: drawn to sit on a vertical face; laid on a floor they read as scratches
+#: hanging in mid-air. And rows 8-11 are 40-77% opaque with hard edges, so at
+#: one tile in fourteen they read as raised slabs rather than as wear. These
+#: three rows are 82-95% opaque with soft faint detail, which is what makes
+#: them read as the same floor, worn, rather than as something laid on it.
+COVE_WEAR = [(x, y) for y in (12, 13, 14) for x in range(8)]
+COVE_WEAR_RATE = 0.10
+
+
+def cove_animations():
+    """The pack's <animation> nodes, keyed by tileset image filename.
+
+    Lifted from Dungeon1.tmx rather than authored. The pack animates its own
+    water, fire, traps and doors there against the same Tiled_files grid that
+    build_cove.py copies, so every tileid in those nodes is already correct for
+    us; re-deriving them by hand would be forty tiles of guesswork to arrive at
+    the numbers sitting in a file we ship.
+    """
+    import xml.etree.ElementTree as ET
+    if not os.path.isfile(COVE_SAMPLE):
+        return {}
+    out = {}
+    for ts in ET.parse(COVE_SAMPLE).getroot().findall("tileset"):
+        image = ts.find("image")
+        if image is None:
+            continue
+        nodes = [tile for tile in ts.findall("tile")
+                 if tile.find("animation") is not None]
+        if nodes:
+            out[os.path.basename(image.get("source"))] = nodes
+    return out
+
+
+#: Pack filename -> the name build_cove.py writes it under.
+COVE_SHEETS = {
+    "wall": ("walls_floor.png", "walls_floor.png"),
+    "cracks": ("cracks_floor.png", "decorative_cracks_floor.png"),
+    "wallcracks": ("cracks_walls.png", "decorative_cracks_walls.png"),
+    "objects": ("objects.png", "Objects.png"),
+    "fire": ("fire.png", "fire_animation.png"),
+}
+
+
+def cove_fire_spots():
+    """Where a standing fire may go, in preference order.
+
+    Read off the grid rather than listed, so the arena's 40x22 gets fires
+    spread across it instead of four huddled in one corner of a room four
+    times the size. Each is the CENTRE of a 3x3 stamp, so nothing may sit
+    closer than two tiles to a wall.
+    """
+    inset = 3
+    spots = [
+        (inset, inset), (ROOM_W - 1 - inset, inset),
+        (inset, ROOM_H - 1 - inset), (ROOM_W - 1 - inset, ROOM_H - 1 - inset),
+    ]
+    if ROOM_W >= 30:
+        mid = ROOM_H // 2
+        spots += [(ROOM_W // 3, inset), (2 * ROOM_W // 3, inset),
+                  (ROOM_W // 3, ROOM_H - 1 - inset),
+                  (2 * ROOM_W // 3, ROOM_H - 1 - inset),
+                  (inset, mid), (ROOM_W - 1 - inset, mid)]
+    return spots
+
+
+def place_fires(dressing, props, fire, solid, rng, count):
+    """Stamps standing fires.
+
+    The bowl blocks and the glow does not, which is the whole reason this
+    writes into two layers: a player should be able to stand in the light of a
+    brazier and be stopped by the brazier. TiledRooms makes everything in
+    `props` solid and nothing in `dressing`, so that split is the collision.
+
+    Returns the centres, which are solid, and the whole nine-tile footprint,
+    which is not - but which the floor scatter has to leave alone. The glow
+    goes into `dressing` and so does the flagstone, and the flagstone is laid
+    afterwards: the first version of this had every halo quietly overwritten
+    by a seam tile, which left each brazier sitting on a bare grey square with
+    the light around it gone.
+    """
+    half = COVE_FIRE_SPAN // 2
+    clear = apron_cells()
+    taken = []
+    footprint = []
+    kinds = list(COVE_FIRES.values())
+    # The preferred spots first, then anywhere that fits. Without the fallback
+    # a room whose pillars happen to stand in all four corners got no fire at
+    # all - which is most of them, and is why the first render of this came
+    # back as dark as the one it was meant to fix.
+    spots = list(cove_fire_spots())
+    spare = [(x, y) for y in range(2, ROOM_H - 2) for x in range(2, ROOM_W - 2)
+             if (x, y) not in spots]
+    rng.shuffle(spare)
+    # Nearest the wall first. A brazier standing in the middle of an open
+    # floor is an obstacle somebody put there; one against the wall is part of
+    # the room. The shuffle above survives as the tie-break, so rooms with the
+    # same shape do not all light the same corners.
+    spare.sort(key=lambda c: min(c[0], c[1], ROOM_W - 1 - c[0], ROOM_H - 1 - c[1]))
+    for (cx, cy) in spots + spare:
+        if len(taken) >= count:
+            break
+        # Two fires sharing a glow read as one big smear, so keep them apart.
+        if any(abs(cx - tx) < COVE_FIRE_SPAN + 1 and abs(cy - ty) < COVE_FIRE_SPAN + 1
+               for (tx, ty) in taken):
+            continue
+        cells = [(cx + dx, cy + dy)
+                 for dy in range(-half, half + 1) for dx in range(-half, half + 1)]
+        if any(not (0 < x < ROOM_W - 1 and 0 < y < ROOM_H - 1)
+               or solid[y][x] or (x, y) in clear for (x, y) in cells):
+            continue
+        ox, oy = kinds[rng.randrange(len(kinds))]
+        for dy in range(COVE_FIRE_SPAN):
+            for dx in range(COVE_FIRE_SPAN):
+                x, y = cx - half + dx, cy - half + dy
+                gid = fire.gid(ox + dx, oy + dy)
+                if dx == half and dy == half:
+                    props.put(x, y, gid)
+                else:
+                    dressing.put(x, y, gid)
+                footprint.append((x, y))
+        taken.append((cx, cy))
+    return taken, footprint
+
+
+def paint_cove(blocks, singles, rng):
+    """Ground, walls and props for one Drowned Cove room.
+
+    Returns the tilesets, the layers, the tileset map, and the cells this
+    painter made solid on its own - the braziers - so make_room can keep
+    spawns off them.
+    """
+    anims = cove_animations()
+    sets, gid = {}, 1
+    for key, (filename, pack_name) in COVE_SHEETS.items():
+        ts = Tileset(key, filename, gid, folder=COVE_TILES,
+                     tiles=anims.get(pack_name))
+        sets[key] = ts
+        gid += ts.count
+    wall, cracks, objects = sets["wall"], sets["cracks"], sets["objects"]
+
+    ground, dressing, decor, walls, props, overhead = room_layers()
+
+    # Floor under the walls too: the wall tiles have transparent pixels at
+    # their outer rim, and with nothing behind them the screen's clear colour
+    # shows through as a black fringe around the room.
+    for y in range(ROOM_H):
+        for x in range(ROOM_W):
+            ground.put(x, y, wall.gid(*COVE_FLOOR))
+
+    perimeter(walls, lambda piece: wall.gid(*COVE_FRAME[piece]))
+
+    for (x, y, w, h) in blocks:
+        for dy in range(h):
+            for dx in range(w):
+                if dy == h - 1:
+                    piece = COVE_BLOCK_FACE       # the side that faces south
+                elif dy == 0:
+                    piece = COVE_BLOCK_RIM        # lit top edge, so it reads solid
+                else:
+                    piece = COVE_BLOCK_TOP
+                props.put(x + dx, y + dy, wall.gid(*piece))
+    for (x, y) in singles:
+        props.put(x, y, objects.gid(*rng.choice(COVE_POTS)))
+
+    solid = solid_grid(blocks, singles)
+    # Standing fires first, because they take floor away and everything after
+    # this has to know about it: scatter_floor must not lay flagstone joints
+    # under a brazier, and the loose gold must not be dropped inside one.
+    fires, lit = place_fires(dressing, props, sets["fire"], solid, rng,
+                             cove_fire_count())
+    for (fx, fy) in fires:
+        solid[fy][fx] = True
+
+    scatter_floor(dressing, wall, cracks, solid, rng, set(lit))
+    scatter_gold(dressing, objects, solid, rng, set(lit))
+    crack_far_wall(dressing, sets["wallcracks"], rng)
+    return ([wall, cracks, sets["wallcracks"], objects, sets["fire"]],
+            [ground, dressing, decor, walls, props, overhead], sets, fires)
+
+
+def scatter_gold(dressing, objects, solid, rng, lit=()):
+    """A few piles of coin on open floor.
+
+    Into `dressing`, over the flagstone this has already laid, and never into
+    `decor`. decor is the human's layer: carry_decor copies it forward across
+    a regenerate so hand edits survive, which means anything the generator
+    puts there is captured as a hand edit and copied forward again on the next
+    run, and again on the one after. The first version of this wrote gold to
+    decor and the very next generate reported "kept 5 hand-placed decor tiles"
+    for tiles no hand had placed.
+
+    Losing the seam under a pile of coin costs nothing: it is under a pile of
+    coin.
+    """
+    clear = apron_cells()
+    free = [(x, y) for y in range(1, ROOM_H - 1) for x in range(1, ROOM_W - 1)
+            if not solid[y][x] and (x, y) not in clear and (x, y) not in lit]
+    rng.shuffle(free)
+    for (x, y) in free[:cove_gold_count()]:
+        dressing.put(x, y, objects.gid(*rng.choice(COVE_GOLD)))
+
+
+def crack_far_wall(dressing, wallcracks, rng):
+    """Damage across the brick face the player is looking at.
+
+    Only row 0. The other three walls are seen from above - their top surface,
+    not their face - and a crack drawn for a vertical surface laid on one of
+    those reads as a scratch floating over the stone.
+    """
+    for x in range(1, ROOM_W - 1):
+        if x in DOOR_X or rng.random() >= COVE_WALL_CRACK_RATE:
+            continue
+        dressing.put(x, 0, wallcracks.gid(*rng.choice(COVE_WALL_CRACKS)))
+
+
+def scatter_floor(dressing, wall, cracks, solid, rng, lit=()):
+    """Flagstone across the whole floor, worn through here and there.
+
+    One layer carries both, so a cell is a joint or a worn stone and never
+    both. The joint is now the default rather than an accent - see COVE_JOINT
+    - and wear is what replaces it, which also means the wear reads as a
+    flagstone that has broken up rather than as a stain on nothing.
+
+    Doorway aprons are left clear, as the depths' bones are, because debris on
+    the tile the player first steps onto reads as something to pick up.
+    """
+    clear = apron_cells()
+    for y in range(ROOM_H):
+        for x in range(ROOM_W):
+            if solid[y][x] or (x, y) in clear or (x, y) in lit:
+                continue
+            if rng.random() < COVE_WEAR_RATE:
+                dressing.put(x, y, cracks.gid(*rng.choice(COVE_WEAR)))
+            else:
+                dressing.put(x, y, wall.gid(*COVE_JOINT))
+
+
 def room_layers():
     """The six layers every room carries, in render order.
 
@@ -913,13 +1295,32 @@ def nearest_free(walkable, tx, ty, used):
 # Where the player stands after stepping through each of the four doors. The
 # tag names the side of THIS room the player arrived at: coming out of the
 # room to the west means arriving at this room's LEFT door.
-ENTRIES = [
-    ("UP", 9, 1), ("DOWN", 9, ROOM_H - 2), ("LEFT", 1, 5), ("RIGHT", ROOM_W - 2, 5),
-]
+def entries():
+    """One arrival point just inside each of the four doors.
+
+    Off the current grid, not a fixed table: in the cove's 40x22 arena a table
+    written for 20x11 puts the DOWN entry eleven tiles short of the door it is
+    named for, which RoomCatalogTest.entriesSitBesideTheDoorTheyAreNamedFor
+    catches, and which would otherwise drop the player in mid-room on entry.
+    """
+    mid_x = DOOR_X[DOOR_SPAN // 2]
+    mid_y = DOOR_Y[DOOR_SPAN // 2]
+    return [("UP", mid_x, 1), ("DOWN", mid_x, ROOM_H - 2),
+            ("LEFT", 1, mid_y), ("RIGHT", ROOM_W - 2, mid_y)]
+
 
 # Enemies stand off the centre line so a room never opens with something
-# directly on top of the door the player walked through.
-ENEMY_ANCHORS = [(4, 3), (15, 3), (4, 7), (15, 7), (9, 3), (9, 7), (7, 5), (12, 5)]
+# directly on top of the door the player walked through. Written for the 20x11
+# grid and scaled to any other, which keeps that shape rather than bunching a
+# whole pack into one corner of the arena.
+ENEMY_ANCHORS_20x11 = [(4, 3), (15, 3), (4, 7), (15, 7),
+                       (9, 3), (9, 7), (7, 5), (12, 5)]
+
+
+def enemy_anchors():
+    return [(min(max(round(x * ROOM_W / DEFAULT_W), 1), ROOM_W - 2),
+             min(max(round(y * ROOM_H / DEFAULT_H), 1), ROOM_H - 2))
+            for (x, y) in ENEMY_ANCHORS_20x11]
 
 SPAWN_RULES = {
     # kind: (enemies, chests, extra). Wall dressing is counted separately, in
@@ -973,14 +1374,24 @@ SPAWN_RULES = {
 # 16px sprite centred on the last row would hang off the foot of a 176px room.
 # Rendering it proved that wrong - the row is fully on screen and nothing draws
 # over it - and it is now the best surface in the room.
-WALL_TORCHES = [
-    (3, ROOM_H - 1), (ROOM_W - 4, ROOM_H - 1),
-    (0, ROOM_H - 3), (ROOM_W - 1, ROOM_H - 3),
-    (5, ROOM_H - 1), (ROOM_W - 6, ROOM_H - 1),
-    (0, 3), (ROOM_W - 1, 3),
-]
-# Flanking the bottom door, where a banner reads as marking the way through.
-WALL_BANNERS = [(7, ROOM_H - 1), (ROOM_W - 8, ROOM_H - 1)]
+def wall_torches():
+    """Bracket positions, worked out from the grid rather than fixed.
+
+    These were a constant list until the cove's 40x22 arena, which is why they
+    are a function: a table written for a 20-wide room puts half its torches in
+    mid-air in a 40-wide one, and wall_prop_cells rightly refuses to place them.
+    """
+    return [
+        (3, ROOM_H - 1), (ROOM_W - 4, ROOM_H - 1),
+        (0, ROOM_H - 3), (ROOM_W - 1, ROOM_H - 3),
+        (5, ROOM_H - 1), (ROOM_W - 6, ROOM_H - 1),
+        (0, 3), (ROOM_W - 1, 3),
+    ]
+
+
+def wall_banners():
+    """Flanking the bottom door, where a banner reads as marking the way through."""
+    return [(7, ROOM_H - 1), (ROOM_W - 8, ROOM_H - 1)]
 
 # How lit each kind of room is. The rooms with nothing in them get the most,
 # which is the point: a boss arena and a start room are deliberately empty of
@@ -1000,8 +1411,8 @@ WALL_DRESSING = {
 def wall_prop_cells(kind):
     """(tile, tag) for every torch and banner bracketed to this room's walls."""
     torches, banners = WALL_DRESSING[kind]
-    out = [(cell, "torch") for cell in WALL_TORCHES[:torches]]
-    out += [(cell, "banner") for cell in WALL_BANNERS[:banners]]
+    out = [(cell, "torch") for cell in wall_torches()[:torches]]
+    out += [(cell, "banner") for cell in wall_banners()[:banners]]
     for (x, y), _ in out:
         if (x, y) in door_cells():
             raise ValueError("%s: wall prop at %d,%d is in a doorway" % (kind, x, y))
@@ -1013,7 +1424,7 @@ def wall_prop_cells(kind):
 def spawns_for(kind, walkable, rng):
     out, used = [], set()
 
-    for tag, tx, ty in ENTRIES:
+    for tag, tx, ty in entries():
         x, y = nearest_free(walkable, tx, ty, used)
         out.append(("ENTRY", *at(x, y), tag))
     # One untagged entry at the middle, used when there is no door to arrive
@@ -1033,7 +1444,7 @@ def spawns_for(kind, walkable, rng):
         x, y = nearest_free(walkable, ROOM_W // 2, 3, used)
         out.append(("SHOPKEEPER", *at(x, y), ""))
 
-    anchors = list(ENEMY_ANCHORS)
+    anchors = list(enemy_anchors())
     rng.shuffle(anchors)
     for tx, ty in anchors[:enemies]:
         x, y = nearest_free(walkable, tx, ty, used)
@@ -1090,25 +1501,62 @@ BIOMES = [
     ("ruins_green", "ruins", "green"),
     ("ruins_orange", "ruins", "orange"),
     ("depths", "depths", None),
+    ("cove", "cove", None),
 ]
 
+# Stage 6's arena, in tiles. Four screens, and the only room in the game that
+# is not one: see gen/RoomTemplate. A boss chain of three bodies with rains of
+# fire and water to dodge needs somewhere to run to, and a 20x11 room with a
+# 64px boss in it is a corridor.
+ARENA_W, ARENA_H = 40, 22
 
-def make_room(folder, pack, variant, kind, layout, index, seed):
+# The cove's plan. ROOM_PLAN with one boss template instead of two, because
+# FloorGenerator picks at random within (biome, kind) and a second 20x11 arena
+# would mean half of all stage-6 runs never see the big one.
+COVE_PLAN = [entry for entry in ROOM_PLAN if entry[0] != "boss"] + [
+    ("boss", "open", (ARENA_W, ARENA_H)),
+]
+
+#: Biome folder -> its room plan. Anything not named here uses ROOM_PLAN.
+PLANS = {"cove": COVE_PLAN}
+
+
+def make_room(folder, pack, variant, kind, layout, index, seed, size=None):
     rng = random.Random(seed)
+    set_room_size(*(size or (DEFAULT_W, DEFAULT_H)))
     blocks, singles = LAYOUTS[layout](rng)
     name = "%s_%02d" % (kind, index)
     solid = solid_grid(blocks, singles)
     walkable = check_room("%s/%s" % (folder, name), solid)
 
+    # A painter may add solid tiles of its own - the cove stands braziers on
+    # the floor - so it hands back whatever it blocked and those cells leave
+    # the walkable set before anything is spawned onto them. Without this the
+    # fires were placed after the floor plan was settled and before the spawn
+    # points were chosen from it, and RoomCatalogTest duly found an enemy
+    # standing inside one.
+    extra = []
     if pack == "ruins":
         tilesets, layers, sets = paint_ruins(variant, blocks, singles, rng)
+    elif pack == "cove":
+        tilesets, layers, sets, extra = paint_cove(blocks, singles, rng)
     else:
         tilesets, layers, sets = paint_depths(blocks, singles, rng)
 
+    if extra:
+        # Re-flood with the painter's own obstacles in place. A single tile
+        # dropped in a corridor can cut a room in two, and a room that fails
+        # its flood fill is invisible in a preview - the doorway still looks
+        # open - so this asks the same question again rather than assuming a
+        # brazier is harmless because it is small.
+        for (x, y) in extra:
+            solid[y][x] = True
+        walkable = check_room("%s/%s" % (folder, name), solid)
     objects = spawns_for(kind, sorted(walkable), rng)
     path = os.path.join(OUT, "rooms", folder, name + ".tmx")
     write_tmx(path, ROOM_W, ROOM_H, tilesets, layers,
               tiles_rel="../../../gfx/tiles/%s/" % pack, objects=objects)
+    set_room_size(DEFAULT_W, DEFAULT_H)
     return path, len(objects)
 
 
@@ -1122,15 +1570,19 @@ def rooms():
     total = 0
     for folder, pack, variant in BIOMES:
         counts = {}
-        for i, (kind, layout) in enumerate(ROOM_PLAN):
+        plan = PLANS.get(folder, ROOM_PLAN)
+        for entry in plan:
+            kind, layout = entry[0], entry[1]
+            size = entry[2] if len(entry) > 2 else None
             counts[kind] = counts.get(kind, 0) + 1
             # Seeded off the names so a room's clutter is stable across runs
             # and a re-generate produces no diff noise.
             seed = hash_seed(folder, kind, counts[kind], layout)
-            make_room(folder, pack, variant, kind, layout, counts[kind], seed)
+            make_room(folder, pack, variant, kind, layout, counts[kind], seed,
+                      size)
             total += 1
         print("  rooms/%-13s %2d rooms  (%s pack%s)"
-              % (folder, len(ROOM_PLAN), pack,
+              % (folder, len(plan), pack,
                  ", %s" % variant if variant else ""))
     print("  %d room templates in %d biomes" % (total, len(BIOMES)))
 

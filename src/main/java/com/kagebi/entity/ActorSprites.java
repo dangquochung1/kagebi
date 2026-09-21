@@ -38,6 +38,11 @@ import com.kagebi.gfx.Anim;
  *     animation frames as four facings of a one-frame animation. Checking the
  *     height is what tells them apart.
  * <li><b>Boss strips</b> - one file per animation at a size per boss.
+ * <li><b>Directional sets</b> - stage 6's slimes and pirates: one file per
+ *     animation, each a four-column directional sheet, so they have a real
+ *     left and right and a frame count per animation. The two shapes above
+ *     each give up one of those; this gives up neither, at the cost of six
+ *     regions per body instead of one.
  * </ul>
  *
  * <p>The player's {@code dead} sheet is a fifth shape - 32x64, one column of
@@ -80,6 +85,8 @@ public final class ActorSprites {
     public final boolean singleFacing;
     public final Anim idle;
     public final Anim walk;
+    /** Chasing, for the bodies whose art has a second gait. Null falls back to walk. */
+    public final Anim run;
     /** One step per frame; the caller remaps elapsed steps with {@link #frameOf}. */
     public final Anim attack;
     public final Anim hurt;
@@ -104,12 +111,19 @@ public final class ActorSprites {
     private ActorSprites(int cell, boolean singleFacing, Anim idle, Anim walk, Anim attack,
                          Anim hurt, Anim roll, Anim death, TextureRegion[] dead,
                          TextureRegion shadow) {
+        this(cell, singleFacing, idle, walk, null, attack, hurt, roll, death, dead, shadow);
+    }
+
+    private ActorSprites(int cell, boolean singleFacing, Anim idle, Anim walk, Anim run,
+                         Anim attack, Anim hurt, Anim roll, Anim death, TextureRegion[] dead,
+                         TextureRegion shadow) {
         this.cell = cell;
         this.figureW = cell;
         this.figureH = cell;
         this.singleFacing = singleFacing;
         this.idle = idle;
         this.walk = walk;
+        this.run = run;
         this.attack = attack;
         this.hurt = hurt;
         this.roll = roll;
@@ -158,6 +172,14 @@ public final class ActorSprites {
         if (atlas == null || def == null || def.sprite == null) {
             return null;
         }
+        String setId = Assets.Actor.slimeIdOf(def.sprite);
+        if (setId != null) {
+            return directionalSet(atlas, "slimes/" + setId, def.cell);
+        }
+        setId = Assets.Actor.boss6IdOf(def.sprite);
+        if (setId != null) {
+            return directionalSet(atlas, "bosses6/" + setId, def.cell);
+        }
         String bossId = Assets.Actor.bossIdOf(def.sprite);
         if (bossId != null) {
             return boss(atlas, bossId);
@@ -188,6 +210,70 @@ public final class ActorSprites {
     }
 
     /** A boss, from one horizontal strip per animation, each probed rather than assumed. */
+    /**
+     * One body from a folder of four-column directional sheets.
+     *
+     * <p>Idle is required and everything else is optional, so a body can ship
+     * whatever its pack drew. The steps-per-frame numbers are the same ones
+     * the 4x4 monsters use, except that attack and hurt get one step per frame
+     * and are stretched over the def's own windup by {@link #frameOf} - the
+     * art must not decide how long a swing lasts.
+     *
+     * <p>The figure is measured off the idle sheet the way a boss's is. These
+     * cells are 64px around a body half that size, and drawn centred in the
+     * cell a slime floats a dozen pixels above its own shadow.
+     */
+    public static ActorSprites directionalSet(TextureAtlas atlas, String prefix, int cell) {
+        if (atlas == null) {
+            return null;
+        }
+        String idleRegion = prefix + "/" + Assets.Actor.SET_ANIMS[0];
+        TextureRegion sheet = atlas.findRegion(idleRegion);
+        if (sheet == null) {
+            return null;
+        }
+        int size = cell > 0 ? cell : sheet.getRegionWidth() / Dir.ALL.length;
+        ActorSprites out = new ActorSprites(size, false,
+            setAnim(atlas, prefix, "idle", size, 10, true),
+            setAnim(atlas, prefix, "walk", size, 6, true),
+            setAnim(atlas, prefix, "run", size, 4, true),
+            setAnim(atlas, prefix, "attack", size, 1, false),
+            setAnim(atlas, prefix, "hurt", size, 1, false),
+            null,
+            setAnim(atlas, prefix, "death", size, 5, false),
+            null, atlas.findRegion(Assets.Actor.SHADOW));
+        int[] fig = measureFigure(sheet, size);
+        if (fig != null) {
+            out.figure(fig[0], fig[1], fig[2]);
+        }
+        return out;
+    }
+
+    /**
+     * One animation of a directional set, sliced by whichever shape it is.
+     *
+     * <p>Measured rather than assumed, the way {@link #enemy} tells its two
+     * trash shapes apart. Most of a set is four columns wide, one per facing -
+     * but a pack that draws a death once rather than four times ships it as a
+     * single row, and the pirates' do exactly that. Handing that to
+     * {@link Anim#directional} throws, which is how this was found.
+     */
+    private static Anim setAnim(TextureAtlas atlas, String prefix, String name, int cell,
+                                int stepsPerFrame, boolean looping) {
+        String region = prefix + "/" + name;
+        TextureRegion sheet = atlas.findRegion(region);
+        if (sheet == null) {
+            return null;
+        }
+        if (sheet.getRegionWidth() == cell * Dir.ALL.length) {
+            return Anim.directional(atlas, region, cell, stepsPerFrame, looping);
+        }
+        if (sheet.getRegionHeight() == cell) {
+            return Anim.strip(atlas, region, stepsPerFrame, looping);
+        }
+        return null;
+    }
+
     public static ActorSprites boss(TextureAtlas atlas, String id) {
         if (atlas == null) {
             return null;

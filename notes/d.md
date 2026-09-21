@@ -75,7 +75,7 @@ and combat can run one resolver over both.
 
 ---
 
-## 2. Brain names `ai` must implement (12)
+## 2. Brain names `ai` must implement (19)
 
 Also enforced by `ContentValidator`, from `ContentValidator.BRAINS`.
 
@@ -91,8 +91,31 @@ Also enforced by `ContentValidator`, from `ContentValidator.BRAINS`.
 | `orbiter` | circles at `attackRange`, darts in on cooldown | kappagreen |
 | `splitter` | `chaser` that spawns two half-HP copies on death | mushroom |
 | `caster` | stationary, telegraphs, drops an area effect at range | mushroom2, acolyte |
+| `burster` | holds at `attackRange`, swells, then fires a ring of shots on every spoke at once | slimetide |
+| `bomber` | closes while it flashes, then detonates an area effect on itself - and again, for less, when it is killed | slimeember |
 | `boss_frog` | scripted: hop-slam, tongue lash, summon two larva | giantfrog2 |
 | `boss_tengu` | scripted, two phases. P1 dash-slash. At half HP plays `bosses/tengured/trans`, then P2 adds flame waves | tengured |
+| `boss_pirateleader` | melee only: swing, charge, and a combo that lands three shoving blows down one line while walking in behind them | pirateleader |
+| `boss_orb` | untouchable and immobile for eight seconds, dropping spells on the player, then summons `evolvesInto` and kills itself | fireorb |
+| `boss_orb_tide` | the same, but throwing arcs outward in a turning ring rather than aiming at anyone | waterorb |
+| `boss_piratezombie` | three-arrow fan, a barrage down one line, and a wall of burning ground. At `enrageAt` rains a wave and calls in its `summons` | piratezombie |
+| `boss_squidman` | the same fan, plus a ring of hazards around itself with one gap on the far side | squidman |
+
+A boss sizes each of its moves for itself. `EnemyDef.activeSteps` is one
+number and a boss has eight attacks: a swing is a sixth of a second and a
+three-blow combo is nearly three, so one number shared between them is wrong
+for at least one of them. `BossBrain.activeSteps` gives each move its own
+window and `AiBrain.longestActiveSteps` declares the ceiling, which is what
+`AiStateMachineTest` holds every brain to - the old invariant was "no state
+outlives the number in the def", and this widens it in the open rather than
+quietly. Before it existed, `pirateleader` carried the combo's 190 steps and
+so every ordinary swing he threw stood open for over three seconds.
+
+The last four are one fight: `pirateleader` -> `fireorb` -> `piratezombie` ->
+`waterorb` -> `squidman`, each named in the one before's `evolvesInto` and
+summoned by its brain on death. Three full health bars with two untouchable
+intermissions between them, rather than one bar in slices - which is what
+`phases` does, and what needs a `trans` strip these packs do not ship.
 
 `splitter` spawns copies of its own id, so cap the split at one generation or
 `mushroom` recurses forever.
@@ -114,6 +137,33 @@ keeps region names out of the content files that do not need them.
 | `bonebolt` | `fx/projectile/arrow` |
 | `sporecloud` | `fx/elemental/plant/spritesheet` |
 | `flamewave` | `fx/elemental/flam/spritesheet` |
+
+The cove's boss names its own art directly in `EnemyDef.projectile`, because
+its six regions are its own and nothing else in the game shoots them:
+`fx/skill6/{fire,water}_{ball,spell,arrow}`. Two more are derived rather than
+named - `fx/skill6/fire_burst` and `water_burst`, which are what a spell
+leaves on the floor where it lands. `Assets.Fx.burstOf` does the pairing, so
+no def carries a second field that never varies independently of the first.
+They are not from the spell pack at all: they are the death strips of the
+ember and tide slimes, re-emitted as fx by `build_cove.py`, because a slime
+dissolving into a burning puddle is exactly what a spell landing looks like
+and the art was already converted.
+
+Three shapes of enemy shot, and the difference is worth knowing before adding
+a fourth:
+
+- `fireProjectile` - straight, at a speed, until its life runs out.
+- `homingProjectile` - steers at the player for `homeSteps` at up to
+  `turnRate` radians a step, then flies straight. Both bounds are what make it
+  fair: running outruns the turn, and waiting does not outlast the window.
+- `lobProjectile` and `rainSpell` - airborne, so no walls and no hitbox until
+  they land, and both leave a hazard where they do. A lob eases along its
+  ground track (fast out, nearly still at the top, then over and down); a rain
+  falls straight from a height that follows from how long it is given, and the
+  fall is its own warning. `placeHazard` is the fourth thing and is not a
+  shot: it puts burning ground down where it is asked, blinking first. Use it
+  for a wall or a ring laid along the floor, never for rain - rain that
+  appears on the floor reads as something climbing out of it.
 
 ---
 
@@ -230,11 +280,20 @@ happens. In the order I would add them.
   first death buys exactly one. `BalanceTest` pins that.
 - **`Progression.MAX_DARKNESS` is 10** - my guess at how many dimming steps the
   hub can show before the art is unreadable. It is the hub's number to change.
-- **Biomes are `ruins`, `ruins_green`, `ruins_orange`, `depths`** - the folder
-  names procgen writes under `assets/maps/rooms/`. Floors 1/2/3 take one ruins
-  colourway each and 4/5 share `depths`. `ContentValidator.BIOMES` holds the
-  four names; a fifth biome folder needs adding there too.
-- **Floor 3 and floor 5 are the only floors with a boss.** `FloorDef.boss` is
+- **Biomes are `ruins`, `ruins_green`, `ruins_orange`, `depths`, `cove`** -
+  the folder names procgen writes under `assets/maps/rooms/`. Floors 1/2/3
+  take one ruins colourway each, 4/5 share `depths`, and 6 has `cove` to
+  itself. `ContentValidator.BIOMES` holds the five names; a sixth biome folder
+  needs adding there too.
+- **Floor 6 is a side stage.** `FloorDef.side` means the world map opens it
+  from the first run rather than one past the last stage cleared, and that
+  clearing it gives the stage-clear screen rather than the ending. The win
+  still belongs to the deepest floor with `side: false`.
+- **`cove/boss_01` is 40x22, and it is the only room that is not 20x11.**
+  `RoomTemplate.width` and `height` are per template now; the constants are
+  the default a .tmx gets for saying nothing. Read the template, never the
+  constants, for anything that touches a wall or a door.
+- **Floors 3, 5 and 6 are the only floors with a boss.** `FloorDef.boss` is
   null on 1, 2 and 4, and `hasBoss()` already answers that.
 - **`assets/data/icons.json` is a name-to-index map, not a def.** It is loaded
   into `ContentRegistry`'s item and relic icons at parse time - `icons.json`

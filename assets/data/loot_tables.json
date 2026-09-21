@@ -81,6 +81,46 @@
       ]
     },
     {
+      // The Drowned Cove. A side stage is entered at whatever strength the
+      // player already has rather than at the end of a descent, so this sits
+      // beside trash_f5 rather than past it: the same drop rate, weighted a
+      // little further towards keys and gold, because the cove has the run of
+      // locked and secret rooms every floor gets and none of the relics four
+      // floors of descent would have handed out on the way.
+      // What the links of a chain drop: nothing. Only the last body of
+      // stage 6's boss pays out, or the player is handed three boss rewards
+      // for one fight. rolls must be positive and a table must have an entry,
+      // so this is a weight of 99 against 1 - it drops a single coin's worth
+      // of item about once in a hundred kills, and there are two such kills
+      // in the game.
+      "id": "nothing", "rolls": 1, "nothingWeight": 99,
+      "entries": [
+        { "itemId": "heart_small", "weight": 1, "min": 1, "max": 1 }
+      ]
+    },
+    {
+      // The cove's boss, modelled on boss_f5. A little leaner: the cove is a
+      // side stage that can be replayed from the first run, so it must not be
+      // the cheapest route to a full kit.
+      "id": "boss_f6", "rolls": 3, "nothingWeight": 0,
+      "entries": [
+        { "itemId": "heart_large",  "weight": 20, "min": 1, "max": 1 },
+        { "itemId": "potion_large", "weight": 22, "min": 1, "max": 1 },
+        { "itemId": "gold_pouch",   "weight": 30, "min": 2, "max": 4 },
+        { "itemId": "key_iron",     "weight": 14, "min": 1, "max": 2 }
+      ]
+    },
+    {
+      "id": "trash_f6", "rolls": 1, "nothingWeight": 64,
+      "entries": [
+        { "itemId": "heart_small",  "weight": 13, "min": 1, "max": 1 },
+        { "itemId": "potion_small", "weight": 7,  "min": 1, "max": 1 },
+        { "itemId": "potion_large", "weight": 1,  "min": 1, "max": 1 },
+        { "itemId": "key_iron",     "weight": 8,  "min": 1, "max": 1 },
+        { "itemId": "gold_pouch",   "weight": 9,  "min": 1, "max": 3 }
+      ]
+    },
+    {
       // The one non-boss table worth seeking out. Two rolls at 75% each, so
       // an elite drops 1.5 things on average and drops nothing at all only
       // 6% of the time. Rewarding in keys and gold rather than in healing:

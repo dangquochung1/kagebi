@@ -36,9 +36,16 @@ public final class AiBrains {
         register(new AmbusherBrain());
         register(new SplitterBrain());
         register(new CasterBrain());
+        register(new BursterBrain());
+        register(new BomberBrain());
         register(BossBrain.generic());
         register(BossBrain.frog());
         register(BossBrain.tengu());
+        register(BossBrain.pirateLeader());
+        register(BossBrain.pirateZombie());
+        register(BossBrain.squidman());
+        register(OrbBrain.rain());
+        register(OrbBrain.fountain());
     }
 
     private static void register(AiBrain brain) {
