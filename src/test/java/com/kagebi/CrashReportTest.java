@@ -44,6 +44,17 @@ class CrashReportTest {
     }
 
     @Test
+    void everyReportSaysWhichBuildItCameFrom(@TempDir Path dir) throws IOException {
+        // A trace that does not name its build cannot be read against the
+        // source it came from, which is most of what a trace is for once there
+        // is more than one tagged version in the world.
+        Path written = CrashReport.write(dir, thrown(), null);
+
+        String text = new String(Files.readAllBytes(written), StandardCharsets.UTF_8);
+        assertTrue(text.contains(Cfg.VERSION), text);
+    }
+
+    @Test
     void asecondCrashIsAddedRatherThanReplacingTheFirst(@TempDir Path dir) throws IOException {
         // The first crash is usually the informative one; a bad state throws
         // again in shallower places afterwards.

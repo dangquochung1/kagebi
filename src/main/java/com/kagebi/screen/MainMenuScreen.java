@@ -124,11 +124,12 @@ public class MainMenuScreen extends GameScreen {
         // set() rather than push(): a new run should not leave a title screen,
         // its map and its fog texture alive underneath it for the whole run.
         //
-        // Straight to the village, not to the character select. That screen was
-        // the first thing a new player met and it had nothing to offer them: a
-        // fresh profile owns one ninja and one sword, so it was a choice
-        // between one option and a locked row. It is still reachable, from the
-        // badge in the village, at the point where there is something to choose.
+        // Straight to the village, not to a character select. There used to be
+        // one here and it had nothing to offer a new player: a fresh profile
+        // owns one ninja and one sword, so it was a choice between one option
+        // and a locked row. Choosing now lives in the village's character
+        // sheet, which is reached at the point where there is something to
+        // choose between.
         addMenuButton(panel, t.get("menu.newgame"), false, this::newGame);
         addMenuButton(panel, t.get("menu.settings"), false,
             () -> stack().push(new SettingsScreen(game)));
@@ -155,6 +156,21 @@ public class MainMenuScreen extends GameScreen {
 
         root.add(panel).width(150);
         stage.addActor(root);
+
+        // Outside the panel, in the screen's corner. The panel is already 177
+        // of the 180 rows tall with the buttons it has, so a row added to it
+        // would push its own border off the top of the screen; and this is not
+        // a menu entry anyway. "boxed" rather than "dim" because what is behind
+        // it here is the village map rather than a flat panel, and a version
+        // nobody can read against the sea is a version nobody will quote.
+        //
+        // Untranslated on purpose: the question it answers - which build is
+        // this? - is asked by a bug report, not by a player.
+        Table corner = new Table();
+        corner.setFillParent(true);
+        corner.bottom().right();
+        corner.add(new Label("v" + Cfg.VERSION, game.skin(), "boxed")).pad(2);
+        stage.addActor(corner);
     }
 
     /**

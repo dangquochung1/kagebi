@@ -4,6 +4,17 @@ package com.kagebi;
 public final class Cfg {
 
     /**
+     * What this build calls itself.
+     *
+     * <p>Kept in step with {@code pom.xml} by {@code VersionTest}, because two
+     * places holding the same number is two places to forget one. It reaches a
+     * player twice: the corner of the main menu, and the head of every crash
+     * report - a trace that does not say which build produced it can only be
+     * guessed at.
+     */
+    public static final String VERSION = "0.6.0";
+
+    /**
      * Virtual render size. The Ninja Adventure pack ships its full-screen
      * overlays (FX/Environment/Fog.png) at exactly 320x180, which is the
      * clearest statement of the resolution the art was drawn for. Scaling up by

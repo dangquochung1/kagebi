@@ -4,8 +4,13 @@ A pixel-art roguelite dungeon crawler in Java, built on libGDX 1.14.2: five
 stages beneath an island village that farms, fishes and cooks for whoever goes
 down.
 
+Current version **v0.6.0** - tagged in git, and shown in the corner of the main
+menu and at the head of every crash report, so a bug can be pinned to a build.
+`main` runs ahead of the tag.
+
 Non-commercial; see [CREDITS.md](CREDITS.md) for the asset packs and their
-licences.
+licences. There are no downloadable builds and there will not be: several of
+the packs forbid redistribution, and a packaged game is those packs.
 
 ## The Last Flamekeeper
 
@@ -76,6 +81,21 @@ Every key except Esc can be rebound under Settings → Controls. In the village,
 the ninja's badge at the top right opens the character sheet - who you are,
 what you wear, what you carry, what you can make and what you have met - and
 the basket beside it opens the bag.
+
+## Codes
+
+Main menu → **Enter a Code**, then type and press Enter. Capitals do not matter:
+a code copied off a screenshot should not have to be reproduced letter for
+letter.
+
+| Code | What it does |
+|---|---|
+| `HungDZ` | Unlocks the lot - all six ninja, every weapon, one of every piece of gear, and every villager's job marked paid. Once per profile; the screen says so rather than reporting the second try as a typo. |
+| `KataMoney` | +10,000,000 gold, which is more than the shop can spend. May be used again. |
+
+A code changes the **profile**, not the run you are in the middle of. There is
+deliberately no code for stones: they are the forge's material, and a forge with
+nothing left to do is a screen quietly removed from the game.
 
 ## Getting started
 

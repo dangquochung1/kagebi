@@ -71,7 +71,8 @@ public final class CrashReport {
     static String body(Throwable error, String context) {
         StringWriter out = new StringWriter();
         PrintWriter w = new PrintWriter(out);
-        w.println("---- " + LocalDateTime.now().format(STAMP) + " ----");
+        w.println("---- " + LocalDateTime.now().format(STAMP)
+            + "  kagebi " + Cfg.VERSION + " ----");
         if (context != null && !context.isEmpty()) {
             w.println(context);
         }
