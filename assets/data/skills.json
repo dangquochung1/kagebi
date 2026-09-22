@@ -1,0 +1,50 @@
+{
+  "skills": [
+    {
+      "id": "thunder_lunge",
+      "nameKey": "skill.thunder_lunge.name",
+      "descKey": "skill.thunder_lunge.desc",
+      "icon": "bolt",
+      "slot": 2,
+      "kind": "LUNGE",
+      "cooldown": 6,
+      "damageMult": 1.2,
+      "range":40,
+      "knockback": 60,
+      "vfx": "bolt"
+    },
+    {
+      "id": "thunder_nova",
+      "nameKey": "skill.thunder_nova.name",
+      "descKey": "skill.thunder_nova.desc",
+      "icon": "nova",
+      "slot": 1,
+      "kind": "NOVA",
+      "cooldown": 12,
+      "damageMult": 1.0,
+      "range": 36,
+      "knockback": 140,
+      "vfx": "nova"
+    },
+    {
+      "id": "thunder_avatar",
+      "nameKey": "skill.thunder_avatar.name",
+      "descKey": "skill.thunder_avatar.desc",
+      "icon": "shock",
+      "slot": 3,
+      "kind": "AVATAR",
+      "cooldown": 10,
+      "duration": 8,
+      "damageMult": 1.0,
+      "range": 48,
+      "knockback": 40,
+      "vfx": "aura",
+      "effects": ["damage_mult", "crit_chance_add", "crit_damage_mult",
+                  "throw_damage_mult", "attack_speed_mult", "move_speed_mult",
+                  "armour_mult"],
+      "magnitudes": [1.2, 0.2, 1.2, 1.2, 1.2, 1.2, 0.9],
+      "hpCost": 0.1,
+      "hpFloor": 0.3
+    }
+  ]
+}

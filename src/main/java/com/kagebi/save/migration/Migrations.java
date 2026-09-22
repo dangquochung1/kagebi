@@ -16,6 +16,9 @@ public final class Migrations {
     private static final Migration[] CHAIN = {
         new V0ToV1(),
         new V1ToV2(),
+        new V2ToV3(),
+        new V3ToV4(),
+        new V4ToV5(),
     };
 
     /** The shipped chain, from version 0 to {@code to}. */

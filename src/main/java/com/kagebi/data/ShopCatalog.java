@@ -27,6 +27,14 @@ import com.kagebi.save.Progression;
  */
 public final class ShopCatalog {
 
+    /**
+     * What a shop entry hands over.
+     *
+     * <p>There was a third kind, {@code SKIN}, for the ninja colours while they
+     * were cosmetic. They carry perks again and are characters again, so a
+     * colour is bought the same way a body is and there is one fewer set for a
+     * chest to file a prize into by mistake.
+     */
     public enum UnlockKind { CHARACTER, WEAPON }
 
     /**
@@ -204,27 +212,57 @@ public final class ShopCatalog {
     }
 
     public static boolean owned(Unlock u, Profile p) {
-        return u.kind == UnlockKind.CHARACTER
-            ? p.unlockedCharacters.contains(u.id)
-            : p.unlockedWeapons.contains(u.id);
+        return switch (u.kind) {
+            case CHARACTER -> p.unlockedCharacters.contains(u.id);
+            default -> p.unlockedWeapons.contains(u.id);
+        };
     }
 
     public static boolean requirementMet(Unlock u, Profile p) {
-        switch (u.requirement) {
+        return requirementMet(u.requirement, u.requirementValue, p);
+    }
+
+    /**
+     * The same rule, for anything else gated on a milestone.
+     *
+     * <p>The forge's lines are, and they are not unlocks - there is no shelf
+     * entry to hand in, just a recipe that appears once the player has been
+     * deep enough. Two copies of this switch would be two places to add the
+     * next requirement name to, and the second one would be forgotten.
+     */
+    public static boolean requirementMet(String requirement, int value, Profile p) {
+        switch (requirement) {
             case "none":
                 return true;
             case "deepest_floor":
-                return p.deepestFloor >= u.requirementValue;
+                return p.deepestFloor >= value;
             case "wins":
-                return p.wins >= u.requirementValue;
+                return p.wins >= value;
             case "runs":
-                return p.runs >= u.requirementValue;
+                return p.runs >= value;
             case "bestiary":
-                return p.bestiary.size >= u.requirementValue;
+                return p.bestiary.size >= value;
             default:
                 // Unreachable for validated content; false rather than true so
                 // that a typo can never give something away.
                 return false;
+        }
+    }
+
+    /**
+     * Puts an unlock into the set that owns it, without charging for it.
+     *
+     * <p>Split out of {@link #buy} because a chest gives one away, and the
+     * chest used to carry its own copy of this mapping. The two drifted apart
+     * once already: a third kind was added, the shop learned about it and the
+     * chest did not, so a chest that rolled one filed it under weapons - where
+     * {@link #owned} would never find it, and the same prize could be won again
+     * every floor.
+     */
+    public static void grant(Unlock u, Profile p) {
+        switch (u.kind) {
+            case CHARACTER -> p.unlockedCharacters.add(u.id);
+            default -> p.unlockedWeapons.add(u.id);
         }
     }
 
@@ -237,11 +275,7 @@ public final class ShopCatalog {
             return false;
         }
         p.gold -= u.cost;
-        if (u.kind == UnlockKind.CHARACTER) {
-            p.unlockedCharacters.add(u.id);
-        } else {
-            p.unlockedWeapons.add(u.id);
-        }
+        grant(u, p);
         return true;
     }
 

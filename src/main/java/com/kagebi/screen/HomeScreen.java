@@ -7,6 +7,7 @@ import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.MapObject;
 import com.badlogic.gdx.maps.tiled.TiledMap;
@@ -220,9 +221,14 @@ public class HomeScreen extends SimScreen {
         ui.apply();
         batch.setProjectionMatrix(ui.camera().combined);
         batch.begin();
-        batch.draw(game.skin().getRegion(Assets.Ui.COIN), 6, Cfg.VIRT_H - 15);
+        TextureRegion coin = Preload.coin();
+        int textX = 17;
+        if (coin != null) {
+            batch.draw(coin, 4, Cfg.VIRT_H - 20);
+            textX = 4 + coin.getRegionWidth() + 3;
+        }
         batch.setColor(GOLD);
-        Hud.shadowed(batch, font, String.valueOf(game.profile().gold), 17,
+        Hud.shadowed(batch, font, String.valueOf(game.profile().gold), textX,
                      Cfg.VIRT_H - 5, com.badlogic.gdx.utils.Align.left);
         batch.setColor(Color.WHITE);
         Hud.card(batch, game.skin(), font, card, game.i18n().get("floor.home"), null);

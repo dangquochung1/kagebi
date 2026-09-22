@@ -1,0 +1,111 @@
+// Jobs.
+//
+// Two kinds, and the difference is whether anyone hands them to you.
+//
+// THE CHAIN. `first_blood`, `the_herbalists_errand` and `down_the_well` are
+// given by the three villagers, one after the other, and are the game's
+// tutorial: they teach that monsters drop things, that the village buys them,
+// and that the stairs go down. Each one requires the last, so the order is the
+// order they are learnt in. A quest with a giver shows a mark over that
+// villager's head - see HubScreen.drawOverWorld.
+//
+// THE BOUNTIES. The rest have no giver and no mark. They are standing work,
+// visible in the journal from the start, and they pay for the things a player
+// is going to want anyway - a stone, a piece of gear, the net.
+//
+// Steps name things that already exist and are checked against them at boot:
+// KILL an enemy id, COLLECT an item id, REACH a floor number, TALK to a
+// villager. Nothing here can ask for something the game does not already count.
+{
+  "quests": [
+    {
+      "id": "first_blood", "giver": "master",
+      "nameKey": "quest.first_blood.name", "descKey": "quest.first_blood.desc",
+      "steps": [
+        { "kind": "KILL", "target": "slime", "count": 5 }
+      ],
+      "rewardGold": 120, "rewardItems": ["potion_small"]
+    },
+    {
+      "id": "the_herbalists_errand", "giver": "herbalist", "requires": "first_blood",
+      "nameKey": "quest.the_herbalists_errand.name",
+      "descKey": "quest.the_herbalists_errand.desc",
+      "steps": [
+        { "kind": "COLLECT", "target": "heart_small", "count": 3 },
+        { "kind": "TALK", "target": "herbalist", "count": 1 }
+      ],
+      "rewardGold": 200, "rewardGear": "trinket_t1"
+    },
+    {
+      "id": "down_the_well", "giver": "elder", "requires": "the_herbalists_errand",
+      "nameKey": "quest.down_the_well.name", "descKey": "quest.down_the_well.desc",
+      "steps": [
+        { "kind": "REACH", "target": "2", "count": 1 }
+      ],
+      "rewardGold": 350, "rewardGear": "body_t1"
+    },
+    {
+      "id": "the_masters_lesson", "giver": "master", "requires": "down_the_well",
+      "nameKey": "quest.the_masters_lesson.name",
+      "descKey": "quest.the_masters_lesson.desc",
+      "steps": [
+        { "kind": "KILL", "target": "mouse", "count": 10 },
+        { "kind": "KILL", "target": "bluebat", "count": 8 }
+      ],
+      "rewardGold": 500, "rewardWeapon": "net"
+    },
+
+    // Bounties. No giver, no mark, always in the journal.
+    {
+      "id": "bounty_larva", "nameKey": "quest.bounty_larva.name",
+      "descKey": "quest.bounty_larva.desc",
+      "steps": [
+        { "kind": "KILL", "target": "larva", "count": 12 }
+      ],
+      "rewardGold": 260, "rewardItems": ["potion_small", "potion_small"]
+    },
+    {
+      "id": "a_pocketful_of_stones", "nameKey": "quest.a_pocketful_of_stones.name",
+      "descKey": "quest.a_pocketful_of_stones.desc",
+      "steps": [
+        { "kind": "COLLECT", "target": "gem_shard", "count": 6 }
+      ],
+      "rewardGold": 300, "rewardGear": "head_t1"
+    },
+    {
+      "id": "deeper_still", "nameKey": "quest.deeper_still.name",
+      "descKey": "quest.deeper_still.desc",
+      "steps": [
+        { "kind": "REACH", "target": "4", "count": 1 }
+      ],
+      "rewardGold": 700, "rewardGear": "hands_t2"
+    },
+    {
+      "id": "the_long_walk", "nameKey": "quest.the_long_walk.name",
+      "descKey": "quest.the_long_walk.desc",
+      "steps": [
+        { "kind": "REACH", "target": "5", "count": 1 },
+        { "kind": "COLLECT", "target": "gold_pouch", "count": 20 }
+      ],
+      "rewardGold": 1200, "rewardGear": "feet_t3"
+    },
+    {
+      "id": "the_drowned_crew", "nameKey": "quest.the_drowned_crew.name",
+      "descKey": "quest.the_drowned_crew.desc",
+      "steps": [
+        { "kind": "KILL", "target": "slimespike", "count": 8 },
+        { "kind": "KILL", "target": "slimetide", "count": 8 }
+      ],
+      "rewardGold": 900, "rewardGear": "body_t3"
+    },
+    {
+      "id": "what_stayed_down_there", "nameKey": "quest.what_stayed_down_there.name",
+      "descKey": "quest.what_stayed_down_there.desc",
+      "steps": [
+        { "kind": "REACH", "target": "7", "count": 1 },
+        { "kind": "KILL", "target": "slimeember", "count": 10 }
+      ],
+      "rewardGold": 1800, "rewardGear": "trinket_t3"
+    }
+  ]
+}

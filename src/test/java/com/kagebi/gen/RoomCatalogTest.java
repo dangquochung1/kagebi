@@ -54,7 +54,7 @@ class RoomCatalogTest {
      * back to borrowed rooms, which only shows up as the wrong tileset.
      */
     private static final Set<String> BIOMES =
-        Set.of("ruins", "ruins_green", "ruins_orange", "depths", "cove");
+        Set.of("ruins", "ruins_green", "ruins_orange", "depths", "cove", "cove_deep");
 
     private static final String[] LAYERS = {
         TiledRooms.GROUND, TiledRooms.DRESSING, TiledRooms.DECOR,
@@ -65,14 +65,24 @@ class RoomCatalogTest {
     private static final int H = RoomTemplate.HEIGHT;
 
     /**
-     * The one room that is not one screen: stage 6's boss arena, 40x22.
+     * The rooms that are not one screen, and how big each is instead.
      *
-     * <p>Pinned as an exception rather than dropped as a rule. Every check
-     * below now reads each room's own size, so a 30x17 room would pass all of
-     * them silently; this is what still says a room bigger than the screen is
-     * a decision, and it is the list to add to if there is ever a second one.
+     * <p>Pinned rather than dropped as a rule. Every check below reads each
+     * room's own size, so an oversized room passes all of them silently; this
+     * is what still says a room bigger than the screen is a decision someone
+     * took. Two of them now: stage 6's boss arena, and the whole of stage 7,
+     * whose point is that no room is ever all in view at once.
      */
-    private static final Set<String> OVERSIZED = Set.of("cove/boss_01");
+    private static final Map<String, int[]> OVERSIZED = oversized();
+
+    private static Map<String, int[]> oversized() {
+        Map<String, int[]> out = new TreeMap<>();
+        out.put("cove/boss_01", new int[] {40, 22});
+        for (File f : new File(ROOMS, "cove_deep").listFiles((d, n) -> n.endsWith(".tmx"))) {
+            out.put("cove_deep/" + f.getName().replace(".tmx", ""), new int[] {30, 17});
+        }
+        return out;
+    }
     /** Tiled keeps flip and rotation flags in the top four bits of a gid. */
     private static final int GID_MASK = 0x0FFFFFFF;
 
@@ -148,17 +158,13 @@ class RoomCatalogTest {
     // ---- shape -------------------------------------------------------------
 
     @Test
-    void everyRoomIsTwentyByElevenBarTheOneArena() {
+    void everyRoomIsTwentyByElevenBarTheOnesThatSayOtherwise() {
         for (Map.Entry<String, Tmx> e : files.entrySet()) {
             Tmx m = e.getValue();
             String id = e.getKey();
-            if (OVERSIZED.contains(id)) {
-                assertEquals(40, m.width, id);
-                assertEquals(22, m.height, id);
-            } else {
-                assertEquals(W, m.width, id);
-                assertEquals(H, m.height, id);
-            }
+            int[] big = OVERSIZED.get(id);
+            assertEquals(big == null ? W : big[0], m.width, id);
+            assertEquals(big == null ? H : big[1], m.height, id);
             assertEquals(16, m.tileWidth, id);
             assertEquals(16, m.tileHeight, id);
             for (Map.Entry<String, int[]> layer : m.layers.entrySet()) {

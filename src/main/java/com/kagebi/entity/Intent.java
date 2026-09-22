@@ -43,6 +43,22 @@ public final class Intent {
     public boolean roll;
     public boolean interact;
     public boolean useItem;
+    /**
+     * One per skill slot, indexed from zero.
+     *
+     * <p>An array rather than three fields, because the slot a skill sits in
+     * is content - assets/data/skills.json decides which skill is on which
+     * key - so the code that casts one has a number in its hand rather than a
+     * name, and swapping two skills is an edit to that file.
+     */
+    public final boolean[] skill = new boolean[SKILLS];
+
+    /** Skill slots, matching {@code ContentValidator.SKILL_SLOTS}. */
+    public static final int SKILLS = 3;
+
+    private static final GameAction[] SKILL_KEYS = {
+        GameAction.SKILL_1, GameAction.SKILL_2, GameAction.SKILL_3,
+    };
 
     private ActionSource source;
 
@@ -57,6 +73,9 @@ public final class Intent {
         roll = src.buffered(GameAction.ROLL, BUFFER_STEPS);
         interact = src.buffered(GameAction.INTERACT, BUFFER_STEPS);
         useItem = src.buffered(GameAction.USE_ITEM, BUFFER_STEPS);
+        for (int i = 0; i < SKILLS; i++) {
+            skill[i] = src.buffered(SKILL_KEYS[i], BUFFER_STEPS);
+        }
     }
 
     public void consumeAttack() {
@@ -84,6 +103,11 @@ public final class Intent {
         useItem = false;
     }
 
+    public void consumeSkill(int slot) {
+        spend(SKILL_KEYS[slot]);
+        skill[slot] = false;
+    }
+
     public boolean moving() {
         return moveX != 0 || moveY != 0;
     }
@@ -101,6 +125,7 @@ public final class Intent {
         roll = false;
         interact = false;
         useItem = false;
+        java.util.Arrays.fill(skill, false);
     }
 
     private void spend(GameAction action) {

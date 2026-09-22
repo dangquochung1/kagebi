@@ -132,7 +132,13 @@ abstract class RunEndScreen extends SimScreen {
             // far as the pantry has room; a death loses it with everything else.
             Pantry.bringHome(profile, game.shop(), run.items, this::carriable);
         }
-        if (!game.saves().save(profile)) {
+        // Banked into the profile above whatever happens, because this screen
+        // has to show the totals. Written to disk only for a real run: a
+        // launch that exists to photograph the death screen must not bank its
+        // invented gold into somebody's actual save, which it did - taking one
+        // screenshot of this screen moved a real profile from 3136 gold to
+        // 5507. Same rule as the village clock and the village's own save.
+        if (!game.reviewing() && !game.saves().save(profile)) {
             Gdx.app.error("save", "profile not written; the previous save stands");
         }
 
@@ -148,6 +154,7 @@ abstract class RunEndScreen extends SimScreen {
         next.throwWeaponId = run.throwWeaponId;
         // So is the choice of what the quick key uses, for the same reason.
         next.quickItem = run.quickItem;
+        // And the colour, which is the one of these the player can see.
         game.setRun(next);
     }
 

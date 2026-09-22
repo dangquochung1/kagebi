@@ -40,12 +40,14 @@ class ContentLoaderTest {
     @Test
     void shippedContentLoadsAndPassesEveryCheck() {
         ContentRegistry reg = real();
-        assertEquals(30, reg.allEnemies().size, "enemies");
+        assertEquals(31, reg.allEnemies().size, "enemies");
+        // Five melee and two thrown. There were two spells as well, which were
+        // one character's and only hers; they went when she did.
         assertEquals(7, reg.allWeapons().size, "weapons");
         assertEquals(24, reg.allRelics().size, "relics");
         assertEquals(23, reg.allItems().size, "items");
         assertEquals(17, reg.allLootTables().size, "loot tables");
-        assertEquals(6, reg.allFloors().size, "floors");
+        assertEquals(7, reg.allFloors().size, "floors");
     }
 
     @Test

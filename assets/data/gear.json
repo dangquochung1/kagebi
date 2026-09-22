@@ -1,0 +1,306 @@
+// Armour, stones and the forge.
+//
+// Three sections, one file, because they are one system: a stone is both a
+// socket filler and the forge's raw material, and a piece of gear is either
+// bought or made out of stones. Splitting them across three files would mean
+// three places to look when a tier does not line up.
+//
+// WHAT GEAR IS FOR. The run is a roguelite: relics are the interesting
+// choices, and they are drawn at random inside a run and lost at the end of
+// it. Gear is the opposite and deliberately so - bought and forged between
+// runs, kept for good, and dull. Eight numbers that go up. It is what a player
+// has to show for the twentieth run when the relics they found that time were
+// bad ones.
+//
+// SLOTS. HEAD, BODY, HANDS, FEET, TRINKET. One of each may be worn, and none
+// of them is drawn on the character: the pack has one body per hero and no
+// layered equipment art. What a helmet changes is the numbers.
+//
+// TIERS. 1 to 4. Tier 1 is bought with the gold of a first stage clear; tier 4
+// is forged out of tier 3 and a fistful of stones, and is not for sale at any
+// price. The prices follow the same curve the weapon unlocks do, so a shelf of
+// armour never out-competes a shelf of swords for the same gold.
+//
+// EFFECTS. Only names in ContentValidator.GEAR_EFFECTS, which is a shorter
+// list than the relics get. Nothing here needs new combat code: Loadout folds
+// gear into the same Modifiers relics and village upgrades already write to.
+{
+  "gear": [
+    {
+      "id": "head_t1", "icon": "stat_vitality", "slot": "HEAD", "tier": 1,
+      "nameKey": "gear.head_t1.name", "descKey": "gear.head_t1.desc",
+      "sockets": 0, "effects": ["max_hp_add", "crit_chance_add"], "magnitudes": [8, 0.02], "price": 400
+    },
+    {
+      "id": "head_t2", "icon": "stat_vitality", "slot": "HEAD", "tier": 2,
+      "nameKey": "gear.head_t2.name", "descKey": "gear.head_t2.desc",
+      "sockets": 1, "effects": ["max_hp_add", "crit_chance_add"], "magnitudes": [16, 0.04], "price": 900
+    },
+    {
+      "id": "head_t3", "icon": "stat_vitality", "slot": "HEAD", "tier": 3,
+      "nameKey": "gear.head_t3.name", "descKey": "gear.head_t3.desc",
+      "sockets": 2, "effects": ["max_hp_add", "crit_chance_add"], "magnitudes": [26, 0.06], "price": 1800
+    },
+    {
+      "id": "head_t4", "icon": "stat_vitality", "slot": "HEAD", "tier": 4,
+      "nameKey": "gear.head_t4.name", "descKey": "gear.head_t4.desc",
+      "sockets": 3, "effects": ["max_hp_add", "crit_chance_add"], "magnitudes": [40, 0.09], "price": 0
+    },
+    {
+      "id": "body_t1", "icon": "stat_armour", "slot": "BODY", "tier": 1,
+      "nameKey": "gear.body_t1.name", "descKey": "gear.body_t1.desc",
+      "sockets": 0, "effects": ["armour_add", "max_hp_add"], "magnitudes": [1, 8], "price": 400
+    },
+    {
+      "id": "body_t2", "icon": "stat_armour", "slot": "BODY", "tier": 2,
+      "nameKey": "gear.body_t2.name", "descKey": "gear.body_t2.desc",
+      "sockets": 1, "effects": ["armour_add", "max_hp_add"], "magnitudes": [2, 16], "price": 900
+    },
+    {
+      "id": "body_t3", "icon": "stat_armour", "slot": "BODY", "tier": 3,
+      "nameKey": "gear.body_t3.name", "descKey": "gear.body_t3.desc",
+      "sockets": 2, "effects": ["armour_add", "max_hp_add"], "magnitudes": [3, 26], "price": 1800
+    },
+    {
+      "id": "body_t4", "icon": "stat_armour", "slot": "BODY", "tier": 4,
+      "nameKey": "gear.body_t4.name", "descKey": "gear.body_t4.desc",
+      "sockets": 3, "effects": ["armour_add", "max_hp_add"], "magnitudes": [4, 40], "price": 0
+    },
+    {
+      "id": "hands_t1", "icon": "gauntlet", "slot": "HANDS", "tier": 1,
+      "nameKey": "gear.hands_t1.name", "descKey": "gear.hands_t1.desc",
+      "sockets": 0, "effects": ["damage_mult", "attack_speed_mult"], "magnitudes": [1.04, 1.03], "price": 400
+    },
+    {
+      "id": "hands_t2", "icon": "gauntlet", "slot": "HANDS", "tier": 2,
+      "nameKey": "gear.hands_t2.name", "descKey": "gear.hands_t2.desc",
+      "sockets": 1, "effects": ["damage_mult", "attack_speed_mult"], "magnitudes": [1.08, 1.06], "price": 900
+    },
+    {
+      "id": "hands_t3", "icon": "gauntlet", "slot": "HANDS", "tier": 3,
+      "nameKey": "gear.hands_t3.name", "descKey": "gear.hands_t3.desc",
+      "sockets": 2, "effects": ["damage_mult", "attack_speed_mult"], "magnitudes": [1.13, 1.1], "price": 1800
+    },
+    {
+      "id": "hands_t4", "icon": "gauntlet", "slot": "HANDS", "tier": 4,
+      "nameKey": "gear.hands_t4.name", "descKey": "gear.hands_t4.desc",
+      "sockets": 3, "effects": ["damage_mult", "attack_speed_mult"], "magnitudes": [1.2, 1.15], "price": 0
+    },
+    {
+      "id": "feet_t1", "icon": "boot", "slot": "FEET", "tier": 1,
+      "nameKey": "gear.feet_t1.name", "descKey": "gear.feet_t1.desc",
+      "sockets": 0, "effects": ["move_speed_mult", "armour_add"], "magnitudes": [1.03, 1], "price": 400
+    },
+    {
+      "id": "feet_t2", "icon": "boot", "slot": "FEET", "tier": 2,
+      "nameKey": "gear.feet_t2.name", "descKey": "gear.feet_t2.desc",
+      "sockets": 1, "effects": ["move_speed_mult", "armour_add"], "magnitudes": [1.05, 2], "price": 900
+    },
+    {
+      "id": "feet_t3", "icon": "boot", "slot": "FEET", "tier": 3,
+      "nameKey": "gear.feet_t3.name", "descKey": "gear.feet_t3.desc",
+      "sockets": 2, "effects": ["move_speed_mult", "armour_add"], "magnitudes": [1.08, 3], "price": 1800
+    },
+    {
+      "id": "feet_t4", "icon": "boot", "slot": "FEET", "tier": 4,
+      "nameKey": "gear.feet_t4.name", "descKey": "gear.feet_t4.desc",
+      "sockets": 3, "effects": ["move_speed_mult", "armour_add"], "magnitudes": [1.12, 4], "price": 0
+    },
+    {
+      "id": "trinket_t1", "icon": "ring_gold", "slot": "TRINKET", "tier": 1,
+      "nameKey": "gear.trinket_t1.name", "descKey": "gear.trinket_t1.desc",
+      "sockets": 0, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.05, 1], "price": 400
+    },
+    {
+      "id": "trinket_t2", "icon": "ring_gold", "slot": "TRINKET", "tier": 2,
+      "nameKey": "gear.trinket_t2.name", "descKey": "gear.trinket_t2.desc",
+      "sockets": 1, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.1, 2], "price": 900
+    },
+    {
+      "id": "trinket_t3", "icon": "ring_gold", "slot": "TRINKET", "tier": 3,
+      "nameKey": "gear.trinket_t3.name", "descKey": "gear.trinket_t3.desc",
+      "sockets": 2, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.16, 3], "price": 1800
+    },
+    {
+      "id": "trinket_t4", "icon": "ring_gold", "slot": "TRINKET", "tier": 4,
+      "nameKey": "gear.trinket_t4.name", "descKey": "gear.trinket_t4.desc",
+      "sockets": 3, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.24, 5], "price": 0
+    }
+  ],
+
+  // Stones. One effect each, and the colour says which: red is damage,
+  // green is survival, blue is speed, yellow is the big hits, purple is
+  // the odd ones. ContentValidator.GEM_COLOURS enforces it at boot, so a
+  // red stone that made you faster fails the build rather than teaching
+  // the player that the colours are decoration.
+  //
+  // Only tier 1 is for sale. The rest are forged three-for-one, below.
+  "gems": [
+    {
+      "id": "red_t1", "nameKey": "gem.red_t1.name",
+      "icon": "gem_red", "colour": "RED", "tier": 1, "effect": "damage_mult", "magnitude": 1.02, "price": 120
+    },
+    {
+      "id": "red_t2", "nameKey": "gem.red_t2.name",
+      "icon": "shard_pink", "colour": "RED", "tier": 2, "effect": "crit_chance_add", "magnitude": 0.025, "price": 0
+    },
+    {
+      "id": "red_t3", "nameKey": "gem.red_t3.name",
+      "icon": "crystal_purple", "colour": "RED", "tier": 3, "effect": "damage_mult", "magnitude": 1.09, "price": 0
+    },
+    {
+      "id": "green_t1", "nameKey": "gem.green_t1.name",
+      "icon": "gem_green", "colour": "GREEN", "tier": 1, "effect": "max_hp_add", "magnitude": 5, "price": 120
+    },
+    {
+      "id": "green_t2", "nameKey": "gem.green_t2.name",
+      "icon": "gem_teal", "colour": "GREEN", "tier": 2, "effect": "armour_add", "magnitude": 2, "price": 0
+    },
+    {
+      "id": "green_t3", "nameKey": "gem.green_t3.name",
+      "icon": "crystal_white", "colour": "GREEN", "tier": 3, "effect": "max_hp_add", "magnitude": 20, "price": 0
+    },
+    {
+      "id": "blue_t1", "nameKey": "gem.blue_t1.name",
+      "icon": "gem_blue", "colour": "BLUE", "tier": 1, "effect": "move_speed_mult", "magnitude": 1.02, "price": 120
+    },
+    {
+      "id": "blue_t2", "nameKey": "gem.blue_t2.name",
+      "icon": "ice_shard", "colour": "BLUE", "tier": 2, "effect": "attack_speed_mult", "magnitude": 1.04, "price": 0
+    },
+    {
+      "id": "blue_t3", "nameKey": "gem.blue_t3.name",
+      "icon": "soul_blue", "colour": "BLUE", "tier": 3, "effect": "move_speed_mult", "magnitude": 1.07, "price": 0
+    },
+    {
+      "id": "yellow_t1", "nameKey": "gem.yellow_t1.name",
+      "icon": "gem_amber", "colour": "YELLOW", "tier": 1, "effect": "crit_damage_mult", "magnitude": 1.04, "price": 120
+    },
+    {
+      "id": "yellow_t2", "nameKey": "gem.yellow_t2.name",
+      "icon": "star_orange", "colour": "YELLOW", "tier": 2, "effect": "throw_damage_mult", "magnitude": 1.09, "price": 0
+    },
+    {
+      "id": "yellow_t3", "nameKey": "gem.yellow_t3.name",
+      "icon": "medallion_gold", "colour": "YELLOW", "tier": 3, "effect": "crit_damage_mult", "magnitude": 1.15, "price": 0
+    },
+    {
+      "id": "purple_t1", "nameKey": "gem.purple_t1.name",
+      "icon": "shard_white", "colour": "PURPLE", "tier": 1, "effect": "gold_mult", "magnitude": 1.04, "price": 120
+    },
+    {
+      "id": "purple_t2", "nameKey": "gem.purple_t2.name",
+      "icon": "ring_emerald", "colour": "PURPLE", "tier": 2, "effect": "lifesteal", "magnitude": 2, "price": 0
+    },
+    {
+      "id": "purple_t3", "nameKey": "gem.purple_t3.name",
+      "icon": "soul_blue", "colour": "PURPLE", "tier": 3, "effect": "gold_mult", "magnitude": 1.14, "price": 0
+    }
+  ],
+
+  // The forge. Two kinds of line: three stones of one colour make one of
+  // the next tier up, and a piece of gear plus stones makes the piece
+  // above it. Tier 4 gear has no price anywhere and is only ever made.
+  "crafts": [
+    {
+      "id": "fuse_red_t2", "kind": "GEM", "output": "red_t2",
+      "inputs": ["red_t1"], "counts": [3], "goldCost": 150
+    },
+    {
+      "id": "fuse_red_t3", "kind": "GEM", "output": "red_t3",
+      "inputs": ["red_t2"], "counts": [3], "goldCost": 300
+    },
+    {
+      "id": "fuse_green_t2", "kind": "GEM", "output": "green_t2",
+      "inputs": ["green_t1"], "counts": [3], "goldCost": 150
+    },
+    {
+      "id": "fuse_green_t3", "kind": "GEM", "output": "green_t3",
+      "inputs": ["green_t2"], "counts": [3], "goldCost": 300
+    },
+    {
+      "id": "fuse_blue_t2", "kind": "GEM", "output": "blue_t2",
+      "inputs": ["blue_t1"], "counts": [3], "goldCost": 150
+    },
+    {
+      "id": "fuse_blue_t3", "kind": "GEM", "output": "blue_t3",
+      "inputs": ["blue_t2"], "counts": [3], "goldCost": 300
+    },
+    {
+      "id": "fuse_yellow_t2", "kind": "GEM", "output": "yellow_t2",
+      "inputs": ["yellow_t1"], "counts": [3], "goldCost": 150
+    },
+    {
+      "id": "fuse_yellow_t3", "kind": "GEM", "output": "yellow_t3",
+      "inputs": ["yellow_t2"], "counts": [3], "goldCost": 300
+    },
+    {
+      "id": "fuse_purple_t2", "kind": "GEM", "output": "purple_t2",
+      "inputs": ["purple_t1"], "counts": [3], "goldCost": 150
+    },
+    {
+      "id": "fuse_purple_t3", "kind": "GEM", "output": "purple_t3",
+      "inputs": ["purple_t2"], "counts": [3], "goldCost": 300
+    },
+    {
+      "id": "forge_head_t2", "kind": "GEAR", "output": "head_t2",
+      "inputs": ["head_t1", "red_t1"], "counts": [1, 2], "goldCost": 300, "requirement": "none", "requirementValue": 0
+    },
+    {
+      "id": "forge_head_t3", "kind": "GEAR", "output": "head_t3",
+      "inputs": ["head_t2", "red_t2"], "counts": [1, 3], "goldCost": 800, "requirement": "deepest_floor", "requirementValue": 3
+    },
+    {
+      "id": "forge_head_t4", "kind": "GEAR", "output": "head_t4",
+      "inputs": ["head_t3", "red_t2"], "counts": [1, 4], "goldCost": 1600, "requirement": "wins", "requirementValue": 1
+    },
+    {
+      "id": "forge_body_t2", "kind": "GEAR", "output": "body_t2",
+      "inputs": ["body_t1", "red_t1"], "counts": [1, 2], "goldCost": 300, "requirement": "none", "requirementValue": 0
+    },
+    {
+      "id": "forge_body_t3", "kind": "GEAR", "output": "body_t3",
+      "inputs": ["body_t2", "red_t2"], "counts": [1, 3], "goldCost": 800, "requirement": "deepest_floor", "requirementValue": 3
+    },
+    {
+      "id": "forge_body_t4", "kind": "GEAR", "output": "body_t4",
+      "inputs": ["body_t3", "red_t2"], "counts": [1, 4], "goldCost": 1600, "requirement": "wins", "requirementValue": 1
+    },
+    {
+      "id": "forge_hands_t2", "kind": "GEAR", "output": "hands_t2",
+      "inputs": ["hands_t1", "red_t1"], "counts": [1, 2], "goldCost": 300, "requirement": "none", "requirementValue": 0
+    },
+    {
+      "id": "forge_hands_t3", "kind": "GEAR", "output": "hands_t3",
+      "inputs": ["hands_t2", "red_t2"], "counts": [1, 3], "goldCost": 800, "requirement": "deepest_floor", "requirementValue": 3
+    },
+    {
+      "id": "forge_hands_t4", "kind": "GEAR", "output": "hands_t4",
+      "inputs": ["hands_t3", "red_t2"], "counts": [1, 4], "goldCost": 1600, "requirement": "wins", "requirementValue": 1
+    },
+    {
+      "id": "forge_feet_t2", "kind": "GEAR", "output": "feet_t2",
+      "inputs": ["feet_t1", "red_t1"], "counts": [1, 2], "goldCost": 300, "requirement": "none", "requirementValue": 0
+    },
+    {
+      "id": "forge_feet_t3", "kind": "GEAR", "output": "feet_t3",
+      "inputs": ["feet_t2", "red_t2"], "counts": [1, 3], "goldCost": 800, "requirement": "deepest_floor", "requirementValue": 3
+    },
+    {
+      "id": "forge_feet_t4", "kind": "GEAR", "output": "feet_t4",
+      "inputs": ["feet_t3", "red_t2"], "counts": [1, 4], "goldCost": 1600, "requirement": "wins", "requirementValue": 1
+    },
+    {
+      "id": "forge_trinket_t2", "kind": "GEAR", "output": "trinket_t2",
+      "inputs": ["trinket_t1", "red_t1"], "counts": [1, 2], "goldCost": 300, "requirement": "none", "requirementValue": 0
+    },
+    {
+      "id": "forge_trinket_t3", "kind": "GEAR", "output": "trinket_t3",
+      "inputs": ["trinket_t2", "red_t2"], "counts": [1, 3], "goldCost": 800, "requirement": "deepest_floor", "requirementValue": 3
+    },
+    {
+      "id": "forge_trinket_t4", "kind": "GEAR", "output": "trinket_t4",
+      "inputs": ["trinket_t3", "red_t2"], "counts": [1, 4], "goldCost": 1600, "requirement": "wins", "requirementValue": 1
+    }
+  ]
+}

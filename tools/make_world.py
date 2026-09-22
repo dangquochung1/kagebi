@@ -43,7 +43,10 @@ WIDTH, HEIGHT = 20, 11
 # other read as alternatives rather than as a sequence.
 # Stage 6 is the last pair, and it is deliberately off the trail: a side stage
 # that sat in line with the five would read as a sixth step of the descent.
-NODES = [(2, 4), (6, 6), (10, 3), (14, 7), (17, 4), (3, 8)]
+# Stage 7 sits beside stage 6 rather than after it: the two side stages are
+# the same detour off the same coast, and a player reading the map should see
+# a pair hanging below the trail rather than a seventh step of it.
+NODES = [(2, 4), (6, 6), (10, 3), (14, 7), (17, 4), (3, 8), (7, 9)]
 
 # What stands beside each node, as (tileset, tile, w, h, dx, dy) from the node.
 # One landmark each, because the node marker is the thing to look at and a
@@ -58,6 +61,7 @@ LANDMARKS = [
     ("nature", ROCK,  2, 3,  2, -1),   # 4 cursed depths
     ("nature", ROCK,  2, 3, -4, -1),   # 5 flame core
     ("nature", ROCK,  2, 3, -3, -1),   # 6 the drowned cove: rocks at the water
+    ("nature", ROCK,  2, 3,  2, -1),   # 7 the sunken vault: the same rocks, lower
 ]
 
 

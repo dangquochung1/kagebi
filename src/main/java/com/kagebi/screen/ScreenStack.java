@@ -39,10 +39,26 @@ public final class ScreenStack implements Disposable {
         installInput();
     }
 
-    /** Pops the top screen and disposes it. */
+    /**
+     * Pops the top screen and disposes it.
+     *
+     * <p><b>Never down to nothing.</b> An empty stack is not a quit and does not
+     * look like one: {@link #installInput} clears the input processor and
+     * {@link #render} returns at its first line, so the window stays open,
+     * black and deaf forever. That is indistinguishable from a hang or a crash
+     * from the outside, and it is always a bug in the caller - a screen popping
+     * itself when it was the only one, rather than replacing itself with
+     * {@link #set}. Failing loudly puts it in the crash log where it can be
+     * fixed, instead of leaving a dead window and no evidence.
+     */
     public void pop() {
         if (screens.isEmpty()) {
             return;
+        }
+        if (screens.size == 1) {
+            throw new IllegalStateException(
+                "pop() would empty the screen stack; " + screens.peek().getClass().getSimpleName()
+                + " is the last screen and must use set() to replace itself");
         }
         GameScreen removed = screens.pop();
         removed.hide();

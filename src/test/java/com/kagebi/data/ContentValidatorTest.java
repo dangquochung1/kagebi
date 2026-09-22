@@ -292,6 +292,14 @@ class ContentValidatorTest {
         reg.allRelics().forEach(r -> relicEffects.add(r.effect));
         assertEquals(ContentValidator.RELIC_EFFECTS, relicEffects, "relic effects");
 
+        // Gear and stones share one vocabulary, and between them they have to
+        // use all of it: a name the forge accepts and nothing carries is a
+        // statistic the profile screen will always print as zero.
+        Set<String> gearEffects = new HashSet<>();
+        reg.allGear().forEach(g -> gearEffects.addAll(java.util.Arrays.asList(g.effects)));
+        reg.allGems().forEach(g -> gearEffects.add(g.effect));
+        assertEquals(ContentValidator.GEAR_EFFECTS, gearEffects, "gear effects");
+
         Set<String> itemEffects = new HashSet<>();
         reg.allItems().forEach(i -> itemEffects.add(i.effect));
         assertEquals(ContentValidator.ITEM_EFFECTS, itemEffects, "item effects");
@@ -320,6 +328,23 @@ class ContentValidatorTest {
             }
         });
         assertEquals(ContentValidator.PROJECTILES, projectiles, "projectiles");
+
+        // The skill vocabularies are checked the same way, with one exception
+        // stated rather than assumed: SKILL_VFX is every strip the art tool
+        // writes, and three of the six are things a skill does rather than a
+        // skill - the dash trail, the chain strike and the head shock are cast
+        // by the ultimate, not chosen in the file. So it is a superset, and
+        // what is checked is that nothing names a strip that does not exist.
+        Set<String> skillEffects = new HashSet<>();
+        reg.allSkills().forEach(k -> skillEffects.addAll(java.util.Arrays.asList(k.effects)));
+        assertEquals(ContentValidator.SKILL_EFFECTS, skillEffects, "skill effects");
+
+        Set<String> skillIcons = new HashSet<>();
+        reg.allSkills().forEach(k -> skillIcons.add(k.icon));
+        assertEquals(ContentValidator.SKILL_ICONS, skillIcons, "skill icons");
+
+        reg.allSkills().forEach(k ->
+            assertTrue(ContentValidator.SKILL_VFX.contains(k.vfx), k.id + " names " + k.vfx));
     }
 
     /**
@@ -331,7 +356,8 @@ class ContentValidatorTest {
         String notes = Files.readString(new File("notes/d.md").toPath(), StandardCharsets.UTF_8);
         for (Set<String> vocab : List.of(ContentValidator.RELIC_EFFECTS, ContentValidator.ITEM_EFFECTS,
                 ContentValidator.UPGRADE_EFFECTS, ContentValidator.BRAINS,
-                ContentValidator.BIOMES, ContentValidator.PROJECTILES)) {
+                ContentValidator.BIOMES, ContentValidator.PROJECTILES,
+                ContentValidator.GEAR_EFFECTS, ContentValidator.SKILL_EFFECTS)) {
             for (String name : vocab) {
                 assertTrue(notes.contains("`" + name + "`"), "notes/d.md does not mention `" + name + "`");
             }

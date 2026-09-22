@@ -12,10 +12,15 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.JsonValue;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.def.CraftDef;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.FloorDef;
+import com.kagebi.data.def.GearDef;
+import com.kagebi.data.def.GemDef;
 import com.kagebi.data.def.ItemDef;
 import com.kagebi.data.def.LootTableDef;
+import com.kagebi.data.def.QuestDef;
+import com.kagebi.data.def.SkillDef;
 import com.kagebi.data.def.RelicDef;
 import com.kagebi.data.def.WeaponDef;
 
@@ -83,6 +88,7 @@ public final class ContentLoader {
     static ContentRegistry parse(FileHandle dataDir, List<String> problems) {
         DataFiles data = DataFiles.read(dataDir, problems);
         ContentRegistry registry = new ContentRegistry();
+        registry.putIcons(data.icons);
 
         Ids enemyIds = new Ids("enemy", problems);
         for (Fields f : data.objects(DataFiles.ENEMIES, "enemy")) {
@@ -134,6 +140,41 @@ public final class ContentLoader {
             problems.add("floors: numbered up to " + highest + " but floor "
                 + (registry.allFloors().size + 1) + " is missing");
         }
+        Ids gearIds = new Ids("gear", problems);
+        for (Fields f : data.objects(DataFiles.GEAR, "gear")) {
+            GearDef d = gear(f, data);
+            if (gearIds.fresh(d.id, f)) {
+                registry.put(d);
+            }
+        }
+        Ids gemIds = new Ids("gem", problems);
+        for (Fields f : data.objects(DataFiles.GEMS, "gem")) {
+            GemDef d = gem(f, data);
+            if (gemIds.fresh(d.id, f)) {
+                registry.put(d);
+            }
+        }
+        Ids craftIds = new Ids("craft", problems);
+        for (Fields f : data.objects(DataFiles.CRAFTS, "craft")) {
+            CraftDef d = craft(f);
+            if (craftIds.fresh(d.id, f)) {
+                registry.put(d);
+            }
+        }
+        Ids questIds = new Ids("quest", problems);
+        for (Fields f : data.objects(DataFiles.QUESTS, "quest")) {
+            QuestDef d = quest(f, problems);
+            if (questIds.fresh(d.id, f)) {
+                registry.put(d);
+            }
+        }
+        Ids skillIds = new Ids("skill", problems);
+        for (Fields f : data.objects(DataFiles.SKILLS, "skill")) {
+            SkillDef d = skill(f);
+            if (skillIds.fresh(d.id, f)) {
+                registry.put(d);
+            }
+        }
         return registry;
     }
 
@@ -165,6 +206,100 @@ public final class ContentLoader {
             f.integer("windupSteps"), f.integer("activeSteps"), f.integer("recoverSteps"),
             f.number("knockback"), f.integer("rootSteps"),
             f.stringOr("projectile", null));
+        f.done();
+        return d;
+    }
+
+    private static GearDef gear(Fields f, DataFiles data) {
+        String id = f.id();
+        GearDef d = new GearDef(
+            id, f.string("nameKey"), f.string("descKey"), f.icon("icon", data.icons),
+            f.enumeration("slot", GearDef.Slot.class),
+            f.integer("tier"), f.integerOr("sockets", 0),
+            f.strings("effects"), f.numbers("magnitudes"), f.integerOr("price", 0));
+        f.done();
+        return d;
+    }
+
+    private static GemDef gem(Fields f, DataFiles data) {
+        String id = f.id();
+        GemDef d = new GemDef(
+            id, f.string("nameKey"), f.icon("icon", data.icons),
+            f.enumeration("colour", GemDef.Colour.class), f.integer("tier"),
+            f.string("effect"), f.number("magnitude"), f.integerOr("price", 0));
+        f.done();
+        return d;
+    }
+
+    private static CraftDef craft(Fields f) {
+        String id = f.id();
+        CraftDef d = new CraftDef(
+            id, f.enumeration("kind", CraftDef.Output.class), f.string("output"),
+            f.strings("inputs"), f.integers("counts"), f.integerOr("goldCost", 0),
+            f.stringOr("requirement", "none"), f.integerOr("requirementValue", 0));
+        f.done();
+        return d;
+    }
+
+    /**
+     * A quest and its steps.
+     *
+     * <p>Steps are a nested array of objects, which {@link Fields} reads as a
+     * raw child - the only shape in the content that needs it, and the reason
+     * {@code Fields.child} exists. Each step is built by hand here rather than
+     * through a second {@code Fields}, because a step has three keys and no
+     * optional ones.
+     */
+    /**
+     * A skill.
+     *
+     * <p>{@code cooldown} and {@code duration} are read as seconds and turned
+     * into steps by {@link SkillDef}: the file is written by whoever is tuning
+     * the game, and they think in seconds.
+     */
+    private static SkillDef skill(Fields f) {
+        String id = f.id();
+        SkillDef d = new SkillDef(
+            id, f.string("nameKey"), f.string("descKey"), f.string("icon"),
+            f.integer("slot"), f.enumeration("kind", SkillDef.Kind.class),
+            f.number("cooldown"), f.numberOr("duration", 0f),
+            f.numberOr("damageMult", 0f), f.numberOr("range", 0f),
+            f.numberOr("knockback", 0f), f.string("vfx"),
+            f.stringsOr("effects"), f.numbersOr("magnitudes"),
+            f.numberOr("hpCost", 0f), f.numberOr("hpFloor", 0f));
+        f.done();
+        return d;
+    }
+
+    private static QuestDef quest(Fields f, List<String> problems) {
+        String id = f.id();
+        com.badlogic.gdx.utils.JsonValue raw = f.child("steps");
+        List<QuestDef.Step> steps = new ArrayList<>();
+        if (raw == null || !raw.isArray() || raw.size == 0) {
+            problems.add("quest '" + id + "': has no steps");
+        } else {
+            for (com.badlogic.gdx.utils.JsonValue s = raw.child; s != null; s = s.next) {
+                String kind = s.getString("kind", "");
+                QuestDef.Kind parsed = null;
+                for (QuestDef.Kind k : QuestDef.Kind.values()) {
+                    if (k.name().equals(kind)) {
+                        parsed = k;
+                    }
+                }
+                if (parsed == null) {
+                    problems.add("quest '" + id + "': step kind '" + kind + "' is not one of "
+                        + java.util.Arrays.toString(QuestDef.Kind.values()));
+                    continue;
+                }
+                steps.add(new QuestDef.Step(parsed, s.getString("target", ""),
+                                            Math.max(1, s.getInt("count", 1))));
+            }
+        }
+        QuestDef d = new QuestDef(id, f.string("nameKey"), f.string("descKey"),
+            f.stringOr("giver", null), f.stringOr("requires", null),
+            steps.toArray(new QuestDef.Step[0]), f.integerOr("rewardGold", 0),
+            f.stringsOr("rewardItems"), f.stringOr("rewardGear", null),
+            f.stringOr("rewardWeapon", null));
         f.done();
         return d;
     }
@@ -223,7 +358,8 @@ public final class ContentLoader {
             f.integer("treasureRooms"), f.integer("shopRooms"),
             f.strings("enemies"), f.integers("enemyWeights"),
             f.integer("packMin"), f.integer("packMax"),
-            f.stringOr("boss", null), f.bool("side", false));
+            f.stringOr("boss", null), f.bool("side", false),
+            f.numberOr("hpScale", 1f), f.numberOr("damageScale", 1f));
         f.done();
         return d;
     }

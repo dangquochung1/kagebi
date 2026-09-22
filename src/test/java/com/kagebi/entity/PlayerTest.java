@@ -381,4 +381,23 @@ class PlayerTest {
         in.ticks(world, 10);
         assertFalse(p.attacking(), "the dead do not swing");
     }
+
+    /**
+     * The run used to end on the step hp reached zero, so the death frames in
+     * the atlas were never once seen in play. The screen now waits this out;
+     * if it ever reports zero again, it will stop waiting.
+     */
+    @Test
+    void deathLastsLongEnoughToBeSeen() {
+        assertTrue(p.deathDuration() > 0, "a death the screen waits zero steps for is not one");
+        assertEquals(p.deathDuration(), world.playerDeathSteps());
+    }
+
+    @Test
+    void theDeadKeepCountingStepsSoTheAnimationCanPlay() {
+        p.takeHit(1000, p.x, p.y, 0f);
+        assertEquals(0, p.deadSteps());
+        in.ticks(world, 5);
+        assertEquals(5, p.deadSteps(), "the body has to fall while the screen waits");
+    }
 }

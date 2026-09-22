@@ -36,7 +36,8 @@ At the Flame Core, one of the six will have to choose.
 
 ## What you do
 
-- **Go down.** Five stages, picked from a world map and played one at a time.
+- **Go down.** Five stages, picked from a world map and played one at a time,
+  plus two side stages off the trail that are open from the first run.
   A stage starts at full health, banks its own gold, and opens the next one when
   it is cleared. The difficulty is chosen per stage.
 - **Or go sideways.** The Drowned Cove is a sixth stage that is not part of the
@@ -64,14 +65,17 @@ At the Flame Core, one of the six will have to choose.
 | Roll | Space / L |
 | Interact, talk, buy | E / Enter |
 | Use the quick item (a meal or a potion) | Q / C |
-| Bag (village), inventory (dungeon) | Tab / I |
+| Skills | U / I / O, or 1 / 2 / 3 |
+| Character sheet | Tab / P |
+| Bag (village), inventory (dungeon) | F / B |
 | Floor map | M |
 | Zoom in / out (village) | `=` / `-`, the numpad `+` / `-`, or the mouse wheel |
 | Pause, back | Esc |
 
 Every key except Esc can be rebound under Settings → Controls. In the village,
-the ninja's badge at the top right opens the kit, and the basket beside it opens
-the bag.
+the ninja's badge at the top right opens the character sheet - who you are,
+what you wear, what you carry, what you can make and what you have met - and
+the basket beside it opens the bag.
 
 ## Getting started
 
@@ -108,6 +112,7 @@ assets/packs/
   slimes6/           CraftPix Slime Enemies        its three slimes
   bosses6/           CraftPix Pirate Characters    its boss, all three bodies
   bossfx6/           CraftPix Fire & Water Spells  the boss's spells
+  heroui/            CraftPix RPG Fantasy GUI      the character sheet's windows
 ```
 
 Where a pack has a public page, that is where it comes from. Each keeps its
@@ -120,7 +125,7 @@ author's terms:
 | Raven Fantasy Icons (Free) | [clockwork-raven.itch.io](https://clockwork-raven.itch.io/) | see the page |
 | SunnyLand Music | [ansimuz.itch.io](https://ansimuz.itch.io/) | CC0 |
 | Sunnyside World | [danieldiggle.itch.io](https://danieldiggle.itch.io/sunnyside) | see the page |
-| Dungeon Tileset, Slime Enemies, Pirate Characters, Fire &amp; Water Spells | [craftpix.net](https://craftpix.net/) | [file licence](https://craftpix.net/file-licenses/) — usable in a game, not redistributable |
+| Dungeon Tileset, Slime Enemies, Pirate Characters, Fire &amp; Water Spells, RPG Fantasy GUI | [craftpix.net](https://craftpix.net/) | [file licence](https://craftpix.net/file-licenses/) — usable in a game, not redistributable |
 | Enemy Animations Set, Top-Down Character Home | unknown | unknown |
 
 ### 2. Build the art and sound
@@ -192,8 +197,10 @@ boot                   the loading bar, then the menu
 menu                   (default)
 settings  --page 1-3   audio, controls, video
 style     --page 1-2   widget sheet, surface sheet
-select    --page 1-6   character select, with that ninja highlighted
-loadout   --page 1-6   the same screen changing the run's kit, over the village
+confirm                the New Game wipe warning, over the menu
+sheet     --page 1-6   the character sheet, on one of its six tabs
+profile   --page 1-4   the same, on its profile tab, on one of its four panels:
+                       worn gear, stones, the roster, the weapons
 hub       --page 1-11  the village: 1 at home, 2 the torii, 3 the shop, 4-9 each
                        region's worker, 10 zoomed out to the whole island,
                        11 zoomed out once at the torii
@@ -202,24 +209,24 @@ harvest   --page 1-3   the village mid-effect: goods flying from the woodcutter,
 bag       --page 1-5   the bag over the village, on that tab
 counter   --page 1-6   a trading counter: the herbalist's four tabs, the farmer, the cook
 home      --page 1-2   inside the house: on the doormat, or on the rug by the table
-world     --page 1-6   the world map, open to that stage and focused on it
-stage     --page 1-6   the same, with that stage's panel and its difficulty row
-cleared   --page 1-6   the stage-clear screen, for that stage
+world     --page 1-7   the world map, open to that stage and focused on it
+stage     --page 1-7   the same, with that stage's panel and its difficulty row
+cleared   --page 1-7   the stage-clear screen, for that stage
 talk      --page 1-3   the village, mid-conversation with that villager
 store     --page 1-4   the herbalist's upgrade shelf, over a profile N runs deep
 unlocks   --page 1-4   the same, on its second tab
-dungeon   --page 1-6   the start room of that stage
-map       --page 1-6   the same, with the floor map expanded
-fight     --page 1-6   the first room of that floor that has enemies in it
-swing     --page 1-6   the same, swinging on a timer so a blade is visible
+dungeon   --page 1-7   the start room of that stage
+map       --page 1-7   the same, with the floor map expanded
+fight     --page 1-7   the first room of that floor that has enemies in it
+swing     --page 1-7   the same, swinging on a timer so a blade is visible
 throw     --page 1-10  the same with a kunai in the off hand, throwing; 6-10 a shuriken
-boss      --page 3,5,6 the boss arena of a floor that has one, from the first
+boss      --page 3,5,6,7 the boss arena of a floor that has one, from the first
                        step of the fight
-treasure  --page 1-6   the first treasure room, for looking at a chest
-shop      --page 1-6   the first shop room, for looking at the shopkeeper
-trade     --page 1-6   the same, mid-purchase, with gold to spend
+treasure  --page 1-7   the first treasure room, for looking at a chest
+shop      --page 1-7   the first shop room, for looking at the shopkeeper
+trade     --page 1-7   the same, mid-purchase, with gold to spend
 slide                  halfway through the first room transition
-exit      --page 1-6   standing on that floor's way down
+exit      --page 1-7   standing on that floor's way down
 pause, inventory       those overlays over floor 1
 victory, gameover      the end screens, over a sample run
 credits   --page 1-4   the roll, starting at that section
@@ -283,6 +290,7 @@ python tools/make_island.py    # rebuild the island village from the Sunnyside p
 python tools/make_village.py   # rebuild the inside of the house from its art pack
 python tools/make_world.py     # lay out the world map again, keeping its decor layer
 python tools/make_font.py      # rebuild the bitmap font, Vietnamese marks included
+python tools/slice_heroui.py   # cut the forge, equipment and bag windows out of the GUI pack
 python tools/preview_map.py    # render a .tmx to a PNG; --collision tints what blocks red
 python tools/preview_tiles.py  # render a tileset with its grid, for measuring
 python tools/link_assets.py    # point a git worktree at this checkout's built assets and packs
@@ -292,7 +300,8 @@ python tools/link_assets.py    # point a git worktree at this checkout's built a
 
 ```
 assets/          art, audio, fonts, maps, and the JSON the game is balanced in
-  data/          enemies, weapons, relics, items, floors, upgrades, loot tables, village.json
+  data/          enemies, weapons, relics, items, floors, upgrades, loot tables, village.json,
+                 gear.json (armour, stones, the forge), quests.json
   i18n/          vi.json + en.json (interface), content.*.json (names and flavour)
   maps/          village.tmx (make_island.py), home.tmx (make_village.py), world.tmx, rooms/
   packs/         Sunnyside World, Top-Down Character Home and the Drowned Cove's

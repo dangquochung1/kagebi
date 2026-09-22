@@ -18,6 +18,8 @@ import com.kagebi.Cfg;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.gfx.PixelViewport;
+import com.kagebi.save.Profile;
+import com.kagebi.save.SavedRun;
 import com.kagebi.ui.I18n;
 
 /**
@@ -109,7 +111,16 @@ public class MainMenuScreen extends GameScreen {
         panel.add(new Label("KAGEBI", game.skin(), "title")).padBottom(1).row();
         panel.add(new Label(t.get("game.title"), game.skin(), "dim")).padBottom(5).row();
 
-        addMenuButton(panel, t.get("menu.continue"), true, null);
+        // Lit exactly when there is something to carry on with, which is the
+        // question the button asks. It used to be hard-coded disabled with a
+        // null action - a placeholder that shipped, and that a player rightly
+        // read as the game having forgotten their progress.
+        SavedRun saved = game.profile().savedRun;
+        addMenuButton(panel, t.get("menu.continue"), saved == null,
+            saved == null ? null : () -> {
+                game.setRun(saved.restore());
+                stack().set(new HubScreen(game).arriveAt("gate"));
+            });
         // set() rather than push(): a new run should not leave a title screen,
         // its map and its fog texture alive underneath it for the whole run.
         //
@@ -118,13 +129,11 @@ public class MainMenuScreen extends GameScreen {
         // fresh profile owns one ninja and one sword, so it was a choice
         // between one option and a locked row. It is still reachable, from the
         // badge in the village, at the point where there is something to choose.
-        addMenuButton(panel, t.get("menu.newgame"), false, () -> {
-            game.setRun(Screens.freshRun(game, Assets.Actor.DEFAULT_CHARACTER, "katana",
-                                         Screens.DEFAULT_MAX_HP));
-            stack().set(new HubScreen(game));
-        });
+        addMenuButton(panel, t.get("menu.newgame"), false, this::newGame);
         addMenuButton(panel, t.get("menu.settings"), false,
             () -> stack().push(new SettingsScreen(game)));
+        addMenuButton(panel, t.get("menu.code"), false,
+            () -> stack().push(new CodeScreen(game)));
         addMenuButton(panel, t.get("menu.credits"), false,
             () -> stack().set(new CreditsScreen(game, 1)));
         addMenuButton(panel, t.get("menu.quit"), false, Gdx.app::exit);
@@ -146,6 +155,45 @@ public class MainMenuScreen extends GameScreen {
 
         root.add(panel).width(150);
         stage.addActor(root);
+    }
+
+    /**
+     * Starts over, asking first when there is something to lose.
+     *
+     * <p>"Everything resets" is what New Game has to mean, and until now it did
+     * not: it built a fresh run and left the profile - gold, unlocks, gear, the
+     * island - entirely alone, so it was Continue with the floor forgotten.
+     *
+     * <p>The question is skipped on a profile with nothing in it. A dialog
+     * asking a new player to confirm the destruction of a save they have not
+     * made yet teaches them that the dialog means nothing.
+     */
+    private void newGame() {
+        if (worthKeeping(game.profile())) {
+            stack().push(new ConfirmScreen(game, "menu.newgame", "confirm.newgame",
+                                           this::wipeAndStart));
+            return;
+        }
+        wipeAndStart();
+    }
+
+    private void wipeAndStart() {
+        game.resetProfile();
+        game.setRun(Screens.freshRun(game, Assets.Actor.DEFAULT_CHARACTER, "katana",
+                                     Screens.DEFAULT_MAX_HP));
+        stack().set(new HubScreen(game));
+    }
+
+    /**
+     * Whether this profile represents play that a wipe would destroy.
+     *
+     * <p>Four independent signs, because progress arrives by several routes and
+     * any one of them is enough: a run to continue, money banked, a stage
+     * cleared, or anything bought. A profile that has only had the language
+     * changed is not progress.
+     */
+    private static boolean worthKeeping(Profile p) {
+        return p.savedRun != null || p.gold > 0 || p.runs > 0 || p.deepestFloor > 0;
     }
 
     private void addMenuButton(Table panel, String text, boolean disabled,

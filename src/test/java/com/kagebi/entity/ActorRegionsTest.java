@@ -40,14 +40,60 @@ class ActorRegionsTest {
         return out;
     }
 
+    /**
+     * Every region name a constant class holds.
+     *
+     * <p>A value ending in a slash is a directory prefix rather than a region -
+     * {@code Assets.Fx.SKILL_DIR} is joined to a name by a helper beside it -
+     * and asking the atlas for a directory finds nothing. The slash is the
+     * marker rather than a list of exceptions here, so a second prefix added
+     * later needs nothing of this test.
+     */
     private static List<String> constantsOf(Class<?> type) throws IllegalAccessException {
         List<String> out = new ArrayList<>();
         for (Field f : type.getDeclaredFields()) {
             if (Modifier.isStatic(f.getModifiers()) && f.getType() == String.class) {
-                out.add((String) f.get(null));
+                String value = (String) f.get(null);
+                if (!value.endsWith("/")) {
+                    out.add(value);
+                }
             }
         }
         return out;
+    }
+
+    /**
+     * The skill strips, which no constant names one by one.
+     *
+     * <p>They are reached through {@code Assets.Fx.skill(name)} from a
+     * vocabulary in the validator, so nothing reflection can see would catch a
+     * missing one - and a missing one is a skill that fires, damages and draws
+     * nothing at all.
+     */
+    @Test
+    void everySkillStripExists() {
+        Map<String, int[]> fx = sizes("fx");
+        List<String> missing = new ArrayList<>();
+        for (String name : com.kagebi.data.ContentValidator.SKILL_VFX) {
+            if (!fx.containsKey(Assets.Fx.skill(name))) {
+                missing.add(name);
+            }
+        }
+        assertTrue(missing.isEmpty(), "missing from fx.atlas: " + missing);
+    }
+
+    /** And each of them is square-celled, which is all Anim.strip can read. */
+    @Test
+    void everySkillStripIsSquareCelled() {
+        Map<String, int[]> fx = sizes("fx");
+        List<String> odd = new ArrayList<>();
+        for (String name : com.kagebi.data.ContentValidator.SKILL_VFX) {
+            int[] size = fx.get(Assets.Fx.skill(name));
+            if (size != null && (size[0] % size[1] != 0 || size[0] == 0)) {
+                odd.add(name + " is " + size[0] + "x" + size[1]);
+            }
+        }
+        assertTrue(odd.isEmpty(), "not a strip of square frames: " + odd);
     }
 
     /**

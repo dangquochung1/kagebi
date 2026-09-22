@@ -3,8 +3,12 @@ package com.kagebi.screen;
 import com.badlogic.gdx.math.MathUtils;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.def.GearDef;
+import com.kagebi.data.def.GemDef;
 import com.kagebi.gen.RoomKind;
+import com.kagebi.input.GameAction;
 import com.kagebi.run.RunState;
+import com.kagebi.save.OwnedGear;
 import com.kagebi.save.Profile;
 import com.kagebi.save.VillageState;
 import com.kagebi.settings.Difficulty;
@@ -27,8 +31,9 @@ import com.kagebi.village.Pantry;
  *   menu                   (default)
  *   settings  --page 1-3   audio, controls, video
  *   style     --page 1-2   widget sheet, surface sheet
- *   select    --page 1-6   character select, with that ninja highlighted
- *   loadout   --page 1-6   the same screen editing the run, over the village
+ *   confirm                the New Game wipe warning, over the menu
+ *   sheet     --page 1-6   the character sheet, on one of its six tabs
+ *   profile   --page 1-4   the same, on its profile tab, on one of its four panels
  *   hub       --page 1-11  the village: 1 at home, 2 the torii, 3 the shop, 4-9 each
  *                          region's worker, 10 zoomed out to the whole island,
  *                          11 zoomed out once at the torii
@@ -37,23 +42,23 @@ import com.kagebi.village.Pantry;
  *   bag       --page 1-5   the bag over the village, on that tab
  *   counter   --page 1-6   a trading counter: the herbalist's four tabs, the farmer, the cook
  *   home      --page 1-2   inside the house: on the doormat, or on the rug by the table
- *   world     --page 1-6   the world map, open to that stage and focused on it
- *   stage     --page 1-6   the same, with that stage's panel and difficulty row
- *   cleared   --page 1-6   the stage-clear screen, for that stage
+ *   world     --page 1-7   the world map, open to that stage and focused on it
+ *   stage     --page 1-7   the same, with that stage's panel and difficulty row
+ *   cleared   --page 1-7   the stage-clear screen, for that stage
  *   talk      --page 1-3   the village, mid-conversation with that villager
  *   store     --page 1-4   the herbalist's stall, over a profile N runs deep
  *   unlocks   --page 1-4   the same, on its second tab
- *   dungeon   --page 1-6   the start room of that floor
- *   map       --page 1-6   the same, with the floor map expanded
- *   fight     --page 1-6   the first room of that floor that has enemies in it
- *   swing     --page 1-6   the same, swinging on a timer so a blade is visible
+ *   dungeon   --page 1-7   the start room of that floor
+ *   map       --page 1-7   the same, with the floor map expanded
+ *   fight     --page 1-7   the first room of that floor that has enemies in it
+ *   swing     --page 1-7   the same, swinging on a timer so a blade is visible
  *   throw     --page 1-10  the same with a kunai in the off hand, throwing; 6-10 a shuriken
- *   boss      --page 3,5,6 the boss arena of a floor that has one
- *   treasure  --page 1-6   the first treasure room, for looking at a chest
- *   shop      --page 1-6   the first shop room, for looking at the shopkeeper
- *   trade     --page 1-6   the same, mid-purchase, with gold to spend
+ *   boss      --page 3,5,6,7 the boss arena of a floor that has one
+ *   treasure  --page 1-7   the first treasure room, for looking at a chest
+ *   shop      --page 1-7   the first shop room, for looking at the shopkeeper
+ *   trade     --page 1-7   the same, mid-purchase, with gold to spend
  *   slide                  halfway through the first room transition
- *   exit      --page 1-6   standing on that floor's way down
+ *   exit      --page 1-7   standing on that floor's way down
  *   pause                  the pause menu over floor 1
  *   inventory              the inventory over floor 1
  *   victory, gameover      the end screens, over a sample run
@@ -95,11 +100,6 @@ public final class Screens {
             case "settings":
                 return new GameScreen[] {new MainMenuScreen(game),
                                          new SettingsScreen(game, page - 1)};
-            case "select":
-                return new GameScreen[] {new CharacterSelectScreen(game, page - 1)};
-            case "loadout":
-                return new GameScreen[] {new HubScreen(game),
-                    new CharacterSelectScreen(game, page - 1).asLoadout()};
             case "world":
                 stockStages(game, page);
                 return new GameScreen[] {new WorldMapScreen(game).focusOn(page)};
@@ -130,7 +130,7 @@ public final class Screens {
             case "bag": {
                 stockVillage(game);
                 HubScreen hub = new HubScreen(game);
-                return new GameScreen[] {hub, new BagScreen(game, hub::openLoadout).onTab(page - 1)};
+                return new GameScreen[] {hub, new BagScreen(game, hub::openKit).onTab(page - 1)};
             }
             case "store":
                 stockProfile(game, page);
@@ -139,6 +139,31 @@ public final class Screens {
                 stockProfile(game, page);
                 return new GameScreen[] {new HubScreen(game),
                                          new ShopScreen(game).onUnlocks()};
+            // The character sheet, on whichever of its four pages. Stocked,
+            // because an empty bag and a forge with nothing in it photograph
+            // as a broken screen rather than as a new profile.
+            case "code":
+                return new GameScreen[] {new MainMenuScreen(game), new CodeScreen(game)};
+            // The wipe warning. It has no way in from a fresh profile, which is
+            // exactly the profile a screenshot run has, so it needs a door.
+            case "confirm":
+                return new GameScreen[] {new MainMenuScreen(game),
+                    new ConfirmScreen(game, "menu.newgame", "confirm.newgame", () -> { })};
+            // The profile's three upright panels: worn, stones, roster.
+            case "profile": {
+                stockProfile(game, 4);
+                stockGear(game);
+                startRun(game, 1);
+                return new GameScreen[] {new HubScreen(game),
+                    new CharacterScreen(game, 0, Math.max(0, page - 1))};
+            }
+            case "sheet": {
+                stockProfile(game, 4);
+                stockGear(game);
+                startRun(game, 1);
+                return new GameScreen[] {new HubScreen(game),
+                    new CharacterScreen(game, Math.max(0, page - 1))};
+            }
             case "dungeon":
                 startRun(game, page);
                 return new GameScreen[] {new DungeonScreen(game)};
@@ -160,13 +185,21 @@ public final class Screens {
                 // over: otherwise the throw could not be looked at until
                 // someone had banked 350 gold. Pages past five are the same
                 // floors with a shuriken, which flew as a kunai for a long time.
-                startRun(game, page > 5 ? page - 5 : page).throwWeaponId =
-                    page > 5 ? "shuriken" : "kunai";
+                RunState throwing = startRun(game, page > 5 ? page - 5 : page);
+                throwing.throwWeaponId = page > 5 ? "shuriken" : "kunai";
                 // The start room, not a fight: enemies chase, and a kunai that
                 // hits something a step after it leaves the hand cannot be
                 // photographed in flight at all.
                 return new GameScreen[] {
                     new DungeonScreen(game).openIn(RoomKind.START).throwing()};
+            // One skill, cast on a cadence. Page 1 to 3 is the key.
+            case "skill": {
+                startRun(game, 1);
+                GameAction key = page >= 3 ? GameAction.SKILL_3
+                    : page == 2 ? GameAction.SKILL_2 : GameAction.SKILL_1;
+                return new GameScreen[] {
+                    new DungeonScreen(game).openIn(RoomKind.NORMAL).casting(key)};
+            }
             case "boss":
                 // The one room no other flag reaches. Stage 6's boss is five
                 // bodies with two untouchable intermissions between them, and
@@ -211,8 +244,12 @@ public final class Screens {
     }
 
     private static RunState startRun(Kagebi game, int floor) {
-        RunState run = freshRun(game, Assets.Actor.DEFAULT_CHARACTER,
-                                "katana", DEFAULT_MAX_HP);
+        String hero = debugHero == null ? Assets.Actor.DEFAULT_CHARACTER : debugHero;
+        RunState run = freshRun(game, hero, "katana", DEFAULT_MAX_HP);
+        // Whoever is being looked at is unlocked for the length of the look.
+        // A debug flag that opened a locked character would show the shop's
+        // darkened placeholder rather than the character.
+        game.profile().unlockedCharacters.add(hero);
         run.floor = Math.max(1, floor);
         // Something carried, so a screenshot of the dungeon shows the quick
         // key's slot - which draws only while there is something to use.
@@ -235,6 +272,47 @@ public final class Screens {
      * without this guard, opening the shop with a debug flag and buying
      * anything would write invented gold over a real player's bank.
      */
+    /**
+     * Some armour, some stones, and one of each worn.
+     *
+     * <p>A character sheet on a fresh profile is four empty windows, which
+     * photographs as a screen that does not work. Guarded the same way
+     * {@link #stockProfile} is: a profile that has been played is left alone.
+     */
+    private static void stockGear(Kagebi game) {
+        Profile p = game.profile();
+        if (p.stash.size > 0 || p.materials.size > 0) {
+            return;
+        }
+        for (GearDef def : game.content().allGear()) {
+            if (def.tier > 2) {
+                continue;
+            }
+            OwnedGear piece = new OwnedGear(p.nextGearId(), def.id, def.sockets);
+            if (piece.sockets.length > 0) {
+                piece.sockets[0] = "red_t1";
+            }
+            p.stash.add(piece);
+            if (def.tier == 2) {
+                p.equipped.put(def.slot.name(), piece.instance);
+            }
+        }
+        for (GemDef gem : game.content().allGems()) {
+            if (gem.tier == 1) {
+                p.addMaterial(gem.id, 4);
+            }
+        }
+        // Half the book filled, so the bestiary shows a met row and an unmet
+        // one in the same shot.
+        int half = game.content().allEnemies().size / 2;
+        for (com.kagebi.data.def.EnemyDef e : game.content().allEnemies()) {
+            if (p.bestiary.size >= half) {
+                break;
+            }
+            p.bestiary.add(e.id);
+        }
+    }
+
     private static void stockProfile(Kagebi game, int runs) {
         Profile p = game.profile();
         if (p.runs > 0 || p.gold > 0) {
@@ -265,7 +343,7 @@ public final class Screens {
         if (p.runs > 0 || p.gold > 0) {
             return;
         }
-        p.clearedStages = Math.max(0, Math.min(6, stage - 1));
+        p.clearedStages = Math.max(0, Math.min(7, stage - 1));
         p.deepestFloor = Math.max(p.deepestFloor, p.clearedStages);
     }
 
@@ -275,6 +353,11 @@ public final class Screens {
      * each region's worker, in the order {@link HubScreen#REGIONS} lists them.
      */
     private static HubScreen hubAt(Kagebi game, int page) {
+        // A run first, so --hero reaches the village. Without one the hub
+        // backfills the default ninja, which meant the flag silently did
+        // nothing here - and the village is where the badge that broke on a
+        // side-view hero is drawn, so it was the one screen worth aiming it at.
+        startRun(game, 1);
         HubScreen hub = new HubScreen(game);
         if (page == 2) {
             return hub.arriveAt("gate");
@@ -366,6 +449,14 @@ public final class Screens {
     }
 
     private static Long fixedSeed;
+    /** Who {@code --hero} says a debug run should be; null for the default. */
+    private static String debugHero;
+
+    /** Set from {@code Boot.hero}; see DesktopLauncher for what it is for. */
+    public static void debugHero(String characterId) {
+        debugHero = characterId != null && Assets.Actor.indexOf(characterId) >= 0
+            ? characterId : null;
+    }
 
     /**
      * Pins the seed every later run is built from, for {@code --seed}.

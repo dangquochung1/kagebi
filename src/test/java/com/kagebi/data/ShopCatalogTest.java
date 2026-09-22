@@ -27,6 +27,8 @@ class ShopCatalogTest {
     @Test
     void theShippedShopHasSevenTracksAndElevenUnlocks() {
         assertEquals(7, shop.upgrades().size);
+        // Five ninja and six weapons. The sixth ninja is free, so it has no
+        // row - which is what lets it be the one character with no perk.
         assertEquals(11, shop.unlocks().size);
     }
 
@@ -126,6 +128,26 @@ class ShopCatalogTest {
                 assertNull(shop.character(ch));
             } else {
                 assertTrue(shop.character(ch).effect != null, ch);
+            }
+        }
+    }
+
+    /**
+     * No two of them do the same thing.
+     *
+     * <p>The point of the roster, and the thing it failed at last time it was
+     * six entries long: five perks were invented so that five recolours could
+     * be priced, and what a player was choosing between was a hue. Five
+     * different effects is the cheapest possible check that the choice is a
+     * real one.
+     */
+    @Test
+    void noTwoCharactersShareAPerk() {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (String ch : Assets.Actor.CHARACTERS) {
+            ShopCatalog.Unlock u = shop.character(ch);
+            if (u != null) {
+                assertTrue(seen.add(u.effect), ch + " repeats the perk " + u.effect);
             }
         }
     }

@@ -19,6 +19,7 @@ import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.ShopCatalog;
 import com.kagebi.data.def.EnemyDef;
+import com.kagebi.data.def.QuestDef;
 import com.kagebi.data.def.FloorDef;
 import com.kagebi.entity.DemoInput;
 import com.kagebi.entity.Boss;
@@ -37,6 +38,7 @@ import com.kagebi.gen.TiledRooms;
 import com.kagebi.gfx.Anim;
 import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
+import com.kagebi.quest.Quests;
 import com.kagebi.run.RunState;
 import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
@@ -136,6 +138,17 @@ public class DungeonScreen extends SimScreen {
 
     // Fade between floors; the action runs at the dark midpoint.
     private int fade;
+    /**
+     * Steps of death animation still to play before the run is declared over.
+     *
+     * <p>The run used to end on the step {@code hp} reached zero, so the
+     * ninja's death frames - which have always been in the atlas - were never
+     * once seen in play. This is the same two-stage shape {@link #descend}
+     * uses for a victory: let the thing finish, then fade, then push. Unlike
+     * {@link #ended} it does not stop the world, because the body still has to
+     * fall.
+     */
+    private int deathHold;
     private Runnable fadeAction;
     private int title;
     /** Steps left on the "you need a key" card at a locked door. */
@@ -219,6 +232,19 @@ public class DungeonScreen extends SimScreen {
     }
 
     /** The same, on the throw button, for {@code --screen throw}. */
+    /**
+     * Casts one skill on a cadence, for photographing its effect.
+     *
+     * <p>The bolts last a fifth of a second out of a whole run, so without
+     * this the only way to look at one is to press the key by hand while a
+     * capture runs - which is unrepeatable, and tends to send the keystroke
+     * to whatever window has focus instead.
+     */
+    DungeonScreen casting(GameAction which) {
+        demo = new DemoInput(which);
+        return this;
+    }
+
     DungeonScreen throwing() {
         demo = new DemoInput(GameAction.THROW);
         return this;
@@ -307,6 +333,13 @@ public class DungeonScreen extends SimScreen {
         run.floor = number;
         run.layout = layout;
         run.deepestFloor = Math.max(run.deepestFloor, number);
+        // Arriving is the whole of a REACH step; there is nothing to do on the
+        // floor for it. Counted here rather than on the stairs down, so the
+        // floor the player died on still counts as reached.
+        Quests.record(game.content(), game.profile(), QuestDef.Kind.REACH,
+                      String.valueOf(number), 1);
+        FloorDef here = floorDef(number);
+        run.sideStage = here != null && here.side;
         enter(layout.start(), null);
         title = Hud.CARD_STEPS;
     }
@@ -465,7 +498,7 @@ public class DungeonScreen extends SimScreen {
         // camera is already at the fit, so the ease is inward, and the world
         // is held still until it arrives - see the reveal branch in step().
         float fit = CameraController.fitZoom(roomW, roomH);
-        if (fit > 1f) {
+        if (fit >= WIDE_SHOT) {
             camera.zoomBy(ALL_THE_WAY, fit);
             camera.snapZoom();
             reveal = REVEAL_STEPS;
@@ -483,6 +516,22 @@ public class DungeonScreen extends SimScreen {
      * going out and exactly on 1x coming back.
      */
     private static final int ALL_THE_WAY = 8;
+
+    /**
+     * How much bigger than the screen a room has to be to be shown whole.
+     *
+     * <p>Two, and not "bigger than one screen", for two reasons that point the
+     * same way. A fit of exactly 2 - stage 6's 640x352 arena - is a whole
+     * number, and the wide shot samples the art one view pixel to four map
+     * pixels with nothing in between; stage 7's 480x272 rooms fit at 1.51, and
+     * a non-integer zoom resamples every edge in the picture. And a reveal is
+     * an event: it costs a second and a half of frozen world, which is right
+     * once at the door of an arena and tiresome fourteen times a floor.
+     *
+     * <p>Below this the room simply scrolls, which is what {@code follow}
+     * already does with the room's own size every frame.
+     */
+    private static final float WIDE_SHOT = 2f;
 
     /**
      * Closes every doorway that has no room behind it: the open tiles on that
@@ -562,6 +611,15 @@ public class DungeonScreen extends SimScreen {
             }
             return;
         }
+        if (deathHold > 0) {
+            world.step(input());
+            if (--deathHold == 0) {
+                ended = true;
+                fade = FADE_STEPS * 2;
+                fadeAction = () -> stack().push(new GameOverScreen(game));
+            }
+            return;
+        }
         if (ended) {
             return;
         }
@@ -570,7 +628,7 @@ public class DungeonScreen extends SimScreen {
             stack().push(new PauseScreen(game, true));
             return;
         }
-        if (input().justPressed(GameAction.INVENTORY)) {
+        if (input().justPressed(GameAction.BAG)) {
             stack().push(new InventoryScreen(game));
             return;
         }
@@ -591,8 +649,13 @@ public class DungeonScreen extends SimScreen {
             run.room.cleared = true;
         }
         if (world.playerDead()) {
-            ended = true;
-            stack().push(new GameOverScreen(game));
+            // No input from here on, but the world keeps stepping: the death
+            // animation is played by the player entity, and the monsters that
+            // killed them should not freeze mid-stride. A revive has already
+            // been offered and declined by now - EntityWorld spends it in the
+            // same step hp reaches zero, deliberately, so that the run never
+            // ends underneath one.
+            deathHold = Math.max(1, world.playerDeathSteps());
             return;
         }
 
@@ -783,6 +846,10 @@ public class DungeonScreen extends SimScreen {
             drawFailure(batch);
         } else {
             hud.draw(batch, run, Cfg.VIRT_W, Cfg.VIRT_H);
+            if (world instanceof EntityWorld) {
+                hud.drawSkills(batch, game.skin(), ((EntityWorld) world).player(),
+                               game.input().map());
+            }
             drawQuickSlot(batch);
             drawPrompt(batch);
             drawTitle(batch);
@@ -856,8 +923,12 @@ public class DungeonScreen extends SimScreen {
         }
         // "Descend" was true when the stairs led one floor further down. They
         // lead back to the map now, so on every stage but the last they say so.
+        // isLastFloor, not floorCount: "escape" belongs to the deepest floor
+        // of the descent, and a side stage is neither deepest nor a descent.
+        // Against the count it was already wrong the moment a stage 7 existed
+        // - stage 6 would have started saying "leave" and stage 7 "escape".
         String key = nearExit
-            ? (run.floor >= floorCount() ? "prompt.escape" : "prompt.leave")
+            ? (isLastFloor(run.floor) ? "prompt.escape" : "prompt.leave")
             : world.promptKey();
         if (key == null) {
             return;

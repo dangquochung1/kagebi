@@ -460,6 +460,36 @@
       "boss": true, "enrageAt": 0.4,
       "summons": ["slimetide"],
       "projectile": "fx/skill6/water_arrow"
+    },
+    {
+      // The Sunken Vault's boss, on the squidman's art and nothing else of
+      // his. Stage 6 is three bodies with a third of the moves each; this is
+      // one body with all of them, which is the only way to make a second
+      // cove stage a different fight rather than the same one at bigger
+      // numbers. boss_squidlord shoots water and rains fire - rainFx belongs
+      // to the brain, so that costs the data nothing.
+      //
+      // 500, and the floor's hpScale makes that 750 in the room. Set against
+      // FullRunTest rather than guessed: at 300 the bot put it down in 27
+      // seconds, half of what stage 6's chain of three bodies takes, and a
+      // boss one stage later that is over in half the time is not a boss. At
+      // 750 it is about fifty seconds of swinging, in line with the cove and
+      // well inside BalanceTest's two-minute cap. Its purse and table are the
+      // cove's, because a side stage that paid better than the descent would
+      // become the way to farm it.
+      "id": "squidlord", "nameKey": "enemy.squidlord.name",
+      "sprite": "bosses6/squidman/idle", "cell": 64,
+      "maxHp": 500, "contactDamage": 14, "attackDamage": 24, "moveSpeed": 60,
+      "brain": "boss_squidlord", "aggroRange": 999, "attackRange": 28,
+      "windupSteps": 24, "activeSteps": 14, "recoverSteps": 28, "cooldownSteps": 40,
+      "knockbackResist": 1.0, "hurtInvulnSteps": 5,
+      "lootTable": "boss_f6", "goldMin": 180, "goldMax": 280,
+      "boss": true, "enrageAt": 0.4,
+      // Both, where the cove's bodies called one each. The ember slimes
+      // detonate and the tide slimes burst, so the help arriving is itself
+      // the two elements the boss is fighting in.
+      "summons": ["slimeember", "slimetide"],
+      "projectile": "fx/skill6/water_arrow"
     }
   ]
 }

@@ -16,10 +16,16 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas.TextureAtlasData;
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.kagebi.assets.Assets;
+import com.kagebi.combat.Modifiers;
+import com.kagebi.data.def.CraftDef;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.FloorDef;
+import com.kagebi.data.def.GearDef;
+import com.kagebi.data.def.GemDef;
 import com.kagebi.data.def.ItemDef;
 import com.kagebi.data.def.LootTableDef;
+import com.kagebi.data.def.QuestDef;
+import com.kagebi.data.def.SkillDef;
 import com.kagebi.data.def.RelicDef;
 import com.kagebi.data.def.WeaponDef;
 import com.kagebi.save.Profile;
@@ -51,6 +57,83 @@ public final class ContentValidator {
         "throw_extra", "roll_invuln_add", "damage_mult_low_hp", "burn_aura",
         "glass_cannon", "room_clear_heal");
 
+    /**
+     * Every effect a piece of gear or a stone set into it may carry.
+     *
+     * <p>Its own vocabulary rather than a corner of {@link #RELIC_EFFECTS},
+     * because the two are found in different ways and mean different things to
+     * a player. A relic is a run-long surprise pulled out of a chest and may do
+     * something strange - chain lightning, a burning aura, glass cannon. Gear
+     * is bought, forged and worn between runs, and is deliberately dull: eight
+     * numbers that go up. Nothing here needs new combat code, which is the
+     * point - {@code Loadout} folds gear into the same {@link
+     * com.kagebi.combat.Modifiers} everything else already writes to.
+     *
+     * <p>{@code armour_add} and {@code throw_damage_mult} are the two that had
+     * no source before this: armour was a field nothing wrote, and the off hand
+     * shared the main hand's multiplier.
+     */
+    /** Four tiers of gear and three of stone; what the forge and the shelf draw. */
+    public static final int MAX_GEAR_TIER = 4;
+    public static final int MAX_GEM_TIER = 3;
+    /** Holes in one piece. Three fit across the panel; a fourth would not. */
+    public static final int MAX_SOCKETS = 3;
+
+    /** Keys on the skill bar. Three, because three were asked for and three fit. */
+    public static final int SKILL_SLOTS = 3;
+
+    public static final Set<String> GEAR_EFFECTS = Set.of(
+        "max_hp_add", "armour_add", "damage_mult", "crit_chance_add",
+        "crit_damage_mult", "throw_damage_mult", "attack_speed_mult",
+        "move_speed_mult", "lifesteal", "gold_mult");
+
+    /**
+     * Every effect an ultimate may put on the player while it is up.
+     *
+     * <p>Its own vocabulary for the same reason gear has one: these are
+     * temporary and self-inflicted, which no relic or stone is. The set is
+     * deliberately tiny - a transformation that lasts eight seconds should be
+     * legible in one line of text, and eight numbers going up at once is not.
+     *
+     * <p>{@code armour_mult} is the only name here that is new to the game, and
+     * it exists because an ultimate is a trade: the strike is harder and the
+     * skin is thinner. Nothing else in the game reduces a statistic, so nothing
+     * else needed it.
+     */
+    public static final Set<String> SKILL_EFFECTS = Set.of(
+        "damage_mult", "crit_chance_add", "crit_damage_mult", "throw_damage_mult",
+        "attack_speed_mult", "move_speed_mult", "armour_mult");
+
+    /** The strips {@code tools/make_skillfx.py} writes, and the only ones a skill may name. */
+    public static final Set<String> SKILL_VFX = Set.of(
+        "bolt", "trail", "strike", "shock", "nova", "aura");
+
+    /** Icons that tool writes beside them. */
+    public static final Set<String> SKILL_ICONS = Set.of("bolt", "nova", "shock");
+
+    /**
+     * What colour of stone may carry what, which is the whole of the socket
+     * system's design: a player learns "red is damage" once and then knows what
+     * every red stone in the game is for without reading it.
+     */
+    public static final java.util.Map<String, Set<String>> GEM_COLOURS =
+        java.util.Map.of(
+            "RED", Set.of("damage_mult", "crit_chance_add"),
+            "GREEN", Set.of("max_hp_add", "armour_add"),
+            "BLUE", Set.of("attack_speed_mult", "move_speed_mult"),
+            "YELLOW", Set.of("crit_damage_mult", "throw_damage_mult"),
+            "PURPLE", Set.of("lifesteal", "gold_mult"));
+
+    /**
+     * The villagers a quest may be given by or sent to.
+     *
+     * <p>Written here rather than read from {@code HubScreen.VILLAGERS},
+     * because this class must stay free of anything that needs a screen or a
+     * texture - it is run by tests with no GL context. The two lists agreeing
+     * is what {@code HubMarksTest} is for.
+     */
+    public static final Set<String> VILLAGERS = Set.of("elder", "master", "herbalist");
+
     /** Every pickup effect the inventory and pickup code must interpret. */
     public static final Set<String> ITEM_EFFECTS = Set.of(
         "heal", "cure_poison", "max_hp_add", "gold", "diamond", "key",
@@ -67,7 +150,7 @@ public final class ContentValidator {
         "ambusher", "orbiter", "splitter", "caster", "burster", "bomber",
         "boss_frog", "boss_tengu",
         "boss_pirateleader", "boss_orb", "boss_orb_tide",
-        "boss_piratezombie", "boss_squidman");
+        "boss_piratezombie", "boss_squidman", "boss_squidlord");
 
     /**
      * Folder names under {@code assets/maps/rooms/}. Procgen generated the
@@ -75,7 +158,7 @@ public final class ContentValidator {
      * a floor naming any other would find no rooms at all.
      */
     public static final Set<String> BIOMES = Set.of(
-        "ruins", "ruins_green", "ruins_orange", "depths", "cove");
+        "ruins", "ruins_green", "ruins_orange", "depths", "cove", "cove_deep");
 
     /**
      * Projectile ids a thrown weapon may name. Enemies fire others too, but
@@ -195,6 +278,22 @@ public final class ContentValidator {
         }
         for (LootTableDef t : reg.allLootTables()) {
             table(c, reg, t);
+        }
+        for (GearDef g : reg.allGear()) {
+            gear(c, g);
+        }
+        for (GemDef g : reg.allGems()) {
+            gem(c, g);
+        }
+        for (CraftDef cf : reg.allCrafts()) {
+            craft(c, reg, cf);
+        }
+        Set<Integer> slots = new java.util.HashSet<>();
+        for (SkillDef s : reg.allSkills()) {
+            skill(c, s, slots);
+        }
+        for (QuestDef q : reg.allQuests()) {
+            quest(c, reg, q, VILLAGERS);
         }
         orphans(c, reg);
         shop(c, reg, shop);
@@ -349,6 +448,247 @@ public final class ContentValidator {
             c.fail(w, "projectile '" + wd.projectile + "' is not one of "
                 + new java.util.TreeSet<>(PROJECTILES));
         }
+    }
+
+    private static void gear(Check c, GearDef g) {
+        String w = "gear '" + g.id + "'";
+        c.key(w, "nameKey", g.nameKey);
+        c.key(w, "descKey", g.descKey);
+        c.icon(w, g.icon, true);
+        c.atLeast(w, "tier", g.tier, 1);
+        if (g.tier > MAX_GEAR_TIER) {
+            c.fail(w, "tier " + g.tier + " is above the " + MAX_GEAR_TIER + " the forge knows");
+        }
+        c.atLeast(w, "sockets", g.sockets, 0);
+        if (g.sockets > MAX_SOCKETS) {
+            c.fail(w, "has " + g.sockets + " sockets; the panel draws " + MAX_SOCKETS);
+        }
+        c.atLeast(w, "price", g.price, 0);
+        effects(c, w, g.effects, g.magnitudes);
+    }
+
+    private static void gem(Check c, GemDef g) {
+        String w = "gem '" + g.id + "'";
+        c.key(w, "nameKey", g.nameKey);
+        c.icon(w, g.icon, true);
+        c.atLeast(w, "tier", g.tier, 1);
+        if (g.tier > MAX_GEM_TIER) {
+            c.fail(w, "tier " + g.tier + " is above the " + MAX_GEM_TIER + " the forge knows");
+        }
+        c.atLeast(w, "price", g.price, 0);
+        if (!GEAR_EFFECTS.contains(g.effect)) {
+            c.fail(w, "effect '" + g.effect + "' is not one of "
+                + new java.util.TreeSet<>(GEAR_EFFECTS));
+            return;
+        }
+        // The colour is the label on the tin. A red stone that made the player
+        // faster would teach them that the colours mean nothing, which is worse
+        // than having no colours at all.
+        Set<String> allowed = GEM_COLOURS.get(g.colour.name());
+        if (allowed != null && !allowed.contains(g.effect)) {
+            c.fail(w, "is " + g.colour + " but carries '" + g.effect + "'; "
+                + g.colour + " is " + new java.util.TreeSet<>(allowed));
+        }
+        if (Modifiers.multiplicative(g.effect)) {
+            c.positive(w, "magnitude", Math.round(g.magnitude * 1000));
+        }
+    }
+
+    private static void craft(Check c, ContentRegistry reg, CraftDef cf) {
+        String w = "craft '" + cf.id + "'";
+        if (cf.inputs.length == 0) {
+            c.fail(w, "has no inputs; a forge line that costs nothing is a free item");
+        }
+        if (cf.inputs.length != cf.counts.length) {
+            c.fail(w, "has " + cf.inputs.length + " inputs and "
+                + cf.counts.length + " counts");
+        }
+        for (int i = 0; i < cf.inputs.length; i++) {
+            String in = cf.inputs[i];
+            if (!reg.hasGem(in) && !reg.hasGear(in) && !reg.hasItem(in)) {
+                c.fail(w, "input '" + in + "' is not a gem, a piece of gear or an item");
+            }
+            if (i < cf.counts.length) {
+                c.positive(w, "counts[" + i + "]", cf.counts[i]);
+            }
+        }
+        boolean made = cf.kind == CraftDef.Output.GEAR
+            ? reg.hasGear(cf.output) : reg.hasGem(cf.output);
+        if (!made) {
+            c.fail(w, "makes '" + cf.output + "', which is not a " + cf.kind);
+        }
+        c.atLeast(w, "goldCost", cf.goldCost, 0);
+        if (!ShopCatalog.REQUIREMENTS.contains(cf.requirement)) {
+            c.fail(w, "requirement '" + cf.requirement + "' is not one of "
+                + new java.util.TreeSet<>(ShopCatalog.REQUIREMENTS));
+        }
+        c.atLeast(w, "requirementValue", cf.requirementValue, 0);
+    }
+
+    /** The effects-and-magnitudes pair that gear carries, checked as one thing. */
+    private static void effects(Check c, String where, String[] names, float[] magnitudes) {
+        if (names.length == 0) {
+            c.fail(where, "carries no effects; it would be an item with no reason to wear it");
+        }
+        if (names.length != magnitudes.length) {
+            c.fail(where, "has " + names.length + " effects and "
+                + magnitudes.length + " magnitudes");
+        }
+        for (int i = 0; i < names.length; i++) {
+            if (!GEAR_EFFECTS.contains(names[i])) {
+                c.fail(where, "effect '" + names[i] + "' is not one of "
+                    + new java.util.TreeSet<>(GEAR_EFFECTS));
+            }
+        }
+    }
+
+    /**
+     * A skill: its slot, its shape and the numbers that shape needs.
+     *
+     * <p>The checks that matter are the ones a player would otherwise discover
+     * by pressing a key and having nothing happen: two skills on one key, a
+     * lunge with no distance, a nova with no radius, an ultimate with no
+     * duration. Every one of those loads and runs and simply does nothing.
+     */
+    private static void skill(Check c, SkillDef s, Set<Integer> slots) {
+        String w = "skill '" + s.id + "'";
+        c.key(w, "nameKey", s.nameKey);
+        c.key(w, "descKey", s.descKey);
+        if (!SKILL_ICONS.contains(s.icon)) {
+            c.fail(w, "icon '" + s.icon + "' is not one of "
+                + new java.util.TreeSet<>(SKILL_ICONS));
+        }
+        if (!SKILL_VFX.contains(s.vfx)) {
+            c.fail(w, "vfx '" + s.vfx + "' is not one of "
+                + new java.util.TreeSet<>(SKILL_VFX));
+        }
+        if (s.slot < 1 || s.slot > SKILL_SLOTS) {
+            c.fail(w, "slot " + s.slot + " is not 1 to " + SKILL_SLOTS);
+        } else if (!slots.add(s.slot)) {
+            // Both would be bound to the same key and one of them would never
+            // be reachable, silently.
+            c.fail(w, "is the second skill on slot " + s.slot);
+        }
+        if (s.cooldownSteps <= 0) {
+            c.fail(w, "has no cooldown; it would fire every step the key is held");
+        }
+        switch (s.kind) {
+            case LUNGE:
+                c.atLeast(w, "range", (int) s.range, 1);
+                break;
+            case NOVA:
+                c.atLeast(w, "range", (int) s.range, 1);
+                break;
+            case AVATAR:
+                if (s.durationSteps <= 0) {
+                    c.fail(w, "is an AVATAR with no duration; it would end the step it began");
+                }
+                if (s.effects.length == 0) {
+                    c.fail(w, "is an AVATAR that changes nothing");
+                }
+                if (s.hpCost < 0f || s.hpCost >= 1f) {
+                    c.fail(w, "hpCost " + s.hpCost + " is not a share of health below 1");
+                }
+                break;
+            default:
+                break;
+        }
+        if (s.effects.length != s.magnitudes.length) {
+            c.fail(w, "has " + s.effects.length + " effects and "
+                + s.magnitudes.length + " magnitudes");
+        }
+        for (String name : s.effects) {
+            if (!SKILL_EFFECTS.contains(name)) {
+                c.fail(w, "effect '" + name + "' is not one of "
+                    + new java.util.TreeSet<>(SKILL_EFFECTS));
+            }
+        }
+    }
+
+    /**
+     * A quest, its steps and its pay.
+     *
+     * <p>Every target is checked against the thing it names, because a step
+     * aimed at a monster that does not exist is a quest that can never be
+     * finished - and the player has no way to find that out except by trying
+     * for an hour.
+     */
+    private static void quest(Check c, ContentRegistry reg, QuestDef q, Set<String> givers) {
+        String w = "quest '" + q.id + "'";
+        c.key(w, "nameKey", q.nameKey);
+        c.key(w, "descKey", q.descKey);
+        c.atLeast(w, "rewardGold", q.rewardGold, 0);
+        if (q.giver != null && !givers.contains(q.giver)) {
+            c.fail(w, "giver '" + q.giver + "' is not a villager in HubScreen.VILLAGERS");
+        }
+        if (q.requires != null && !reg.hasQuest(q.requires)) {
+            c.fail(w, "requires '" + q.requires + "', which is not a quest");
+        }
+        if (q.requires != null && q.requires.equals(q.id)) {
+            c.fail(w, "requires itself");
+        }
+        if (q.steps.length == 0) {
+            c.fail(w, "has no steps");
+        }
+        for (QuestDef.Step step : q.steps) {
+            c.positive(w, "step count", step.count);
+            switch (step.kind) {
+                case KILL:
+                    if (!reg.hasEnemy(step.target)) {
+                        c.fail(w, "kills '" + step.target + "', which is not an enemy");
+                    }
+                    break;
+                case COLLECT:
+                    if (!reg.hasItem(step.target)) {
+                        c.fail(w, "collects '" + step.target + "', which is not an item");
+                    }
+                    break;
+                case TALK:
+                    if (!givers.contains(step.target)) {
+                        c.fail(w, "talks to '" + step.target + "', who is not a villager");
+                    }
+                    break;
+                case REACH:
+                    int floor = -1;
+                    try {
+                        floor = Integer.parseInt(step.target);
+                    } catch (NumberFormatException notANumber) {
+                        c.fail(w, "reaches '" + step.target + "', which is not a floor number");
+                    }
+                    if (floor > 0 && floor > reg.allFloors().size) {
+                        c.fail(w, "reaches floor " + floor + ", and there are only "
+                            + reg.allFloors().size);
+                    }
+                    break;
+                default:
+                    c.fail(w, "has a step of no kind");
+            }
+        }
+        for (String item : q.rewardItems) {
+            if (!reg.hasItem(item)) {
+                c.fail(w, "pays '" + item + "', which is not an item");
+            }
+        }
+        if (q.rewardGear != null && !reg.hasGear(q.rewardGear)) {
+            c.fail(w, "pays '" + q.rewardGear + "', which is not a piece of gear");
+        }
+        if (q.rewardWeapon != null && !hasWeapon(reg, q.rewardWeapon)) {
+            c.fail(w, "pays '" + q.rewardWeapon + "', which is not a weapon");
+        }
+        boolean pays = q.rewardGold > 0 || q.rewardItems.length > 0
+            || q.rewardGear != null || q.rewardWeapon != null;
+        if (!pays) {
+            c.fail(w, "pays nothing at all");
+        }
+    }
+
+    private static boolean hasWeapon(ContentRegistry reg, String id) {
+        for (WeaponDef w : reg.allWeapons()) {
+            if (w.id.equals(id)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void relic(Check c, RelicDef r) {
@@ -552,6 +892,8 @@ public final class ContentValidator {
                     c.fail(w, "is not a character in Assets.Actor.CHARACTERS");
                 }
                 // A perk is what makes a character a choice rather than a palette.
+                // The starter has none, which is the exception that proves it:
+                // it is free, so it has no row here to be checked.
                 if (u.effect == null || !UPGRADE_EFFECTS.contains(u.effect)) {
                     c.fail(w, "character perk '" + u.effect + "' is not an upgrade effect");
                 }

@@ -42,7 +42,20 @@ final class FakeArena implements AiContext {
 
     private final Object playerToken = new Object();
 
+    /** Where the player was at the previous step, so their drift can be read. */
+    private float lastPx = px;
+    private float lastPy = py;
+    private float velX;
+    private float velY;
+
     void step(Enemy e) {
+        // Differenced here for the same reason EntityWorld differences it
+        // there: a test that sets px and py directly is exactly a player who
+        // moved, and nothing else in this class would know by how much.
+        velX = (px - lastPx) / com.kagebi.Cfg.STEP;
+        velY = (py - lastPy) / com.kagebi.Cfg.STEP;
+        lastPx = px;
+        lastPy = py;
         current = e;
         e.simulate(this);
     }
@@ -55,6 +68,16 @@ final class FakeArena implements AiContext {
     @Override
     public float playerY() {
         return py;
+    }
+
+    @Override
+    public float playerVelX() {
+        return velX;
+    }
+
+    @Override
+    public float playerVelY() {
+        return velY;
     }
 
     @Override

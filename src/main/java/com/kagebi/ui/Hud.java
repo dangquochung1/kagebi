@@ -10,7 +10,12 @@ import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.utils.Align;
 import com.kagebi.Cfg;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.def.SkillDef;
+import com.kagebi.entity.Intent;
+import com.kagebi.entity.Player;
 import com.kagebi.gen.FloorLayout;
+import com.kagebi.input.GameAction;
+import com.kagebi.input.InputMap;
 import com.kagebi.run.RunState;
 
 /**
@@ -92,6 +97,23 @@ public final class Hud {
     public static final int QUICK_CELL = 20;
 
     /**
+     * The skill bar: three cells along the bottom right, clear of everything.
+     *
+     * <p>Twenty-four because that is what the icons are. They are drawn on an
+     * opaque plate with a rim of their own - they have to be, being drawn over
+     * a dungeon floor rather than a panel - so the plate is the cell, and the
+     * skin's cell art behind it would only be a frame nobody can see.
+     */
+    public static final int SKILL_CELL = 24;
+    private static final int SKILL_GAP = 4;
+    private static final int SKILL_Y = MARGIN;
+    private static final int SKILL_X =
+        Cfg.VIRT_W - MARGIN - 3 * SKILL_CELL - 2 * SKILL_GAP;
+    /** The shutter over a skill that is not ready, and the rim on a live one. */
+    private static final Color COOLDOWN = new Color(0f, 0f, 0f, 0.62f);
+    private static final Color READY = new Color(0xffd45aff);
+
+    /**
      * The quick key's slot, bottom left: what it will use, and how many are
      * left. The dungeon draws it only while something is carried - an empty
      * slot says nothing - and this corner is the only one not already taken.
@@ -114,6 +136,87 @@ public final class Hud {
         drawMap(batch, run, screenW, screenH);
         drawBossBar(batch, screenW, screenH);
         batch.setColor(Color.WHITE);
+    }
+
+    // ---- the skill bar -----------------------------------------------------
+
+    /**
+     * Three cells in the bottom-right corner: what each key does, and how long
+     * until it will do it again.
+     *
+     * <p>That corner because it is the only empty one left. The hearts and the
+     * purse own the top left, the map the top right, the quick slot the bottom
+     * left, and the interact prompt sits centred just above the bottom edge -
+     * so the bar starts far enough right to clear it.
+     *
+     * <p>The cooldown is drawn as a shutter falling down the cell rather than
+     * as a number alone. A number has to be read; a shutter is understood from
+     * the corner of the eye, which is where a player fighting will see it.
+     */
+    public void drawSkills(SpriteBatch batch, Skin skin, Player player, InputMap keys) {
+        for (int slot = 0; slot < Intent.SKILLS; slot++) {
+            SkillDef s = player.skill(slot);
+            if (s == null) {
+                continue;
+            }
+            int x = skillX(slot);
+            TextureRegion icon = skin.getRegion(Assets.Ui.skillIcon(s.icon));
+            if (icon != null) {
+                batch.draw(icon, x + (SKILL_CELL - icon.getRegionWidth()) / 2f,
+                           SKILL_Y + (SKILL_CELL - icon.getRegionHeight()) / 2f);
+            }
+
+            int left = player.cooldown(slot);
+            if (left > 0) {
+                drawCooldown(batch, x, left, s.cooldownSteps);
+            } else if (s.kind == SkillDef.Kind.AVATAR && player.transformed()) {
+                // Lit while it is running, so the eight seconds the player
+                // spent health on are visible without counting.
+                batch.setColor(READY);
+                batch.draw(pixel, x - 1, SKILL_Y - 1, SKILL_CELL + 2, 1);
+                batch.draw(pixel, x - 1, SKILL_Y + SKILL_CELL, SKILL_CELL + 2, 1);
+                batch.draw(pixel, x - 1, SKILL_Y, 1, SKILL_CELL);
+                batch.draw(pixel, x + SKILL_CELL, SKILL_Y, 1, SKILL_CELL);
+                batch.setColor(Color.WHITE);
+            }
+
+            // The key cap under the cell, from the pack's art rather than the
+            // letter: every action is rebindable, and a drawn "U" becomes a lie
+            // the first time somebody opens the controls screen.
+            int key = keys == null ? -1 : keys.primary(skillAction(slot));
+            Drawable cap = key < 0 ? null : KeyPrompts.drawable(skin, key);
+            if (cap != null) {
+                cap.draw(batch, x + (SKILL_CELL - cap.getMinWidth()) / 2f,
+                         SKILL_Y + SKILL_CELL + 1, cap.getMinWidth(), cap.getMinHeight());
+            }
+        }
+        batch.setColor(Color.WHITE);
+    }
+
+    /** The shutter, and the seconds left written over it. */
+    private void drawCooldown(SpriteBatch batch, int x, int left, int total) {
+        int shade = Math.max(1, Math.round(SKILL_CELL * (left / (float) Math.max(1, total))));
+        batch.setColor(COOLDOWN);
+        batch.draw(pixel, x, SKILL_Y + SKILL_CELL - shade, SKILL_CELL, shade);
+        batch.setColor(Color.WHITE);
+        // Rounded up, so a skill showing "1" is never already available: a
+        // player who sees zero and presses is told no, which reads as the
+        // button being broken rather than early.
+        int seconds = (int) Math.ceil(left * Cfg.STEP);
+        shadowed(batch, font, String.valueOf(seconds),
+                 x + SKILL_CELL / 2f, SKILL_Y + SKILL_CELL - 3, Align.center);
+    }
+
+    private static GameAction skillAction(int slot) {
+        switch (slot) {
+            case 0: return GameAction.SKILL_1;
+            case 1: return GameAction.SKILL_2;
+            default: return GameAction.SKILL_3;
+        }
+    }
+
+    public static int skillX(int slot) {
+        return SKILL_X + slot * (SKILL_CELL + SKILL_GAP);
     }
 
     // ---- the boss bar ------------------------------------------------------

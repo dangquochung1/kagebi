@@ -1,6 +1,8 @@
 package com.kagebi.save.migration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
+import com.kagebi.assets.Assets;
 import com.kagebi.save.Profile;
 import com.kagebi.save.SaveManager;
 
@@ -54,7 +57,9 @@ class MigrationTest {
         assertEquals(2, p.wins);
         assertEquals(3, p.upgrade("vigor"));
         assertEquals(1, p.upgrade("fortune"));
-        assertTrue(p.unlockedCharacters.contains("ninjablue"));
+        assertTrue(p.unlockedCharacters.contains("ninjablue"),
+                   "the colour bought as a character is a character again");
+        assertTrue(p.unlockedCharacters.contains("ninjagreen"));
         assertTrue(p.unlockedWeapons.contains("hammer"));
         assertEquals(2, p.bestiary.size);
     }
@@ -125,7 +130,7 @@ class MigrationTest {
         assertNull(written.get("villageDarkness"));
         assertNull(written.get("upgrades").get("flamekeeper"));
         assertEquals(1834, written.getInt("gold"));
-        assertEquals(2, written.getInt("version"));
+        assertEquals(Profile.CURRENT_VERSION, written.getInt("version"));
     }
 
     // ---- the machinery -----------------------------------------------------------
@@ -173,5 +178,169 @@ class MigrationTest {
         String before = root.toJson(com.badlogic.gdx.utils.JsonWriter.OutputType.json);
         new V0ToV1().apply(root);
         assertEquals(before, root.toJson(com.badlogic.gdx.utils.JsonWriter.OutputType.json));
+    }
+
+    // ---- v2 to v3: six ninjas become one ninja and six colours ------------------
+
+    /** A profile that had bought four of the six recolours as characters. */
+    private static final String V2_WITH_FIVE_NINJAS =
+        "{ \"version\": 2, \"gold\": 2500,"
+        + " \"unlockedCharacters\": [\"ninjagreen\", \"ninjared\", \"ninjafire\", \"ninjawater\"],"
+        + " \"unlockedWeapons\": [\"katana\", \"axe\"] }";
+
+    /**
+     * Out one door and back in the other: bought as characters at v2, held as
+     * colours at v3 and v4, characters again at v5. What a profile owns is the
+     * same set of six things throughout, whatever the format calls them.
+     */
+    @Test
+    void everyColourBoughtAsACharacterComesBackAsOne() throws IOException {
+        Files.writeString(dir.resolve("kagebi_profile.json"),
+            V2_WITH_FIVE_NINJAS, StandardCharsets.UTF_8);
+        Profile p = new SaveManager(dir).load();
+
+        assertEquals(Profile.CURRENT_VERSION, p.version);
+        assertEquals(2500, p.gold, "no refund, and nothing taken either");
+        for (String id : new String[] {"ninjagreen", "ninjared", "ninjafire", "ninjawater"}) {
+            assertTrue(p.unlockedCharacters.contains(id), id + " was paid for");
+        }
+        assertFalse(p.unlockedCharacters.contains("ninjablue"), "blue was never bought");
+        assertFalse(p.unlockedCharacters.contains("ninjadark"), "dark was never bought");
+        assertFalse(p.unlockedCharacters.contains("ninja"), "the collapsed entry is gone");
+        assertTrue(p.unlockedWeapons.contains("axe"), "weapons are untouched");
+    }
+
+    /**
+     * Green is free and always was, so it is owned even by a file that somehow
+     * does not list it - a hand edit, or the empty-set case SaveManager guards
+     * for characters and weapons already.
+     */
+    @Test
+    void theFreeColourSurvivesAFileThatOmitsIt() throws IOException {
+        Files.writeString(dir.resolve("kagebi_profile.json"),
+            "{ \"version\": 2, \"unlockedCharacters\": [] }", StandardCharsets.UTF_8);
+        Profile p = new SaveManager(dir).load();
+        assertTrue(p.unlockedCharacters.contains("ninjagreen"));
+    }
+
+    /**
+     * A character id that is not one of the six is left where it is. It is
+     * either a hand edit or a roster entry added after this step was written,
+     * and dropping either would be this migration exceeding its remit.
+     */
+    @Test
+    void anUnknownCharacterIsNotSweptUp() {
+        JsonValue root = new JsonReader().parse(
+            "{ \"version\": 2, \"unlockedCharacters\": [\"ninjared\", \"karasu\"] }");
+        new V2ToV3().apply(root);
+        assertTrue(contains(root.get("unlockedCharacters"), "karasu"));
+        assertTrue(contains(root.get("unlockedSkins"), "red"));
+        assertFalse(contains(root.get("unlockedSkins"), "karasu"));
+    }
+
+    // ---- v4 to v5: the colours become characters again ---------------------------
+
+    /**
+     * A profile at v4 exactly as the format left it: one ninja, six colours,
+     * three bought heroes, two spells that came free with one of them, and a
+     * run in progress as the blue ninja.
+     */
+    private static final String V4_WITH_EVERYTHING =
+        "{ \"version\": 4, \"gold\": 4695,"
+        + " \"unlockedCharacters\": [\"karasu\", \"kitsune\", \"ninja\", \"yamabushi\"],"
+        + " \"unlockedSkins\": [\"blue\", \"dark\", \"fire\", \"green\", \"red\", \"water\"],"
+        + " \"ninjaSkin\": \"red\","
+        + " \"unlockedWeapons\": [\"axe\", \"fireball\", \"katana\", \"waterball\"],"
+        + " \"savedRun\": { \"seed\": 99, \"characterId\": \"ninja\", \"skinId\": \"blue\","
+        + " \"weaponId\": \"hammer\", \"throwWeaponId\": \"shuriken\", \"maxHp\": 100,"
+        + " \"baseMaxHp\": 100, \"hp\": 100 } }";
+
+    @Test
+    void everyColourOwnedBecomesANinjaAndTheThreeHeroesGo() throws IOException {
+        Files.writeString(dir.resolve("kagebi_profile.json"),
+            V4_WITH_EVERYTHING, StandardCharsets.UTF_8);
+        Profile p = new SaveManager(dir).load();
+
+        assertEquals(Profile.CURRENT_VERSION, p.version);
+        assertEquals(4695, p.gold, "no refund for the three that go");
+        for (String id : Assets.Actor.CHARACTERS) {
+            assertTrue(p.unlockedCharacters.contains(id), id + " was paid for as a colour");
+        }
+        assertEquals(6, p.unlockedCharacters.size, "and nothing else is in there");
+        assertFalse(p.unlockedWeapons.contains("fireball"), "the spells went with her");
+        assertFalse(p.unlockedWeapons.contains("waterball"));
+        assertTrue(p.unlockedWeapons.contains("axe"), "the steel did not");
+    }
+
+    /**
+     * The run in progress comes back as the ninja it was actually being played
+     * as, which is the character plus the colour.
+     */
+    @Test
+    void theRunInProgressKeepsItsColourAsItsCharacter() throws IOException {
+        Files.writeString(dir.resolve("kagebi_profile.json"),
+            V4_WITH_EVERYTHING, StandardCharsets.UTF_8);
+        Profile p = new SaveManager(dir).load();
+
+        assertNotNull(p.savedRun, "the run survived the change of roster");
+        assertEquals("ninjablue", p.savedRun.characterId);
+        assertEquals("hammer", p.savedRun.weaponId);
+        assertEquals("shuriken", p.savedRun.throwWeaponId);
+    }
+
+    /**
+     * A run saved as one of the three is not dropped, it changes colour.
+     *
+     * <p>Dropping it would be the tidier code and the worse outcome: a player
+     * who left off on floor five would rather come back as a different ninja
+     * than come back to a menu with the Continue button greyed out. The off
+     * hand does go, because a spell has nobody to hold it - and empty rather
+     * than substituted, since handing over a kunai answers a question the
+     * player did not ask.
+     */
+    @Test
+    void aRunSavedAsADeletedHeroComesBackAsTheStarter() {
+        JsonValue root = new JsonReader().parse(
+            "{ \"version\": 4, \"savedRun\": { \"characterId\": \"kitsune\","
+            + " \"throwWeaponId\": \"fireball\" } }");
+        new V4ToV5().apply(root);
+        JsonValue run = root.get("savedRun");
+        assertEquals("ninjagreen", run.getString("characterId"));
+        assertNull(run.get("throwWeaponId"));
+    }
+
+    /**
+     * A character id from neither roster is left alone, the way {@link V2ToV3}
+     * leaves one alone going the other way. It is a hand edit or a branch, and
+     * dropping it would be this step exceeding its remit - {@code SaveManager}
+     * is what refuses to load one, and it does that for every id equally.
+     */
+    @Test
+    void anUnknownCharacterIsStillNotSweptUp() {
+        JsonValue root = new JsonReader().parse(
+            "{ \"version\": 4, \"unlockedCharacters\": [\"ninja\", \"someoneelse\"],"
+            + " \"unlockedSkins\": [\"green\"] }");
+        new V4ToV5().apply(root);
+        assertTrue(contains(root.get("unlockedCharacters"), "someoneelse"));
+        assertTrue(contains(root.get("unlockedCharacters"), "ninjagreen"));
+        assertFalse(contains(root.get("unlockedCharacters"), "ninja"), "the collapsed entry goes");
+        assertNull(root.get("unlockedSkins"));
+    }
+
+    /** Green is free and always was, however the file got to be empty. */
+    @Test
+    void theStarterSurvivesAFileThatOmitsEverything() {
+        JsonValue root = new JsonReader().parse("{ \"version\": 4 }");
+        new V4ToV5().apply(root);
+        assertTrue(contains(root.get("unlockedCharacters"), "ninjagreen"));
+    }
+
+    private static boolean contains(JsonValue array, String value) {
+        for (JsonValue e = array.child; e != null; e = e.next) {
+            if (value.equals(e.asString())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

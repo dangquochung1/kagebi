@@ -38,6 +38,8 @@ public final class CameraController {
 
     private final OrthographicCamera camera = new OrthographicCamera();
     private final PixelViewport viewport;
+    /** Reused by {@link #toVirtual}; unprojecting must not allocate per frame. */
+    private final com.badlogic.gdx.math.Vector2 scratch = new com.badlogic.gdx.math.Vector2();
 
     /** Where the camera wants to be, in virtual pixels, before rounding. */
     private float x;
@@ -65,6 +67,22 @@ public final class CameraController {
 
     public PixelViewport viewport() {
         return viewport;
+    }
+
+    /**
+     * Turns a window pixel into a world pixel, through this camera's viewport.
+     *
+     * <p>The naive form - divide the window size by {@link Cfg#VIRT_W} and scale
+     * - is wrong the moment the window is not an exact multiple of the virtual
+     * resolution, because {@link PixelViewport} then letterboxes and the black
+     * bars are not part of the picture. It was wrong in exactly that way where
+     * the village badges were hit-tested, and the error grew with the size of
+     * the bars. The viewport knows where it put the image; nothing else does.
+     *
+     * <p>The returned vector is reused, so read it before calling again.
+     */
+    public com.badlogic.gdx.math.Vector2 toVirtual(float windowX, float windowY) {
+        return viewport.unproject(scratch.set(windowX, windowY));
     }
 
     /** Jumps the centre of the view, with no interpolation. */

@@ -108,37 +108,39 @@ class ContentContractTest {
     }
 
     /**
-     * The character select screen draws a ninja's perk on one line, and the
-     * screen is 320 pixels wide.
+     * A ninja's perk has two wrapped lines at the foot of the roster panel.
      *
-     * <p>Written after that line ran off both edges. The perk text used to be a
-     * separate short string; when it was merged with the shop's - which also
-     * carried the unlock condition - it became a sentence and a half and there
-     * was nothing to stop it. Measured against the font's own advance widths
-     * rather than counted in characters, because Vietnamese runs longer than
+     * <p>This used to be one line across a 292px screen, back when a whole
+     * screen was given over to choosing a character. That screen is gone and
+     * the choice is a 122px panel on the sheet, so the budget is a fifth of
+     * what it was and a sentence and a half no longer fits anywhere.
+     *
+     * <p>Measured against the font's own advance widths rather than counted in
+     * characters, because Vietnamese runs about fifteen per cent longer than
      * English for the same sentence and neither has a fixed width.
      */
     @Test
-    void everyPerkLineFitsTheCharacterSelectScreen() {
+    void everyPerkLineFitsTheRosterPanel() {
         Map<Integer, Integer> advance = glyphAdvances();
-        List<String> tooWide = new ArrayList<>();
+        List<String> tooTall = new ArrayList<>();
         for (String lang : new String[] {"vi", "en"}) {
             for (Map.Entry<String, String> e : readStrings(lang).entrySet()) {
                 if (!e.getKey().startsWith("character.") || !e.getKey().endsWith(".desc")) {
                     continue;
                 }
-                int width = textWidth(advance, e.getValue());
-                if (width > PERK_WIDTH) {
-                    tooWide.add(e.getKey() + " (" + lang + ") is " + width
-                        + "px, over " + PERK_WIDTH);
+                int lines = wrappedLines(advance, e.getValue(), PERK_WIDTH);
+                if (lines > PERK_LINES) {
+                    tooTall.add(e.getKey() + " (" + lang + ") wraps to " + lines
+                        + " lines, over " + PERK_LINES);
                 }
             }
         }
-        assertTrue(tooWide.isEmpty(), "perk lines that will not fit: " + tooWide);
+        assertTrue(tooTall.isEmpty(), "perk lines that will not fit: " + tooTall);
     }
 
-    /** {@code CharacterSelectScreen.PERK_WIDTH}: 320 less a 14px margin a side. */
-    private static final int PERK_WIDTH = 320 - 2 * 14;
+    /** {@code CharacterScreen.PERK_W}, and the bands the panel has left. */
+    private static final int PERK_WIDTH = 122 - 8;
+    private static final int PERK_LINES = 2;
 
     /** {@code WorldMapScreen}: DESC_W, and the DESC_LINES the panel budgets. */
     private static final int BLURB_WIDTH = 180;

@@ -625,11 +625,7 @@ class EntityWorldTest {
         p.wins = 1;
         p.runs = 20;
         for (ShopCatalog.Unlock u : shop.unlocks()) {
-            if (u.kind == ShopCatalog.UnlockKind.CHARACTER) {
-                p.unlockedCharacters.add(u.id);
-            } else {
-                p.unlockedWeapons.add(u.id);
-            }
+            ShopCatalog.grant(u, p);
         }
         for (long seed = 1; seed <= 500; seed++) {
             assertNull(openOneChest(shop, p, seed),

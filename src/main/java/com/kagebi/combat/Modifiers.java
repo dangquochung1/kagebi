@@ -127,6 +127,43 @@ public final class Modifiers {
         return value("damage_taken_mult") * value("glass_cannon");
     }
 
+    /**
+     * Flat damage soaked before percentages, from armour worn and stones set.
+     *
+     * <p>{@code Player.armour} and {@code Combatant.armour()} have existed
+     * since combat was written and nothing ever wrote to them, so armour was
+     * permanently zero and {@code Damage.incoming} subtracted nothing. This is
+     * the value that finally fills it; the plumbing on the other side needed no
+     * change at all.
+     */
+    public int armourAdd() {
+        return Math.round(intValue("armour_add") * value("armour_mult"));
+    }
+
+    /**
+     * The share of armour kept, for something that trades defence for offence.
+     *
+     * <p>Folded into {@link #armourAdd} rather than read separately, so no
+     * caller has to remember that armour has two halves. Multiplicative by its
+     * name, so two things halving it leave a quarter rather than nothing -
+     * which is the rule everything ending in {@code _mult} already follows.
+     */
+    public float armourMult() {
+        return value("armour_mult");
+    }
+
+    /**
+     * Everything multiplying a thrown hit: the off hand's own damage number.
+     *
+     * <p>Separate from {@link #outgoingMult} because the two hands are separate
+     * statistics on the profile screen and a stone that sharpens a sword should
+     * not also sharpen a fireball. {@code damage_mult} is in both because it is
+     * the one that means "damage", full stop.
+     */
+    public float throwMult() {
+        return value("damage_mult") * value("throw_damage_mult");
+    }
+
     public float critChanceAdd() {
         return value("crit_chance_add");
     }

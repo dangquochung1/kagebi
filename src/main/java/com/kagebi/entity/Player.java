@@ -4,12 +4,16 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.kagebi.Cfg;
 import com.kagebi.Dir;
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.utils.Array;
 import com.kagebi.combat.AttackState;
+import com.kagebi.combat.Combatant;
 import com.kagebi.combat.Damage;
 import com.kagebi.combat.Faction;
 import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
 import com.kagebi.combat.Modifiers;
+import com.kagebi.data.def.SkillDef;
 import com.kagebi.data.def.WeaponDef;
 import com.kagebi.gen.CollisionGrid;
 import com.kagebi.gfx.Anim;
@@ -141,6 +145,19 @@ public final class Player extends Entity {
 
     private int hurtSteps;
     private int deadSteps;
+    /** The last left-or-right heading, for mirroring single-facing art. */
+    private Dir lastHorizontal = Dir.RIGHT;
+
+    /** Steps each frame of the ninjas' two-frame death column is held for. */
+    private static final int DEAD_STEPS_PER_FRAME = 10;
+    /**
+     * How long a death lasts when the character has no death art at all.
+     *
+     * <p>Not zero. The screen waits this out before declaring the run over, and
+     * a wait of nothing would put the game-over screen up on the same step the
+     * last hit landed - which is the behaviour this replaced.
+     */
+    private static final int DEATH_FALLBACK_STEPS = 20;
 
     /** Rolled once when the swing starts, not once per target. */
     private int swingDamage;
@@ -263,9 +280,19 @@ public final class Player extends Entity {
         return mods.incomingMult() * run.difficulty.damageTaken;
     }
 
+    /**
+     * Flat soak, from worn armour and from anything buffing it for a while.
+     *
+     * <p>Summed here rather than written into {@link #armour} when the kit
+     * changes, so the two sources cannot fall out of step: the field is what a
+     * potion added and expires, the modifier is what is being worn and does
+     * not. Before there was armour to wear, this returned a field nothing ever
+     * wrote, and {@code Damage.incoming} subtracted zero on every hit in the
+     * game.
+     */
     @Override
     public int armour() {
-        return armour;
+        return armour + mods.armourAdd();
     }
 
     @Override
@@ -283,11 +310,103 @@ public final class Player extends Entity {
         return run.maxHp;
     }
 
+    /**
+     * How long this character's death takes to play, in fixed steps.
+     *
+     * <p>The mirror of {@link Enemy#deathDuration()}, and it exists for the
+     * same reason: the length belongs to the art, not to the screen that waits
+     * for it. A ninja's two-frame column runs 20 steps; Karasu's six-frame
+     * strip runs 48. Hard-coding either would cut one short or leave the other
+     * staring at a corpse.
+     */
+    public int deathDuration() {
+        if (sprites == null) {
+            return DEATH_FALLBACK_STEPS;
+        }
+        if (sprites.death != null) {
+            return sprites.death.durationSteps();
+        }
+        return sprites.dead == null ? DEATH_FALLBACK_STEPS
+            : sprites.dead.length * DEAD_STEPS_PER_FRAME;
+    }
+
+    /** Steps since this player died; zero while alive. */
+    public int deadSteps() {
+        return deadSteps;
+    }
+
+    /**
+     * Which way a side-view hero is mirrored.
+     *
+     * <p>The three tengu are drawn facing one way only, so up and down have no
+     * art of their own and the sprite has to keep whichever side it was last
+     * turned to. Without this, walking left and then up flips the character to
+     * face east for as long as they walk north - which reads as the sprite
+     * glitching rather than as a limitation of the art.
+     */
+    @Override
+    protected boolean flipX() {
+        return sprites != null && sprites.singleFacing && lastHorizontal == Dir.LEFT;
+    }
+
+    // ---- skills ----------------------------------------------------------------
+
+    /**
+     * What the three keys are bound to, and how long until each may fire again.
+     *
+     * <p>Held on the player rather than on the run, so a cooldown does not
+     * survive a death - and rebuilt when the loadout is, beside the modifiers,
+     * because the skills a character has is content and content can be
+     * reloaded under a running game.
+     */
+    private final SkillDef[] skills = new SkillDef[Intent.SKILLS];
+    private final int[] cooldown = new int[Intent.SKILLS];
+
+    /** The lunge in progress: its definition, how far through, and its heading. */
+    private SkillDef lunging;
+    private int lungeElapsed;
+    private float lungeDirX;
+    private float lungeDirY;
+    private int lungeDamage;
+    /** Everything the current lunge has already hit, so nothing is hit twice. */
+    private final java.util.List<Combatant> lungeStruck = new java.util.ArrayList<>();
+
+    /** The ultimate: what is up, for how long, and when the aura is refreshed. */
+    private SkillDef avatar;
+    private int avatarSteps;
+    private int auraTick;
+
+    /**
+     * Health the player spent on purpose this step.
+     *
+     * <p>The world watches the run's health across a step and treats any
+     * fall as an injury - hit-stop, a shake and the hurt sound. That is right
+     * for everything that had ever reduced it, and wrong for the ultimate,
+     * which is bought with blood: casting it played the sound of being hit,
+     * shook the screen and froze the next five steps, which ate the dash the
+     * player pressed immediately afterwards.
+     *
+     * <p>Reported rather than special-cased in the world, so the world still
+     * has one rule - a fall this did not account for is still an injury.
+     */
+    private int spentThisStep;
+
+    /** The stick this step, so a lunge can aim at eight directions. */
+    private float intentX;
+    private float intentY;
+    private boolean intentMoving;
+
+    /** Steps a lunge takes. Short: it is a thrust, not a second dash. */
+    public static final int LUNGE_STEPS = 12;
+    /** How often the aura strip is re-cast while the ultimate is up. */
+    private static final int AURA_EVERY = 14;
+
     // ---- simulation ------------------------------------------------------
 
     @Override
     public void step(EntityWorld world) {
         hitsLandedThisStep = 0;
+        spentThisStep = 0;
         stepTimers();
         stepBuffs();
         hp = run.hp;
@@ -299,6 +418,14 @@ public final class Player extends Entity {
             return;
         }
 
+        // Read before this step can turn the player, so the mirror of a
+        // side-view hero always reflects a heading they actually held. Kept
+        // here rather than at the four places facing is assigned, because a
+        // fifth one added later would silently not update it.
+        if (facing == Dir.LEFT || facing == Dir.RIGHT) {
+            lastHorizontal = facing;
+        }
+
         applyShove(world.collision());
         if (hurtSteps > 0) {
             hurtSteps--;
@@ -306,14 +433,31 @@ public final class Player extends Entity {
         if (rollCooldown > 0) {
             rollCooldown--;
         }
+        stepSkills(world);
 
         Intent intent = world.intent();
+        // Kept so beginLunge can aim at eight directions without being handed
+        // the intent: it is reached from cast(), which is reached from a loop
+        // over the slots, and threading the intent through both for one read
+        // is more plumbing than a field.
+        intentX = intent.moveX * intent.moveScale();
+        intentY = intent.moveY * intent.moveScale();
+        intentMoving = intent.moving();
 
         // Actions start before the swing is advanced, so a weapon with no
         // windup lands on the step the button was read rather than one step
         // later. One step of added latency at 60Hz is measurable by hand.
+        // Skills before the ordinary actions: a player who presses a skill and
+        // attack in the same step meant the skill, which is the one on a
+        // cooldown they have been waiting out.
+        for (int i = 0; i < Intent.SKILLS; i++) {
+            if (intent.skill[i] && cast(i, world)) {
+                intent.consumeSkill(i);
+            }
+        }
+
         if (canRoll(intent)) {
-            beginRoll(intent);
+            beginRoll(intent, world);
         } else if (canThrow(intent)) {
             beginThrow(intent, world);
         } else if (canAttack(intent)) {
@@ -326,6 +470,11 @@ public final class Player extends Entity {
         if (intent.useItem && !rolling) {
             intent.consumeUseItem();
             world.useQuickItem();
+        }
+
+        if (lunging != null) {
+            advanceLunge(world);
+            return;
         }
 
         if (rolling) {
@@ -351,6 +500,206 @@ public final class Player extends Entity {
         } else {
             moving = false;
         }
+    }
+
+    /**
+     * Binds the skills this character has, by slot.
+     *
+     * <p>Called wherever the modifiers are rebuilt, because both answer the
+     * same question - what is this character able to do - and letting them
+     * drift apart is how a skill outlives the character that had it.
+     */
+    public void setSkills(Array<SkillDef> available) {
+        java.util.Arrays.fill(skills, null);
+        if (available == null) {
+            return;
+        }
+        for (SkillDef s : available) {
+            int slot = s.slot - 1;
+            if (slot >= 0 && slot < skills.length) {
+                skills[slot] = s;
+            }
+        }
+    }
+
+    public SkillDef skill(int slot) {
+        return slot >= 0 && slot < skills.length ? skills[slot] : null;
+    }
+
+    /** Steps until this slot may fire again; zero when it is ready. */
+    public int cooldown(int slot) {
+        return slot >= 0 && slot < cooldown.length ? cooldown[slot] : 0;
+    }
+
+    /** Whether the ultimate is up, which the HUD and the dash both ask. */
+    public boolean transformed() {
+        return avatarSteps > 0 && avatar != null;
+    }
+
+    public int avatarSteps() {
+        return avatarSteps;
+    }
+
+    /** The ultimate that is up, or null. */
+    public SkillDef avatar() {
+        return avatar;
+    }
+
+    /** Health this step's actions cost on purpose; see {@link #spentThisStep}. */
+    public int spentThisStep() {
+        return spentThisStep;
+    }
+
+    public boolean lunging() {
+        return lunging != null;
+    }
+
+    private void stepSkills(EntityWorld world) {
+        for (int i = 0; i < cooldown.length; i++) {
+            if (cooldown[i] > 0) {
+                cooldown[i]--;
+            }
+        }
+        if (avatarSteps > 0 && --avatarSteps == 0) {
+            // Ended by putting the modifiers back, not by undoing each one:
+            // half a dozen inverse operations applied in the wrong order is
+            // how a buff leaves something behind.
+            avatar = null;
+            world.refreshMods();
+        } else if (transformed() && ++auraTick >= AURA_EVERY) {
+            auraTick = 0;
+            world.avatarAura(avatar);
+        }
+    }
+
+    /**
+     * Whether anything may be cast at all.
+     *
+     * <p>The same gate a roll uses, plus not mid-lunge. A skill during a roll
+     * would cancel the invulnerability the roll was spent on, and a skill
+     * during a swing would let the player skip the recovery every weapon is
+     * balanced around.
+     */
+    private boolean canCast() {
+        return alive() && !rolling && lunging == null && hurtSteps == 0
+            && (!swing.busy() || swing.cancellable());
+    }
+
+    /**
+     * Tries to cast whatever is on a slot.
+     *
+     * @return whether anything happened, so the press is only spent if it did
+     */
+    private boolean cast(int slot, EntityWorld world) {
+        SkillDef s = skills[slot];
+        if (s == null || cooldown[slot] > 0 || !canCast()) {
+            return false;
+        }
+        switch (s.kind) {
+            case LUNGE: beginLunge(s, world); break;
+            case NOVA: castNova(s, world); break;
+            case AVATAR: if (!beginAvatar(s, world)) {
+                    return false;
+                }
+                break;
+            default: return false;
+        }
+        cooldown[slot] = s.cooldownSteps;
+        return true;
+    }
+
+    /**
+     * The thrust, aimed by the stick and not by the facing.
+     *
+     * <p>{@code Dir} has four values and the player can hold eight directions,
+     * so a lunge that read {@code facing} would refuse to go diagonally - the
+     * player would press up-right and be thrown straight right. The heading is
+     * taken from the raw axes the way {@link #beginRoll} takes it, which is
+     * the one place in this class that already knew how.
+     */
+    private void beginLunge(SkillDef s, EntityWorld world) {
+        swing.cancel();
+        lunging = s;
+        lungeElapsed = 0;
+        lungeStruck.clear();
+        if (intentMoving) {
+            lungeDirX = intentX;
+            lungeDirY = intentY;
+            facing = Dir.of(intentX, intentY);
+        } else {
+            lungeDirX = facing.dx;
+            lungeDirY = facing.dy;
+        }
+        lungeDamage = Damage.outgoing(weapon == null ? 1 : weapon.damage,
+            damageMult * mods.outgoingMult(hpFraction()) * s.damageMult,
+            false, critMult, rng);
+        // The bolt lies along the thrust and rides the body, which is what was
+        // asked for: pointing where the player is going, not where they were.
+        float angle = MathUtils.atan2(lungeDirY, lungeDirX) * MathUtils.radiansToDegrees;
+        world.skillFx(s.vfx, x, y, true, angle, 1f, 1f, this, 0f);
+        world.onSwingBegun(weapon);
+    }
+
+    private void advanceLunge(EntityWorld world) {
+        float perStep = lunging.range / LUNGE_STEPS;
+        moveBy(world.collision(), lungeDirX * perStep, lungeDirY * perStep);
+        world.lungeThrough(lunging, lungeDamage, lungeStruck);
+        if (++lungeElapsed >= LUNGE_STEPS) {
+            lunging = null;
+        }
+    }
+
+    private void castNova(SkillDef s, EntityWorld world) {
+        swing.cancel();
+        int damage = Damage.outgoing(weapon == null ? 1 : weapon.damage,
+            damageMult * mods.outgoingMult(hpFraction()) * s.damageMult,
+            false, critMult, rng);
+        world.castNova(s, damage);
+    }
+
+    /**
+     * The transformation, and the blood it costs.
+     *
+     * <p>The cost is a share of current health with a floor under it, and the
+     * floor is the whole design: an ultimate that cannot be used when losing is
+     * an ultimate that cannot be used, because losing is when anybody reaches
+     * for one. Below the floor it is free rather than refused - refusing would
+     * be the same mistake dressed as a warning.
+     *
+     * @return false only if the player is already dead, which cannot happen
+     *         here but is cheap to be sure of before subtracting health
+     */
+    private boolean beginAvatar(SkillDef s, EntityWorld world) {
+        if (!alive()) {
+            return false;
+        }
+        if (hpFraction() > s.hpFloor) {
+            int cost = Math.round(run.hp * s.hpCost);
+            int paid = run.hp - Math.max(1, run.hp - cost);
+            run.hp -= paid;
+            hp = run.hp;
+            spentThisStep += paid;
+        }
+        avatar = s;
+        avatarSteps = s.durationSteps;
+        auraTick = 0;
+        // The numbers change by rebuilding them, so ending is the same act as
+        // starting and neither has to know what the other did.
+        world.refreshMods();
+        world.avatarFlash();
+        world.avatarAura(s);
+        return true;
+    }
+
+    /**
+     * What the ultimate adds, folded in beside gear and relics.
+     *
+     * <p>Read by {@code Loadout.of} rather than applied here, so there is one
+     * place that knows how a modifier is built and the ultimate is just a
+     * fourth source of them - which is also why ending it needs no inverse.
+     */
+    public SkillDef activeAvatar() {
+        return transformed() ? avatar : null;
     }
 
     private boolean canRoll(Intent intent) {
@@ -383,8 +732,11 @@ public final class Player extends Entity {
         }
         swingIsThrow = true;
         swingCrit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
+        // The off hand has its own multiplier. It used to share the main
+        // hand's, which meant melee_damage_mult - a perk and an upgrade both
+        // named for melee - was quietly sharpening thrown kunai as well.
         swingDamage = Damage.outgoing(throwWeapon.damage,
-            damageMult * mods.outgoingMult(hpFraction()),
+            damageMult * mods.throwMult(),
             swingCrit, critMult * mods.critDamageMult(), rng);
         float haste = Math.max(0.25f, mods.attackSpeedMult());
         world.onSwingBegun(throwWeapon);
@@ -394,7 +746,7 @@ public final class Player extends Entity {
             throwWeapon.rootSteps);
     }
 
-    private void beginRoll(Intent intent) {
+    private void beginRoll(Intent intent, EntityWorld world) {
         intent.consumeRoll();
         swing.cancel();
         rolling = true;
@@ -410,6 +762,16 @@ public final class Player extends Entity {
             // and much worse game.
             rollDirX = facing.dx;
             rollDirY = facing.dy;
+        }
+        // While the storm is up, a dash is also a weapon: it leaves a trail
+        // and arcs to whatever is close. Both are the ultimate's doing rather
+        // than the dash's, so both are asked of the ultimate's definition and
+        // neither happens when it is not up.
+        if (transformed()) {
+            world.dashTrail(rollDirX, rollDirY);
+            world.dashChain(avatar, Damage.outgoing(weapon == null ? 1 : weapon.damage,
+                damageMult * mods.outgoingMult(hpFraction()) * avatar.damageMult,
+                false, critMult, rng));
         }
     }
 
@@ -698,8 +1060,15 @@ public final class Player extends Entity {
             return null;
         }
         if (!alive()) {
+            // A side-view hero carries a real death strip; the ninjas carry a
+            // two-frame column. Whichever exists is played once and held on
+            // its last frame.
+            if (sprites.death != null) {
+                return sprites.death.frame(facing, deadSteps);
+            }
             TextureRegion[] d = sprites.dead;
-            return d == null ? null : d[Math.min(d.length - 1, deadSteps / 10)];
+            return d == null ? null
+                : d[Math.min(d.length - 1, deadSteps / DEAD_STEPS_PER_FRAME)];
         }
         if (rolling) {
             return ActorSprites.frameOf(sprites.roll, facing, rollElapsed, ROLL_STEPS);

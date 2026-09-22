@@ -139,7 +139,7 @@ public abstract class ShelfScreen extends SimScreen {
         if (flash > 0) {
             flash--;
         }
-        if (input().justPressed(GameAction.PAUSE) || input().justPressed(GameAction.INVENTORY)) {
+        if (input().justPressed(GameAction.PAUSE) || input().justPressed(GameAction.BAG)) {
             game.audio().playSfx(Assets.SFX_CANCEL);
             stack().pop();
             return;
@@ -263,7 +263,7 @@ public abstract class ShelfScreen extends SimScreen {
         batch.setColor(GOLD);
         Hud.right(batch, font, gold, right, TITLE_TOP);
         batch.setColor(Color.WHITE);
-        TextureRegion coin = game.skin().getRegion(Assets.Ui.COIN);
+        TextureRegion coin = Preload.coin();
         batch.draw(coin, Math.round(right - Hud.width(font, gold) - coin.getRegionWidth() - 2),
                    TITLE_TOP - Hud.LINE + 2);
     }
@@ -294,7 +294,7 @@ public abstract class ShelfScreen extends SimScreen {
                 // Five tabs leave no room at the end of their row, so it goes
                 // up a line, beside the purse.
                 String gold = String.valueOf(game.profile().gold);
-                TextureRegion coin = game.skin().getRegion(Assets.Ui.COIN);
+                TextureRegion coin = Preload.coin();
                 float coinLeft = PANEL_X + PANEL_W - 9 - Hud.width(font, gold) - coin.getRegionWidth() - 2;
                 Hud.right(batch, font, aside, Math.round(coinLeft - 8), TITLE_TOP);
             }

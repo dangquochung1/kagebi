@@ -123,7 +123,7 @@ public class TraderScreen extends SimScreen {
         if (flash > 0) {
             flash--;
         }
-        if (input().justPressed(GameAction.PAUSE) || input().justPressed(GameAction.INVENTORY)) {
+        if (input().justPressed(GameAction.PAUSE) || input().justPressed(GameAction.BAG)) {
             game.audio().playSfx(Assets.SFX_CANCEL);
             stack().pop();
             return;

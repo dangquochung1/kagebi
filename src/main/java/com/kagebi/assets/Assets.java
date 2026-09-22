@@ -171,9 +171,53 @@ public final class Assets {
         public static final String BUTTON_DOWN = "ui/button_down";
         public static final String BUTTON_DISABLED = "ui/button_disabled";
 
+        /**
+         * The CraftPix RPG GUI pack, cut down by {@code tools/slice_heroui.py}.
+         *
+         * <p>Whole windows rather than nine-patch parts, because that is what
+         * the pack ships and what this game needs: the screens are a fixed
+         * 320x180, so a window that is already the right shape never has to
+         * stretch and the artist's own proportions survive. Only the three that
+         * earn their place are here - the forge, the equipment frame and the
+         * bag grid. Everything else on these screens stays on the game's own
+         * skin, whose palette the pack happens to share.
+         */
+        public static final String HERO_CRAFT = "ui/hero/craft";
+        public static final String HERO_EQUIPMENT = "ui/hero/equipment";
+        public static final String HERO_INVENTORY = "ui/hero/inventory";
+        /**
+         * <b>These four have the word CREATE printed into their pixels.</b>
+         *
+         * <p>They were sliced out of the forge window, where CREATE is the
+         * label, and they are usable only where CREATE is still the label -
+         * which is the forge, and nothing else. Drawing a label over one of
+         * them does not replace the word, it lands on top of it: the New Game
+         * confirmation read "CREATE" on both buttons for a while, with "Co"
+         * and "Khong" smeared across them. They are also flat regions rather
+         * than nine-patches, so widening one stretches the letters.
+         *
+         * <p>A blank plate that stretches properly is {@link #BUTTON_UP} and
+         * its three states. Reach for those.
+         */
+        public static final String HERO_BUTTON = "ui/hero/button";
+        public static final String HERO_BUTTON_OVER = "ui/hero/button_over";
+        public static final String HERO_BUTTON_DOWN = "ui/hero/button_down";
+        public static final String HERO_BUTTON_OFF = "ui/hero/button_off";
+
         public static final String TAB = "ui/tab";
         public static final String TAB_OVER = "ui/tab_over";
         public static final String TAB_SELECTED = "ui/tab_selected";
+
+        /**
+         * The speech bubble over someone owed for a finished job.
+         *
+         * <p>The pack ships it and nothing drew it until there were quests to
+         * draw it for. Its partner is the alert mark the workshops already use;
+         * see {@code HubScreen.drawQuestMarks} for which means which.
+         */
+        public static final String MARK_CHAT = "ui/sunny/icons/expression_chat";
+        /** Drawn pointing up, and turned to a heading. See {@code ui.Waypoint}. */
+        public static final String ARROW_UP = "ui/sunny/icons/arrow_up";
         public static final String TAB_DISABLED = "ui/tab_disabled";
 
         public static final String CHECK_ON = "ui/check_on";
@@ -247,7 +291,22 @@ public final class Assets {
         public static final String ICON_SWORD = "items/weapons/sword/sprite";
         public static final String ICON_KUNAI = "items/projectile/kunai";
         public static final String ICON_SHURIKEN = "items/projectile/shuriken";
+        /** Kitsune's two spells, cut from their own flight art by make_jphero.py. */
+        public static final String ICON_FIREBALL = "items/projectile/fireball";
+        public static final String ICON_WATERBALL = "items/projectile/waterball";
         public static final String ICON_RELIC = "items/scroll/scrollrock";
+
+        /**
+         * A skill's icon on the bar: 24x24, opaque, with a rim.
+         *
+         * <p>Opaque on purpose. The rest of the interface sits on a panel, but
+         * these are drawn over whatever the dungeon floor happens to be, and a
+         * transparent bolt over a lit tile is invisible at exactly the moment
+         * the player is looking for it.
+         */
+        public static String skillIcon(String name) {
+            return "ui/skill/" + name;
+        }
 
         /**
          * The icon for a weapon id, falling back to a plain sword. Weapon defs
@@ -262,6 +321,8 @@ public final class Assets {
                 case "pickaxe": return ICON_PICKAXE;
                 case "kunai": return ICON_KUNAI;
                 case "shuriken": return ICON_SHURIKEN;
+                case "fireball": return ICON_FIREBALL;
+                case "waterball": return ICON_WATERBALL;
                 default: return ICON_SWORD;
             }
         }
@@ -276,18 +337,30 @@ public final class Assets {
     public static final class Actor {
 
         /**
-         * The six playable characters.
+         * The playable characters: six ninja, one colour each.
          *
-         * <p>Only NinjaGreen ships the full set of animations; the pack's other
-         * sixteen ninjas are NPC-grade 16x16 walk cycles and cannot be played.
-         * The other five here are recoloured from it by
-         * {@code tools/make_ninjas.py}, each using the cloth ramp of the pack's
-         * own variant of that name, so they are in the pack's palette rather
-         * than hue-rotated out of it.
+         * <p><b>A character is a colour here, and that is deliberate.</b> The
+         * six recolours were six entries once; they were folded into one ninja
+         * with six skins on the grounds that a palette is not a roster; they
+         * are six again. What changed is the reason. Each one now carries a
+         * run-start perk of its own and the green one carries none on purpose,
+         * so the list is made of choices rather than of hues with statistics
+         * invented to justify their price. Green is the one you start with,
+         * and what you get out of it is your own.
+         *
+         * <p>The ids are the sprite folders, so nothing has to translate
+         * between a character and its art.
+         *
+         * <p>The three heroes the Japanese pack drew side-on went with this
+         * change. They were a second animation shape - one row of 48px frames
+         * and no back view, which the pack never drew and nobody could invent -
+         * so every screen that put a hero on it had to know which kind it was
+         * looking at. Three of them got it wrong and one took the process down
+         * with it. There is one shape now, and {@code Preload.idle} has no
+         * branch left to get wrong.
          */
         public static final String[] CHARACTERS = {
-            "ninjagreen", "ninjared", "ninjablue",
-            "ninjadark", "ninjafire", "ninjawater",
+            "ninjagreen", "ninjared", "ninjablue", "ninjadark", "ninjafire", "ninjawater",
         };
 
         /**
@@ -520,6 +593,22 @@ public final class Assets {
     public static final class Fx {
 
         /**
+         * The lightning skills, from the Frostwindz pack.
+         *
+         * <p>Square-celled single-row strips written by
+         * {@code tools/make_skillfx.py}; the pack's own sheets are not square
+         * and one of them is a two-row grid, and {@code Anim.strip} can read
+         * neither. Named by what they are rather than by the pack's numbers,
+         * because "VFX4" says nothing at the call site.
+         */
+        public static final String SKILL_DIR = "fx/skill/";
+
+        /** e.g. {@code skill("nova")} -> fx/skill/nova */
+        public static String skill(String name) {
+            return SKILL_DIR + name;
+        }
+
+        /**
          * The way down: a four-frame strip of 32x32 magic circle. The packs
          * ship no stairs, and a glowing circle on the floor of the last room
          * reads as "step here" in any tileset.
@@ -539,7 +628,10 @@ public final class Assets {
          * used to be drawn as one, and a shuriken flew as a kunai.
          */
         public static String projectile(String id) {
-            return "shuriken".equals(id) ? PROJECTILE_SHURIKEN : PROJECTILE_KUNAI;
+            switch (id) {
+                case "shuriken": return PROJECTILE_SHURIKEN;
+                default: return PROJECTILE_KUNAI;
+            }
         }
         /** A lingering area, for casters' clouds. Same radial glow, different use. */
         public static final String HAZARD_CLOUD = "fx/projectile/energyball";
@@ -668,6 +760,25 @@ public final class Assets {
          */
         public static final String CHEST = "props/depths/chest/chest";
         public static final String CHEST_OPEN = "props/depths/chest/chest_open";
+
+        /**
+         * A coin turning on the spot: four 16x16 frames in a 64x16 strip.
+         *
+         * <p>The purse icon outside the dungeon, where {@link Ui#COIN}'s seven
+         * pixels are too small to carry a six-figure total. It is not a
+         * replacement for that one: in the dungeon the HUD is crowded against
+         * the hearts and the keys, and a coin twice the size there would push
+         * the row into the play area. So the small still coin stays where
+         * space is tight, and this one is used on the island, the world map,
+         * the shops and the profile - the places the player stops to read.
+         *
+         * <p>The art was packed into the fx atlas with the rest of the depths
+         * props and then never used by anything; it is the pack's own coin,
+         * drawn to match {@link Ui#COIN}, so the two read as the same currency.
+         */
+        public static final String COIN_SPIN = "props/depths/coin/coin";
+        /** Steps a frame for {@link #COIN_SPIN}: a full turn takes a second. */
+        public static final int COIN_SPIN_STEPS = 15;
 
         private Prop() {}
     }

@@ -180,13 +180,20 @@ final class CoveBossChainTest {
         Enemy first = world.boss();
         assertNotNull(first);
         first.takeHit(first.hp, first.x, first.y, 0f);
-        for (int t = 0; t < 8 * 60 + 8; t++) {
-            input.tick(world);          // through the whole first intermission
+        // Waited for rather than counted out. The intermission is eight
+        // seconds of orb steps, and the world does not step anything on a
+        // frame it is in hitstop - so every spell that actually lands on the
+        // player buys the orb five more ticks of wall clock. A fixed budget
+        // here only held while the rain could not hit anyone.
+        Enemy zombie = null;
+        for (int t = 0; t < BUDGET && zombie == null; t++) {
+            input.tick(world);
+            Enemy boss = world.boss();
+            if (boss != null && "piratezombie".equals(boss.def.id)) {
+                zombie = boss;
+            }
         }
-
-        Enemy zombie = world.boss();
         assertNotNull(zombie, "the fire orb never handed over");
-        assertEquals("piratezombie", zombie.def.id);
 
         // Just past the 40% mark, and one step for the boss to notice.
         zombie.takeHit(zombie.hp - (int) (zombie.maxHp * 0.4f) + 1,

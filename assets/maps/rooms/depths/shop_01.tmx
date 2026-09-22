@@ -101,7 +101,7 @@
   <object id="5" name="" type="ENTRY" x="168" y="88" />
   <object id="6" name="" type="SHOPKEEPER" x="168" y="56" />
   <object id="7" name="stock" type="CHEST" x="88" y="104" />
-  <object id="8" name="stock" type="CHEST" x="152" y="120" />
+  <object id="8" name="stock" type="CHEST" x="168" y="120" />
   <object id="9" name="stock" type="CHEST" x="232" y="104" />
   <object id="10" name="torch" type="PROP" x="56" y="168" />
   <object id="11" name="torch" type="PROP" x="264" y="168" />

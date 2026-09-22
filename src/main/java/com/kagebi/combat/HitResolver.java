@@ -64,7 +64,7 @@ public final class HitResolver {
         if (target.invulnerable()) {
             return false;
         }
-        int amount = Damage.incoming(box.damage, target.armour(), 0f,
+        int amount = Damage.incoming(box.damage, target.armour(), target.resist(),
             target.damageTakenMult());
         target.takeHit(amount, box.originX, box.originY, box.knockback);
         return true;

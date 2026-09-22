@@ -43,11 +43,17 @@ final class DataFiles {
     static final String WORKSHOPS = "workshops";
     static final String TOOLS = "tools";
     static final String RECIPES = "recipes";
+    static final String GEAR = "gear";
+    static final String GEMS = "gems";
+    static final String CRAFTS = "crafts";
+    static final String QUESTS = "quests";
+    static final String SKILLS = "skills";
 
     /** A misspelt section would otherwise load as nothing at all. */
     static final Set<String> SECTIONS = Set.of(
         ENEMIES, WEAPONS, RELICS, ITEMS, TABLES, FLOORS, ICONS, UPGRADES, UNLOCKS,
-        GOODS, CROPS, FARM, WORKSHOPS, TOOLS, RECIPES);
+        GOODS, CROPS, FARM, WORKSHOPS, TOOLS, RECIPES, GEAR, GEMS, CRAFTS, QUESTS,
+        SKILLS);
 
     /** One section as it appeared in one file. */
     static final class Section {

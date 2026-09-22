@@ -22,8 +22,19 @@ public final class OrbBrain extends BaseBrain {
     public static final int LIFE_STEPS = 8 * 60;
     /** Steps between spells falling. Twelve a second is a shower, not a wall. */
     public static final int DROP_INTERVAL = 26;
-    /** How far from the player they fall, at the outside. */
+    /** How far from the player they fall, at the outside, when they stand still. */
     public static final float DROP_RADIUS = 96f;
+    /**
+     * The same, against someone running flat out.
+     *
+     * <p>The scatter grows with how fast the player is travelling, because a
+     * fixed circle around a moving target is a circle they are always leaving.
+     * At a standstill the shower is tight and the answer is to move; at a
+     * sprint it is wide and the answer is to turn.
+     */
+    public static final float DROP_RADIUS_FAR = 168f;
+    /** One drop in this many is aimed where the player is going, not near them. */
+    public static final int DROP_AIMED_IN = 3;
     /**
      * How long a spell takes to fall, and how long it burns where it lands.
      *
@@ -51,6 +62,18 @@ public final class OrbBrain extends BaseBrain {
     public static final int FOUNTAIN_ARMS = 5;
     public static final float FOUNTAIN_MIN = 48f;
     public static final float FOUNTAIN_MAX = 140f;
+    /**
+     * How far the fountain will stretch to reach someone who has backed off,
+     * and how far past them it throws when it does.
+     *
+     * <p>A ring of a fixed 140 px meant a player standing 150 px away was
+     * simply safe, and standing still at range beat the whole intermission.
+     * The ring now opens out to wherever they are, so retreating buys distance
+     * and nothing else; the ceiling is what stops it from being a room-wide
+     * carpet with no floor left to stand on.
+     */
+    public static final float FOUNTAIN_FAR = 232f;
+    public static final float FOUNTAIN_OVERSHOOT = 28f;
     /** Steps a lobbed spell spends in the air, which also sets how high it goes. */
     public static final int FOUNTAIN_FLIGHT = 34;
 
@@ -149,11 +172,29 @@ public final class OrbBrain extends BaseBrain {
             spray(self, ctx, damage);
             return;
         }
+        // One in three is thrown at where the player is going to be rather
+        // than near where they are. Without it the shower is a fence that
+        // never closes: it falls around them, so walking out from under it in
+        // any direction at all works, every time, without looking. With it,
+        // holding a direction is the thing that gets hit, and the answer
+        // becomes turning - which is the habit the fire orb is here to teach
+        // and the water orb is here to punish.
+        if (ctx.rng().nextInt(DROP_AIMED_IN) == 0) {
+            ctx.rainSpell(self, leadX(ctx, DROP_FALL), leadY(ctx, DROP_FALL),
+                damage, DROP_FALL, DROP_LINGER, self.def.projectile);
+            return;
+        }
         double a = ctx.rng().nextDouble() * Math.PI * 2;
-        float r = DROP_RADIUS * (0.15f + 0.85f * ctx.rng().nextFloat());
+        float r = scatter(ctx) * (0.15f + 0.85f * ctx.rng().nextFloat());
         ctx.rainSpell(self, ctx.playerX() + (float) Math.cos(a) * r,
             ctx.playerY() + (float) Math.sin(a) * r,
             damage, DROP_FALL, DROP_LINGER, self.def.projectile);
+    }
+
+    /** How wide the shower spreads: tight over someone standing, wide over a sprint. */
+    private static float scatter(AiContext ctx) {
+        float speed = (float) Math.hypot(ctx.playerVelX(), ctx.playerVelY());
+        return Math.min(DROP_RADIUS_FAR, DROP_RADIUS + speed * 0.6f);
     }
 
     /**
@@ -166,13 +207,44 @@ public final class OrbBrain extends BaseBrain {
      */
     private void spray(Enemy self, AiContext ctx, int damage) {
         double turn = self.aiTimer * (Math.PI * 2 / FOUNTAIN_ARMS / 5.0);
+        float reach = reach(self, ctx);
+        // One arm of the five is thrown at the player instead of at its share
+        // of the circle. Not a sixth arc: the fountain has to stay a fountain,
+        // and adding to it would make the answer "outrun it" rather than "read
+        // it". Swapping one arm keeps the pattern and takes away standing in
+        // the one gap that never moves.
+        int hunter = ctx.rng().nextInt(FOUNTAIN_ARMS);
         for (int i = 0; i < FOUNTAIN_ARMS; i++) {
+            if (i == hunter) {
+                int flight = flight(self.distanceTo(ctx.playerX(), ctx.playerY()));
+                ctx.lobProjectile(self, leadX(ctx, flight), leadY(ctx, flight),
+                    damage, flight, DROP_LINGER, self.def.projectile);
+                continue;
+            }
             double a = turn + i * (Math.PI * 2 / FOUNTAIN_ARMS);
-            float r = FOUNTAIN_MIN
-                + (FOUNTAIN_MAX - FOUNTAIN_MIN) * ctx.rng().nextFloat();
+            float r = FOUNTAIN_MIN + (reach - FOUNTAIN_MIN) * ctx.rng().nextFloat();
             ctx.lobProjectile(self, self.x + (float) Math.cos(a) * r,
                 self.y + (float) Math.sin(a) * r,
-                damage, FOUNTAIN_FLIGHT, DROP_LINGER, self.def.projectile);
+                damage, flight(r), DROP_LINGER, self.def.projectile);
         }
+    }
+
+    /** How far out this turn throws: past the player, to a ceiling. */
+    private static float reach(Enemy self, AiContext ctx) {
+        float wanted = self.distanceTo(ctx.playerX(), ctx.playerY()) + FOUNTAIN_OVERSHOOT;
+        return Math.max(FOUNTAIN_MAX, Math.min(FOUNTAIN_FAR, wanted));
+    }
+
+    /**
+     * Time in the air, scaled with the distance thrown.
+     *
+     * <p>A lob's flight time is what sets its height, and its ground track is
+     * interpolated over that same time regardless of length. Throw twice as
+     * far in the same thirty-four steps and the arc does not rise higher, it
+     * only flattens and doubles in speed - a skimmed stone rather than a
+     * fountain, and one that arrives before it can be read.
+     */
+    private static int flight(float distance) {
+        return Math.round(FOUNTAIN_FLIGHT * Math.max(1f, distance / FOUNTAIN_MAX));
     }
 }

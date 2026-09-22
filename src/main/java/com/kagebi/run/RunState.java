@@ -2,6 +2,7 @@ package com.kagebi.run;
 
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectIntMap;
+import com.kagebi.assets.Assets;
 import com.kagebi.gen.FloorLayout;
 import com.kagebi.gen.Room;
 import com.kagebi.settings.Difficulty;
@@ -16,9 +17,18 @@ import com.kagebi.settings.Difficulty;
  * size - the alternative is four indirections that all resolve to the same
  * five fields.
  *
- * <p>It is deliberately <em>not</em> saved. A roguelite that lets you reload a
- * bad fight is a different game, and the meta-progression that does persist
- * lives in {@code save.Profile}.
+ * <p><b>What of this is saved, and what is not.</b> A fight is never saved. A
+ * roguelite that lets you reload a bad room is a different game, so nothing
+ * here is written to disk while a floor is being played, and dying is still
+ * final.
+ *
+ * <p>What is written is a snapshot taken at the two moments a run is already
+ * standing still - arriving in the village, and stepping down to the next floor
+ * - so that closing the game is not the same as throwing the run away. See
+ * {@link com.kagebi.save.SavedRun}, which copies the fields that can be
+ * restored and deliberately leaves {@link #layout} and {@link #room} behind:
+ * quitting mid-floor costs the floor, which keeps the no-reload rule intact
+ * while letting a player stop playing for the night.
  */
 public final class RunState {
 
@@ -36,6 +46,18 @@ public final class RunState {
      * both weapons.
      */
     public String characterId;
+
+    /**
+     * Enemy ids fought on this run, banked into the profile's bestiary at the
+     * end of it.
+     *
+     * <p>Gathered on the run rather than written straight to the profile for
+     * the reason gold is: a run that is abandoned mid-floor should not have
+     * filled the book on the way. {@code Profile.bestiary} has existed and been
+     * saved since the shop was written, and until this nothing ever wrote to
+     * it - which made the two unlocks gated on it unreachable.
+     */
+    public final java.util.Set<String> met = new java.util.LinkedHashSet<>();
 
     public String weaponId;
 
@@ -63,6 +85,15 @@ public final class RunState {
 
     /** 1 to 5 while in the dungeon; 0 in the village. */
     public int floor;
+    /**
+     * Whether the floor being played is off the descent.
+     *
+     * <p>Set on arrival by the dungeon, which is the one place that has both
+     * the floor number and the content to look it up in. It is here so that
+     * {@link #summary()} can say it: what banks a cleared stage is handed a
+     * summary and nothing else.
+     */
+    public boolean sideStage;
     public FloorLayout layout;
     public Room room;
 
@@ -151,6 +182,7 @@ public final class RunState {
     }
 
     public RunSummary summary() {
-        return new RunSummary(deepestFloor, kills, gold, diamonds, elapsedSeconds, victory);
+        return new RunSummary(deepestFloor, kills, gold, diamonds, elapsedSeconds,
+            victory, sideStage, met);
     }
 }

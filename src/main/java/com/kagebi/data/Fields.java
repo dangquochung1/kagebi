@@ -183,6 +183,11 @@ final class Fields {
         return json.get(name) == null ? new String[0] : strings(name);
     }
 
+    /** An optional float array, paired with {@link #stringsOr}. */
+    float[] numbersOr(String name) {
+        return json.get(name) == null ? new float[0] : numbers(name);
+    }
+
     int[] integers(String name) {
         JsonValue v = get(name, true);
         if (v == null) {
@@ -196,6 +201,35 @@ final class Fields {
         int i = 0;
         for (JsonValue e = v.child; e != null; e = e.next, i++) {
             out[i] = asInt(name + "[" + i + "]", e);
+        }
+        return out;
+    }
+
+    /**
+     * A float array, for magnitudes that sit alongside a list of effect names.
+     *
+     * <p>{@link #integers} rejects a fractional value, deliberately: half a
+     * step is a content error. A magnitude is the opposite - 1.08 is the
+     * ordinary case - so this is a separate reader rather than a flag on that
+     * one.
+     */
+    float[] numbers(String name) {
+        JsonValue v = get(name, true);
+        if (v == null) {
+            return new float[0];
+        }
+        if (!v.isArray()) {
+            problem("'" + name + "' should be an array");
+            return new float[0];
+        }
+        float[] out = new float[v.size];
+        int i = 0;
+        for (JsonValue e = v.child; e != null; e = e.next, i++) {
+            if (!e.isNumber()) {
+                problem("'" + name + "'[" + i + "] should be a number");
+                continue;
+            }
+            out[i] = e.asFloat();
         }
         return out;
     }

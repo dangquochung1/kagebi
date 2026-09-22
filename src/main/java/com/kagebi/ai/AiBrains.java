@@ -44,6 +44,7 @@ public final class AiBrains {
         register(BossBrain.pirateLeader());
         register(BossBrain.pirateZombie());
         register(BossBrain.squidman());
+        register(BossBrain.squidLord());
         register(OrbBrain.rain());
         register(OrbBrain.fountain());
     }

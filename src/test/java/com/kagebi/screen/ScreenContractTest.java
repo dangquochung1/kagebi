@@ -13,11 +13,14 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import com.badlogic.gdx.files.FileHandle;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas.TextureAtlasData;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas.TextureAtlasData.Region;
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.kagebi.assets.Assets;
+import com.kagebi.data.ContentLoader;
+import com.kagebi.data.def.WeaponDef;
 import com.kagebi.input.GameAction;
 
 /**
@@ -80,15 +83,28 @@ class ScreenContractTest {
     }
 
     /**
-     * Character select draws an icon for every weapon it offers, and falls back
-     * to a plain sword for an id it has no icon for. Both paths have to land on
-     * something, or a weapon is a blank cell.
+     * The kit panel draws an icon for every weapon in the content, and falls
+     * back to a plain sword for an id it has no icon for. Both paths have to
+     * land on something, or a weapon is a blank cell.
+     *
+     * <p>Driven off the content rather than off a list in the screen. There
+     * was such a list, beside a set of {@code select.weapon.*} names that said
+     * what {@code weapon.*.name} already said - so a weapon could be renamed
+     * in one place and keep its old name in the other.
      */
+    private static List<String> weaponIds() {
+        List<String> out = new ArrayList<>();
+        for (WeaponDef w : ContentLoader.load(p -> new FileHandle(new File(p))).allWeapons()) {
+            out.add(w.id);
+        }
+        return out;
+    }
+
     @Test
     void everyOfferedWeaponHasAnIcon() {
         Set<String> ui = regions("ui");
         List<String> missing = new ArrayList<>();
-        for (String id : CharacterSelectScreen.FALLBACK_WEAPONS) {
+        for (String id : weaponIds()) {
             if (!ui.contains(Assets.Ui.weaponIcon(id))) {
                 missing.add(id + " -> " + Assets.Ui.weaponIcon(id));
             }
@@ -147,7 +163,10 @@ class ScreenContractTest {
         List<String> keys = new ArrayList<>();
         for (String k : new String[] {
             "menu.newgame", "menu.credits", "menu.settings", "menu.quit", "menu.continue",
-            "select.title", "select.weapon", "select.start",
+            "confirm.newgame",
+            "panel.side.gear", "panel.side.items", "panel.side.chars",
+            "panel.side.kit", "panel.side.wear", "panel.side.wield",
+            "panel.offhand.none", "slot.WEAPON", "slot.OFFHAND",
             "shop.title", "shop.tab.upgrades", "shop.tab.unlocks", "shop.buy",
             "shop.max", "shop.owned", "shop.poor", "shop.bought",
             "prompt.talk", "prompt.descend", "prompt.escape",
@@ -171,6 +190,20 @@ class ScreenContractTest {
             "map.title", "map.play", "stage.cleared", "prompt.leave",
             "game.title", "game.floor", "game.victory", "game.gameover",
             "game.stats.floor", "game.stats.kills", "game.stats.gold", "game.stats.gems", "game.stats.time",
+            // The character sheet's six tabs and the numbers on them.
+            "panel.tab.profile", "panel.tab.gear", "panel.tab.bag", "panel.tab.forge",
+            "panel.tab.tasks", "panel.tab.foes",
+            "panel.empty", "panel.nothing", "panel.equip", "panel.unequip", "panel.forge",
+            "panel.worn", "panel.sockets",
+            "stat.hp", "stat.damage", "stat.crit", "stat.critdmg", "stat.throw",
+            "stat.armour", "stat.attackspeed", "stat.movespeed",
+            "slot.HEAD", "slot.BODY", "slot.HANDS", "slot.FEET", "slot.TRINKET",
+            "foes.unmet",
+            // Jobs: the journal, and what a villager says about one.
+            "quest.taken", "quest.handin", "quest.track", "quest.tracked",
+            "quest.done", "quest.none",
+            // The code box.
+            "menu.code", "code.title", "code.hint", "code.ok", "code.again", "code.bad",
             "common.back", "common.locked", "floor.hub"}) {
             keys.add(k);
         }
@@ -210,12 +243,17 @@ class ScreenContractTest {
             // action is a raw key there until someone translates it.
             keys.add(action.i18nKey);
         }
-        for (String id : CharacterSelectScreen.FALLBACK_WEAPONS) {
-            keys.add("select.weapon." + id);
-        }
         for (String k : CreditsScreen.rollKeys()) {
             keys.add(k);
         }
+        // The detail strip prints one of these beside every number it shows.
+        // Without a label it prints the raw key, which reads as a broken game
+        // rather than as an empty field.
+        for (String effect : com.kagebi.data.ContentValidator.GEAR_EFFECTS) {
+            keys.add("effect." + effect);
+        }
+        keys.add("detail.tier");
+        keys.add("detail.reach");
         return keys;
     }
 

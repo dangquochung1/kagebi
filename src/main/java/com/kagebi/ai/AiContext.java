@@ -25,6 +25,22 @@ public interface AiContext {
 
     float playerY();
 
+    /**
+     * How fast the player is actually travelling, in virtual pixels per second.
+     *
+     * <p>Differenced from their position, not read off an intent: a roll, a
+     * slide round a corner and a wall all change how far the body really went.
+     * Zero on the step a room is entered, and zero while they stand still.
+     *
+     * <p>This is what lets a shot lead its target instead of chasing where the
+     * target was. Use it through {@link BaseBrain#leadX}, which bounds how far
+     * ahead a brain is allowed to guess - an unbounded lead against a player at
+     * full sprint aims off the end of the room.
+     */
+    float playerVelX();
+
+    float playerVelY();
+
     boolean playerAlive();
 
     /** Solid tiles, or null in a test with no room around the fight. */

@@ -29,6 +29,21 @@ public interface Combatant {
     int armour();
 
     /**
+     * Proportion of a hit shrugged off after armour, 0 to 1.
+     *
+     * <p>{@code Damage.incoming} has taken this since it was written and
+     * {@code HitResolver} passed it a literal zero, so the parameter was real
+     * and the value never was. Defaulted here rather than added to every
+     * implementor: nothing in the game resists yet, and a percentage is a
+     * different kind of defence from armour's flat soak - armour is worth most
+     * against a hail of small hits, resistance against one large one.
+     * {@code Damage.MAX_RESIST} caps it so nothing can become immune.
+     */
+    default float resist() {
+        return 0f;
+    }
+
+    /**
      * What this one's relics do to a hit it takes: below 1 shrugs damage off,
      * above 1 takes more. Default 1, so nothing that has no relics has to care.
      */

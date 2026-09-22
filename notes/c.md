@@ -10,8 +10,15 @@
 | `ruins_green`  | ruins    | green   | floor 2   |
 | `ruins_orange` | ruins    | orange  | floor 3   |
 | `depths`       | depths   | purple  | floors 4, 5 |
+| `cove`         | cove     | grey    | floor 6   |
+| `cove_deep`    | cove     | grey    | floor 7   |
 
-The three ruins folders hold the same 26 layouts in three colours. If you get a
+The three ruins folders hold the same 26 layouts in three colours. The two cove
+folders are the same tile pack in two room *sizes*: `cove` is 20x11 everywhere
+but its 40x22 arena, and every room of `cove_deep` is 30x17, with its own set
+of layouts written in fractions of the room rather than in tiles. A biome
+folder is a size and a plan as much as it is a tileset, which is why a second
+stage on the same art is a second folder. If you get a
 name wrong, the game still runs, but it borrows rooms from another biome, so
 all you see is the wrong tileset. `RoomCatalogTest.theBiomesAreExactlyTheFoldersFloorsJsonNames`
 pins the set.

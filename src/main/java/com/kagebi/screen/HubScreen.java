@@ -25,6 +25,7 @@ import com.kagebi.Dir;
 import com.kagebi.Kagebi;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.VillageCatalog;
+import com.kagebi.data.def.QuestDef;
 import com.kagebi.entity.EntityWorld;
 import com.kagebi.entity.Player;
 import com.kagebi.entity.World;
@@ -37,7 +38,10 @@ import com.kagebi.gen.TiledRooms;
 import com.kagebi.gfx.Anim;
 import com.kagebi.gfx.CameraController;
 import com.kagebi.input.GameAction;
+import com.kagebi.quest.Quests;
 import com.kagebi.run.RunState;
+import com.kagebi.save.QuestLog;
+import com.kagebi.save.SavedRun;
 import com.kagebi.save.VillageState;
 import com.kagebi.gfx.Silhouette;
 import com.kagebi.screen.island.CloudLayer;
@@ -45,8 +49,10 @@ import com.kagebi.screen.island.HarvestFx;
 import com.kagebi.screen.island.IslandProps;
 import com.kagebi.screen.island.SeaRipple;
 import com.kagebi.ui.DialogBox;
+import com.kagebi.ui.Hit;
 import com.kagebi.ui.Hud;
 import com.kagebi.ui.I18n;
+import com.kagebi.ui.Waypoint;
 import com.kagebi.village.Farm;
 import com.kagebi.village.Workshops;
 
@@ -119,6 +125,10 @@ public class HubScreen extends SimScreen {
     static final float PLOT_RANGE = 14f;
     /** Over a worker with goods waiting. */
     private static final String ALERT = "ui/sunny/icons/expression_alerted";
+    /** How far above a villager's feet their quest mark floats. */
+    private static final int MARK_LIFT = 22;
+    /** Steps per half of the mark's bob: half a second up, half a second down. */
+    private static final int MARK_BOB_STEPS = 30;
     /** Steps a "+2 wood" floats over the player. */
     private static final int TOAST_STEPS = 60;
     /** Goods drawn flying at one collection; a worker holding eleven sends six. */
@@ -153,8 +163,13 @@ public class HubScreen extends SimScreen {
     static final String[] REGIONS = {"farm", "forest", "ranch", "fishing", "mine", "kitchen"};
 
     /**
-     * The kit badge: the ninja's own face, top right, opening the loadout when
-     * clicked.
+     * Two badges, top right: the ninja's own face, and the basket beside it.
+     *
+     * <p>There were three. The third opened a separate screen for choosing a
+     * character and a weapon, which the sheet already had a panel for, so the
+     * village was offering two doors onto the same choice and they disagreed
+     * about who was selected. The face opens the sheet now and the screen it
+     * used to open is gone.
      *
      * <p>Twenty-four square with the 32px idle frame drawn into it and
      * trimmed - the portrait is the label, so there is no text to translate and
@@ -165,13 +180,15 @@ public class HubScreen extends SimScreen {
     private static final int BADGE = 24;
     private static final int BADGE_X = Cfg.VIRT_W - BADGE - 4;
     private static final int BADGE_Y = Cfg.VIRT_H - BADGE - 4;
-    /** The bag button beside it, which Tab also presses. */
+    /** The bag button beside it, which F also presses. */
     private static final int BAG_X = BADGE_X - BADGE - 4;
     private static final String BAG_ICON = "ui/sunny/icons/basket";
 
     private final Kagebi game;
     private final CameraController camera = new CameraController();
     private final CameraController ui = new CameraController();
+    /** The corner badges are drawn in UI space, so they are hit-tested there. */
+    private final Hit hit;
 
     private TiledMap map;
     private OrthogonalTiledMapRenderer renderer;
@@ -249,7 +266,8 @@ public class HubScreen extends SimScreen {
     private String badgeCharacter;
 
     /** Set when the loadout closes, so the world picks the new kit up. */
-    private boolean loadoutOpen;
+    /** Set while the character sheet is open, so the village re-reads the run after. */
+    private boolean kitOpen;
 
     /** Set while the herbalist is speaking; her last page opens her stall. */
     private boolean openShopAfterTalk;
@@ -262,6 +280,7 @@ public class HubScreen extends SimScreen {
     public HubScreen(Kagebi game) {
         super(game.input());
         this.game = game;
+        this.hit = new Hit(game.input(), ui);
     }
 
     /**
@@ -311,8 +330,8 @@ public class HubScreen extends SimScreen {
     public void show() {
         game.input().clear();
         if (map != null) {
-            if (loadoutOpen) {
-                loadoutOpen = false;
+            if (kitOpen) {
+                kitOpen = false;
                 // Walk back into the village, which is how the world is told
                 // anything about the run: entering a room re-reads the ninja
                 // and both weapons. Where the player already stands, and not at
@@ -356,6 +375,7 @@ public class HubScreen extends SimScreen {
         run.floor = 0;
         run.layout = null;
         run.room = null;
+        rememberRun();
 
         TextureAtlas npc = Preload.npc();
         for (String[] villager : VILLAGERS) {
@@ -595,12 +615,14 @@ public class HubScreen extends SimScreen {
             stack().push(new PauseScreen(game, false));
             return;
         }
-        if (input().justPressed(GameAction.INVENTORY) || clicked(BAG_X, BADGE_Y, BADGE)) {
+        if (input().justPressed(GameAction.BAG)
+                || hit.clicked(BAG_X, BADGE_Y, BADGE, BADGE)) {
             openBag();
             return;
         }
-        if (input().justPressed(GameAction.LOADOUT) || clicked(BADGE_X, BADGE_Y, BADGE)) {
-            openLoadout();
+        if (input().justPressed(GameAction.SHEET)
+                || hit.clicked(BADGE_X, BADGE_Y, BADGE, BADGE)) {
+            openSheet(CharacterScreen.TAB_PROFILE, 0);
             return;
         }
 
@@ -871,6 +893,13 @@ public class HubScreen extends SimScreen {
 
     private void talk(Villager v) {
         I18n t = game.i18n();
+        Quests.record(game.content(), game.profile(), QuestDef.Kind.TALK, v.id, 1);
+        // A job this villager is holding out, or one they are owed for, comes
+        // before their usual two lines: someone with something to say about
+        // work says it first.
+        if (questTalk(v)) {
+            return;
+        }
         String prefix = "npc." + v.id + ".";
         String first = t.get(prefix + "1");
         // The herbalist with an empty customer says so and opens nothing. A
@@ -909,37 +938,98 @@ public class HubScreen extends SimScreen {
     }
 
     /**
-     * Whether the mouse was clicked on the kit badge this step.
+     * Whether this villager had something to say about work, and said it.
      *
-     * <p>Polled here rather than routed through {@link com.kagebi.input.InputService},
-     * which is a key-to-action map and has no notion of a pointer. {@link SimScreen}
-     * asks that input be read in {@code step} and nowhere else, and this obeys
-     * that; one clickable rectangle on one screen is not worth a second input
-     * model. The badge is drawn in UI space, so the click is tested there.
+     * <p>Paying first, then offering. A villager who owes the player for one
+     * job and has another to hand out should settle up before asking for more,
+     * which is both politer and how a player expects a quest giver to behave.
+     *
+     * <p>Accepting is not asked about. The dialogue box pages text and has no
+     * yes-or-no, and building one for this would be a widget used by exactly
+     * one screen; a job that costs nothing to hold is not a decision worth a
+     * prompt. Taking it on is what reading about it does.
      */
-    private boolean clicked(int left, int bottom, int size) {
-        if (!Gdx.input.justTouched()) {
+    private boolean questTalk(Villager v) {
+        I18n t = game.i18n();
+        Array<QuestDef> owed = Quests.claimableFrom(game.content(), game.profile(), v.id);
+        if (owed.size > 0) {
+            QuestDef q = owed.first();
+            Quests.claim(q, game.content(), game.profile());
+            game.saves().save(game.profile());
+            game.audio().playSfx(Assets.SFX_ACCEPT);
+            dialog.show(t.get("npc." + v.id + ".name"), v.face,
+                t.get("quest.handin"), t.get(q.nameKey) + " - " + q.rewardGold + "g");
+            return true;
+        }
+        Array<QuestDef> offers = Quests.offeredBy(game.content(), game.profile(), v.id);
+        if (offers.size == 0) {
             return false;
         }
-        float scaleX = Gdx.graphics.getWidth() / (float) Cfg.VIRT_W;
-        float scaleY = Gdx.graphics.getHeight() / (float) Cfg.VIRT_H;
-        float x = Gdx.input.getX() / scaleX;
-        // Screen y runs down from the top; the virtual one runs up.
-        float y = Cfg.VIRT_H - Gdx.input.getY() / scaleY;
-        return x >= left && x <= left + size
-            && y >= bottom && y <= bottom + size;
+        QuestDef q = offers.first();
+        Quests.accept(q, game.profile());
+        game.profile().tracked = q.id;
+        game.saves().save(game.profile());
+        game.audio().playSfx(Assets.SFX_ACCEPT);
+        dialog.show(t.get("npc." + v.id + ".name"), v.face,
+            t.get(q.nameKey), t.get(q.descKey), t.get("quest.taken"));
+        return true;
+    }
+
+    /**
+     * Marks this run as the one to carry on with, and writes it down.
+     *
+     * <p><b>The village is the only place a run is saved, and that is a rule
+     * rather than an omission.</b> Saving inside a dungeon as well would sound
+     * more generous and would be the opposite: a player could dive, take
+     * whatever floor four was holding, close the game and continue in the
+     * village with the loot and none of the risk. Every relic in the run would
+     * be one quit away from being free.
+     *
+     * <p>So abandoning a dive costs the dive, exactly as dying does, and
+     * nothing that was already banked is ever at stake - gold, unlocks, gear,
+     * quests and the island all live on the profile and are written every
+     * thirty seconds regardless of this.
+     *
+     * <p>Written immediately rather than left to the autosave. The whole point
+     * is to survive the game being closed, and the closing is not always
+     * something the game gets told about.
+     */
+    private void rememberRun() {
+        if (game.reviewing()) {
+            // A run built by --screen is nobody's progress, and writing it
+            // over a real save would mean taking a screenshot cost the
+            // player their game.
+            return;
+        }
+        game.profile().savedRun = SavedRun.of(run);
+        game.saves().save(game.profile());
     }
 
     /** The bag: the storehouse, the tools, the island's people, what is packed, and the kit. */
     private void openBag() {
         game.audio().playSfx(Assets.SFX_ACCEPT);
-        stack().push(new BagScreen(game, this::openLoadout));
+        stack().push(new BagScreen(game, this::openKit));
     }
 
-    void openLoadout() {
+    /**
+     * The character sheet, on whichever page the caller means.
+     *
+     * <p>{@code kitOpen} is set whichever page it is, because the sheet can
+     * change the ninja and both weapons from its own panels and the village
+     * only learns about a change by walking back into its room. Setting it for
+     * the bag page as well costs one room rebuild that was not needed; not
+     * setting it for the page that did change costs a player who swapped
+     * character and watched the old one walk away.
+     */
+    void openSheet(int tab, int side) {
         game.audio().playSfx(Assets.SFX_ACCEPT);
-        loadoutOpen = true;
-        stack().push(new CharacterSelectScreen(game, 0).asLoadout());
+        kitOpen = true;
+        stack().push(new CharacterScreen(game, tab, side));
+    }
+
+    /** The kit: the sheet, open on the panel that chooses a weapon. */
+    void openKit() {
+        openSheet(CharacterScreen.TAB_PROFILE, CharacterScreen.Side.KIT.ordinal());
     }
 
     /**
@@ -1110,6 +1200,86 @@ public class HubScreen extends SimScreen {
                 batch.draw(alert, Math.round(x - alert.getRegionWidth() / 2f), top);
             }
         }
+        drawQuestMarks(batch, cam, alert);
+        drawWaypoint(batch, cam);
+    }
+
+    /**
+     * The arrow for the tracked job: at whoever is owed, or at the gate.
+     *
+     * <p>Two cases and no more. A finished job is handed in to the person who
+     * gave it, so the arrow points at them; anything still in progress is done
+     * down the well, so it points at the gate. A job with neither - a bounty
+     * whose steps are all in the dungeon - falls into the second case, which is
+     * the right answer for it too.
+     */
+    private void drawWaypoint(SpriteBatch batch, OrthographicCamera cam) {
+        String tracked = game.profile().tracked;
+        if (tracked == null || !game.content().hasQuest(tracked)) {
+            return;
+        }
+        QuestDef q = game.content().quest(tracked);
+        if (game.profile().quests.is(tracked, QuestLog.State.CLAIMED)) {
+            return;
+        }
+        float toX;
+        float toY;
+        if (game.profile().quests.is(tracked, QuestLog.State.DONE) && q.hasGiver()) {
+            Villager giver = villagerNamed(q.giver);
+            if (giver == null) {
+                return;
+            }
+            toX = screenX(cam, giver.x);
+            toY = screenY(cam, giver.y + MARK_LIFT);
+        } else {
+            toX = screenX(cam, gateX);
+            toY = screenY(cam, gateY);
+        }
+        Waypoint.draw(batch, art(Assets.Ui.ARROW_UP),
+            screenX(cam, world.playerX()), screenY(cam, world.playerY()), toX, toY);
+    }
+
+    private Villager villagerNamed(String id) {
+        for (Villager v : villagers) {
+            if (v.id.equals(id)) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * A mark over any villager with work to give or work to settle.
+     *
+     * <p><b>!</b> for a job on offer and <b>?</b> for one waiting to be paid,
+     * which is the convention every game with quest givers uses and therefore
+     * the one a player already knows. The same alert mark the workshops use is
+     * the exclamation; the pack's speech bubble is the question, and until now
+     * it was packed into the atlas and drawn by nothing.
+     *
+     * <p>Drawn in screen space at a map point, like the workshop marks above,
+     * so they stay legible zoomed out to the whole island - which is exactly
+     * when a player needs to know who to walk to.
+     */
+    private void drawQuestMarks(SpriteBatch batch, OrthographicCamera cam, TextureRegion alert) {
+        TextureRegion chat = art(Assets.Ui.MARK_CHAT);
+        for (Villager v : villagers) {
+            boolean owed = Quests.claimableFrom(game.content(), game.profile(), v.id).size > 0;
+            boolean offering = Quests.offeredBy(game.content(), game.profile(), v.id).size > 0;
+            TextureRegion mark = owed ? chat : offering ? alert : null;
+            if (mark == null) {
+                continue;
+            }
+            float x = screenX(cam, v.x);
+            float y = Math.round(screenY(cam, v.y + MARK_LIFT));
+            if (x < -16 || x > Cfg.VIRT_W + 16 || y < -24 || y > Cfg.VIRT_H + 8) {
+                continue;
+            }
+            // A slow bob, so the mark reads as attached to the person rather
+            // than stuck to the map behind them.
+            float bob = (steps() / MARK_BOB_STEPS) % 2 == 0 ? 0f : 1f;
+            batch.draw(mark, Math.round(x - mark.getRegionWidth() / 2f), y + bob);
+        }
     }
 
     /** What was just taken, over the player. After the flying goods, which would cover the words. */
@@ -1175,10 +1345,16 @@ public class HubScreen extends SimScreen {
 
     private void drawOverlay(SpriteBatch batch) {
         I18n t = game.i18n();
-        TextureRegion coin = game.skin().getRegion(Assets.Ui.COIN);
-        batch.draw(coin, 6, Cfg.VIRT_H - 15);
+        // The bigger coin out here; the dungeon HUD keeps the small one. See
+        // Preload.coin for why the two are different.
+        TextureRegion coin = Preload.coin();
+        int textX = 17;
+        if (coin != null) {
+            batch.draw(coin, 4, Cfg.VIRT_H - 20);
+            textX = 4 + coin.getRegionWidth() + 3;
+        }
         batch.setColor(GOLD);
-        Hud.shadowed(batch, font, String.valueOf(game.profile().gold), 17, Cfg.VIRT_H - 5,
+        Hud.shadowed(batch, font, String.valueOf(game.profile().gold), textX, Cfg.VIRT_H - 5,
                      Align.left);
         batch.setColor(Color.WHITE);
         drawBadge(batch);
@@ -1235,22 +1411,28 @@ public class HubScreen extends SimScreen {
      * ninja: the sprite sits in the middle of its cell with air round it.
      */
     private void drawBadge(SpriteBatch batch) {
-        String id = run == null ? Assets.Actor.DEFAULT_CHARACTER : run.characterId;
-        if (badgeIdle == null || !id.equals(badgeCharacter)) {
-            badgeCharacter = id;
-            badgeIdle = Anim.directional(Preload.actors(),
-                Assets.Actor.player(id, Assets.Actor.PlayerAnim.IDLE), 32,
-                Anim.DEFAULT_STEPS_PER_FRAME, true);
+        // Through Preload.idle rather than an atlas path built here. This drew
+        // its own, of the ninja's shape, whoever was playing - so walking out
+        // of the kit screen as one of the three side-view heroes threw out of
+        // render and took the process with it.
+        String who = run == null ? Assets.Actor.DEFAULT_CHARACTER : run.characterId;
+        if (badgeIdle == null || !who.equals(badgeCharacter)) {
+            badgeCharacter = who;
+            badgeIdle = Preload.idle(who);
         }
         game.skin().getDrawable(Assets.Ui.CELL).draw(batch, BADGE_X, BADGE_Y, BADGE, BADGE);
-        TextureRegion frame = badgeIdle.frame(Dir.DOWN, steps());
-        batch.draw(frame, BADGE_X + (BADGE - 32) / 2f, BADGE_Y + (BADGE - 32) / 2f);
+        // Cropped to the head rather than scaled: a 32px frame in a 24px cell
+        // loses four pixels a side, and they should come off the empty sheet
+        // around the ninja rather than off the ninja.
+        TextureRegion frame = Preload.face(badgeIdle.frame(Dir.DOWN, steps()), BADGE);
+        batch.draw(frame, BADGE_X + (BADGE - frame.getRegionWidth()) / 2f,
+                   BADGE_Y + (BADGE - frame.getRegionHeight()) / 2f);
         // The key under it, exactly as the bag beside it has always had one.
         // Without this the badge was the only thing on the screen that could
         // be opened but said nothing about how - it had to be clicked, on a
         // screen the player is otherwise driving entirely from the keyboard.
         Hud.prompt(batch, game.skin(), font,
-                   game.input().map().primary(GameAction.LOADOUT), "",
+                   game.input().map().primary(GameAction.SHEET), "",
                    BADGE_X + BADGE / 2f, BADGE_Y - Hud.LINE + 4);
     }
 
@@ -1263,7 +1445,7 @@ public class HubScreen extends SimScreen {
                        BADGE_Y + (BADGE - basket.getRegionHeight()) / 2);
         }
         Hud.prompt(batch, game.skin(), font,
-                   game.input().map().primary(GameAction.INVENTORY), "",
+                   game.input().map().primary(GameAction.BAG), "",
                    BAG_X + BADGE / 2f, BADGE_Y - Hud.LINE + 4);
     }
 

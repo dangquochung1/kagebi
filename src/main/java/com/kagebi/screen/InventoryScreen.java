@@ -141,7 +141,7 @@ public class InventoryScreen extends SimScreen {
 
     @Override
     protected void step() {
-        if (input().justPressed(GameAction.INVENTORY) || input().justPressed(GameAction.PAUSE)) {
+        if (input().justPressed(GameAction.BAG) || input().justPressed(GameAction.PAUSE)) {
             game.audio().playSfx(Assets.SFX_CANCEL);
             stack().pop();
             return;
@@ -194,7 +194,7 @@ public class InventoryScreen extends SimScreen {
         // The way out shares the title's row, at the right. At the bottom it
         // crowded the description, which is the one line here that grows.
         Hud.prompt(batch, game.skin(), font,
-                   game.input().map().primary(GameAction.INVENTORY),
+                   game.input().map().primary(GameAction.BAG),
                    t.get("common.back"), px + pw - 8, top - Hud.LINE, Align.right);
 
         top -= Hud.LINE + 4;

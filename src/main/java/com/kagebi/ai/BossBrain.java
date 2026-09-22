@@ -144,6 +144,9 @@ public final class BossBrain extends BaseBrain {
     /** Spells dropped by an enrage, and the circle they fall in. */
     public static final int RAIN_COUNT = 9;
     public static final float RAIN_RADIUS = 110f;
+    /** The same against someone at a sprint, and how many of the wave are led. */
+    public static final float RAIN_RADIUS_FAR = 180f;
+    public static final int RAIN_AIMED_IN = 3;
     /**
      * How long the first of them takes to fall, and how much longer each
      * later one takes.
@@ -260,6 +263,31 @@ public final class BossBrain extends BaseBrain {
             new Move[] {Move.VOLLEY, Move.RING, Move.RING, Move.BARRAGE})
             .fan(3, 0.5f)
             .rains(com.kagebi.assets.Assets.Fx.WATER_SPELL);
+    }
+
+    /**
+     * The Sunken Vault's one body, and the whole of its fight.
+     *
+     * <p>Stage 6 is a chain of three bodies and two intermissions; doing that
+     * again one stage later would be the same fight with bigger numbers. So
+     * this is the opposite shape - one body that never leaves, with every move
+     * in the game available to it from the first second rather than a third of
+     * them per form.
+     *
+     * <p>It fights in two elements, which is the part that is not just "more".
+     * What it shoots is water, out of {@code EnemyDef.projectile}; what falls
+     * out of the sky when it turns is fire, because {@code rainFx} is a
+     * property of the brain and not of the def. Nothing new had to be said in
+     * the data to get that, and a player who learned in the cove that fire
+     * comes from above and water comes at them level finds both here at once.
+     */
+    public static BossBrain squidLord() {
+        return new BossBrain("boss_squidlord",
+            new Move[] {Move.VOLLEY, Move.RING, Move.BARRAGE, Move.WALL},
+            new Move[] {Move.VOLLEY, Move.RING, Move.BARRAGE, Move.WALL,
+                        Move.COMBO, Move.CHARGE})
+            .fan(4, 0.7f)
+            .rains(com.kagebi.assets.Assets.Fx.FIRE_SPELL);
     }
 
     @Override
@@ -497,15 +525,31 @@ public final class BossBrain extends BaseBrain {
      * floor when the slimes arrive, which is the point of doing both at once
      * rather than either alone.
      */
+    /** How wide the wave spreads: tight over someone standing, wide over a sprint. */
+    private static float rainRadius(AiContext ctx) {
+        float speed = (float) Math.hypot(ctx.playerVelX(), ctx.playerVelY());
+        return Math.min(RAIN_RADIUS_FAR, RAIN_RADIUS + speed * 0.6f);
+    }
+
     @Override
     public void onEnrage(Enemy self, AiContext ctx) {
         int damage = Math.max(1, Math.round(self.def.attackDamage * self.damageMult * 0.8f));
         for (int i = 0; i < RAIN_COUNT; i++) {
+            int fall = RAIN_FALL + i * RAIN_STAGGER;
+            // Every third drop of the wave is thrown where the player is
+            // going. The stagger already spaces them, so a led drop and a
+            // scattered one never land together - the wave still reads as
+            // weather rather than as nine aimed shots.
+            if (i % RAIN_AIMED_IN == 0) {
+                ctx.rainSpell(self, leadX(ctx, fall), leadY(ctx, fall),
+                    damage, fall, RAIN_LINGER, rainFx);
+                continue;
+            }
             double a = ctx.rng().nextDouble() * Math.PI * 2;
-            float r = RAIN_RADIUS * (0.3f + 0.7f * ctx.rng().nextFloat());
+            float r = rainRadius(ctx) * (0.3f + 0.7f * ctx.rng().nextFloat());
             ctx.rainSpell(self, ctx.playerX() + (float) Math.cos(a) * r,
                 ctx.playerY() + (float) Math.sin(a) * r,
-                damage, RAIN_FALL + i * RAIN_STAGGER, RAIN_LINGER, rainFx);
+                damage, fall, RAIN_LINGER, rainFx);
         }
         if (self.def.summons.length == 0) {
             return;

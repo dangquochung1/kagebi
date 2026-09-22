@@ -14,12 +14,15 @@ import java.util.Collections;
 import java.util.List;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
 import com.badlogic.gdx.utils.JsonWriter;
 import com.badlogic.gdx.utils.ObjectIntMap;
 import com.badlogic.gdx.utils.ObjectSet;
+import com.kagebi.assets.Assets;
 import com.kagebi.save.migration.Migrations;
+import com.kagebi.settings.Difficulty;
 
 /**
  * Loads and stores the {@link Profile} as human-readable JSON.
@@ -73,6 +76,14 @@ public final class SaveManager {
 
     public Path file() {
         return dir.resolve(FILE);
+    }
+
+    /**
+     * Where saves are kept. Exposed so a crash report lands beside them rather
+     * than in whichever directory the game happened to be started from.
+     */
+    public Path directory() {
+        return dir;
     }
 
     /**
@@ -205,8 +216,231 @@ public final class SaveManager {
         root.addChild("unlockedCharacters", sortedArray(p.unlockedCharacters));
         root.addChild("unlockedWeapons", sortedArray(p.unlockedWeapons));
         root.addChild("bestiary", sortedArray(p.bestiary));
+        root.addChild("gearSeq", new JsonValue(p.gearSeq));
+        root.addChild("stash", stash(p));
+        root.addChild("materials", counts(p.materials));
+        root.addChild("equipped", equipped(p));
+        root.addChild("quests", quests(p));
+        root.addChild("redeemed", sortedArray(p.redeemed));
+        if (p.tracked != null) {
+            root.addChild("tracked", new JsonValue(p.tracked));
+        }
         root.addChild("village", village(p.village));
+        // Absent rather than null when there is nothing to continue, so the
+        // file says "no run" by not mentioning one.
+        if (p.savedRun != null) {
+            root.addChild("savedRun", savedRun(p.savedRun));
+        }
         return root.prettyPrint(JsonWriter.OutputType.json, 60) + "\n";
+    }
+
+    /**
+     * The owned armour, in instance order.
+     *
+     * <p>Sorted for the same reason the upgrades are: a save file that reorders
+     * itself between two identical sessions cannot be diffed, and diffing it is
+     * how a broken one is found.
+     */
+    private static JsonValue stash(Profile p) {
+        List<OwnedGear> sorted = new ArrayList<>();
+        for (OwnedGear g : p.stash) {
+            sorted.add(g);
+        }
+        sorted.sort((a, b) -> Integer.compare(a.instance, b.instance));
+        JsonValue out = new JsonValue(JsonValue.ValueType.array);
+        for (OwnedGear g : sorted) {
+            JsonValue one = new JsonValue(JsonValue.ValueType.object);
+            one.addChild("instance", new JsonValue(g.instance));
+            one.addChild("def", new JsonValue(g.defId));
+            JsonValue sockets = new JsonValue(JsonValue.ValueType.array);
+            for (String s : g.sockets) {
+                // An empty socket is written as "", not dropped: the position
+                // of a stone in the row is what the panel draws, so a piece
+                // with a stone in its third hole must not read back with it in
+                // the first.
+                sockets.addChild(new JsonValue(s == null ? "" : s));
+            }
+            one.addChild("sockets", sockets);
+            out.addChild(one);
+        }
+        return out;
+    }
+
+    /**
+     * The quest log: one object per quest, holding its state and its per-step
+     * counts.
+     *
+     * <p>Counts are written as an array rather than an object keyed by index,
+     * because the index is a position in the quest's own step list and an
+     * object with keys "0" and "1" reads as a mistake in a file meant to be
+     * repaired by hand.
+     */
+    private static JsonValue quests(Profile p) {
+        List<String> ids = new ArrayList<>();
+        for (String id : p.quests.state.keys()) {
+            ids.add(id);
+        }
+        Collections.sort(ids);
+        JsonValue out = new JsonValue(JsonValue.ValueType.object);
+        for (String id : ids) {
+            JsonValue one = new JsonValue(JsonValue.ValueType.object);
+            one.addChild("state", new JsonValue(p.quests.state.get(id).name()));
+            ObjectIntMap<Integer> counts = p.quests.progress.get(id);
+            if (counts != null && counts.size > 0) {
+                int highest = 0;
+                for (ObjectIntMap.Entry<Integer> e : counts) {
+                    highest = Math.max(highest, e.key);
+                }
+                JsonValue steps = new JsonValue(JsonValue.ValueType.array);
+                for (int i = 0; i <= highest; i++) {
+                    steps.addChild(new JsonValue(counts.get(i, 0)));
+                }
+                one.addChild("steps", steps);
+            }
+            out.addChild(id, one);
+        }
+        return out;
+    }
+
+    private static JsonValue counts(ObjectIntMap<String> map) {
+        List<String> ids = new ArrayList<>();
+        for (ObjectIntMap.Entry<String> e : map) {
+            ids.add(e.key);
+        }
+        Collections.sort(ids);
+        JsonValue out = new JsonValue(JsonValue.ValueType.object);
+        for (String id : ids) {
+            out.addChild(id, new JsonValue(map.get(id, 0)));
+        }
+        return out;
+    }
+
+    private static JsonValue equipped(Profile p) {
+        List<String> slots = new ArrayList<>();
+        for (String slot : p.equipped.keys()) {
+            slots.add(slot);
+        }
+        Collections.sort(slots);
+        JsonValue out = new JsonValue(JsonValue.ValueType.object);
+        for (String slot : slots) {
+            out.addChild(slot, new JsonValue(p.equipped.get(slot, 0)));
+        }
+        return out;
+    }
+
+    /**
+     * The run in progress, flattened.
+     *
+     * <p>Only the fields {@link SavedRun} carries. The floor and its layout are
+     * absent by design - see that class - and the difficulty is written by name
+     * rather than by ordinal, so reordering the enum cannot quietly move
+     * somebody from Normal to Hard.
+     */
+    private static JsonValue savedRun(SavedRun r) {
+        JsonValue out = new JsonValue(JsonValue.ValueType.object);
+        out.addChild("seed", new JsonValue(r.seed));
+        out.addChild("characterId", new JsonValue(r.characterId));
+        out.addChild("weaponId", new JsonValue(r.weaponId));
+        if (r.throwWeaponId != null) {
+            out.addChild("throwWeaponId", new JsonValue(r.throwWeaponId));
+        }
+        out.addChild("difficulty", new JsonValue(r.difficulty.name()));
+        out.addChild("hp", new JsonValue(r.hp));
+        out.addChild("maxHp", new JsonValue(r.maxHp));
+        out.addChild("baseMaxHp", new JsonValue(r.baseMaxHp));
+        out.addChild("gold", new JsonValue(r.gold));
+        out.addChild("diamonds", new JsonValue(r.diamonds));
+        out.addChild("keys", new JsonValue(r.keys));
+        out.addChild("relics", strings(r.relics));
+        out.addChild("items", counts(r.items));
+        if (r.quickItem != null) {
+            out.addChild("quickItem", new JsonValue(r.quickItem));
+        }
+        out.addChild("kills", new JsonValue(r.kills));
+        out.addChild("deepestFloor", new JsonValue(r.deepestFloor));
+        out.addChild("elapsedSeconds", new JsonValue(r.elapsedSeconds));
+        out.addChild("met", strings(r.met));
+        return out;
+    }
+
+    /**
+     * An Array of strings, in the order it is held.
+     *
+     * <p>Not sorted, unlike every set in this file: relics are a list, and the
+     * order they were picked up in is part of what the player has.
+     */
+    private static JsonValue strings(Array<String> values) {
+        JsonValue arr = new JsonValue(JsonValue.ValueType.array);
+        for (String s : values) {
+            arr.addChild(new JsonValue(s));
+        }
+        return arr;
+    }
+
+    /**
+     * Reads a saved run back, or null for a file that has none.
+     *
+     * <p>Every field has a default and nothing here throws. This object is the
+     * newest thing in the save file and therefore the most likely to be absent,
+     * partial, or written by a build that is not this one - and the cost of
+     * being strict is a player who cannot load at all.
+     */
+    private static SavedRun readSavedRun(JsonValue v) {
+        if (v == null || !v.isObject()) {
+            return null;
+        }
+        SavedRun r = new SavedRun();
+        r.seed = v.getLong("seed", 0L);
+        // Filtered, not copied. A character this build does not have reaches
+        // ActorSprites as an atlas path that is not there, and the throw from
+        // findRegion comes out of the top of render and takes the process with
+        // it - which is how a save naming a deleted hero used to end an evening.
+        r.characterId = knownCharacter(v.getString("characterId", null));
+        r.weaponId = v.getString("weaponId", null);
+        r.throwWeaponId = v.getString("throwWeaponId", null);
+        r.difficulty = difficultyNamed(v.getString("difficulty", null));
+        r.maxHp = Math.max(1, v.getInt("maxHp", 1));
+        r.baseMaxHp = v.getInt("baseMaxHp", r.maxHp);
+        r.hp = v.getInt("hp", r.maxHp);
+        r.gold = v.getInt("gold", 0);
+        r.diamonds = v.getInt("diamonds", 0);
+        r.keys = v.getInt("keys", 0);
+        readStrings(v.get("relics"), r.relics);
+        JsonValue items = v.get("items");
+        if (items != null) {
+            for (JsonValue e = items.child; e != null; e = e.next) {
+                r.items.put(e.name, e.asInt());
+            }
+        }
+        r.quickItem = v.getString("quickItem", null);
+        r.kills = v.getInt("kills", 0);
+        r.deepestFloor = v.getInt("deepestFloor", 0);
+        r.elapsedSeconds = v.getFloat("elapsedSeconds", 0f);
+        readStrings(v.get("met"), r.met);
+        // A run with nobody in it cannot be restored, and lighting the Continue
+        // button for it would be a button that fails. Read as no saved run.
+        return r.characterId == null || r.weaponId == null ? null : r;
+    }
+
+    /** By name, falling back to the default rather than throwing on a rename. */
+    private static Difficulty difficultyNamed(String name) {
+        if (name != null) {
+            for (Difficulty d : Difficulty.values()) {
+                if (d.name().equals(name)) {
+                    return d;
+                }
+            }
+        }
+        return Difficulty.DEFAULT;
+    }
+
+    private static void readStrings(JsonValue array, Array<String> into) {
+        if (array == null) {
+            return;
+        }
+        for (JsonValue e = array.child; e != null; e = e.next) {
+            into.add(e.asString());
+        }
     }
 
     private static JsonValue sortedArray(ObjectSet<String> set) {
@@ -262,17 +496,112 @@ public final class SaveManager {
             }
         }
         // Added to, never replaced: the starting character and weapon stay
-        // unlocked whatever a hand-edited file says.
-        addAll(root.get("unlockedCharacters"), p.unlockedCharacters);
+        // unlocked whatever a hand-edited file says. Characters are filtered as
+        // well, because an id this build does not have is one the roster screen
+        // will offer and the world will then fail to draw.
+        addKnownCharacters(root.get("unlockedCharacters"), p.unlockedCharacters);
         addAll(root.get("unlockedWeapons"), p.unlockedWeapons);
         addAll(root.get("bestiary"), p.bestiary);
+        addAll(root.get("redeemed"), p.redeemed);
+
+        readQuests(root.get("quests"), p);
+        p.tracked = root.getString("tracked", null);
+        readStash(root.get("stash"), p);
+        p.gearSeq = Math.max(root.getInt("gearSeq", 0), highestInstance(p));
+        JsonValue materials = root.get("materials");
+        if (materials != null) {
+            for (JsonValue e = materials.child; e != null; e = e.next) {
+                p.addMaterial(e.name, e.asInt());
+            }
+        }
+        JsonValue worn = root.get("equipped");
+        if (worn != null) {
+            for (JsonValue e = worn.child; e != null; e = e.next) {
+                // Only onto a piece that is actually in the stash. A slot
+                // pointing at a piece that was sold, or at a hand-edited
+                // number, would be a permanently empty slot the player could
+                // not fill because the game believed it was full.
+                if (p.gear(e.asInt()) != null) {
+                    p.equipped.put(e.name, e.asInt());
+                }
+            }
+        }
         // A save from before the village had an economy has no such object,
         // and reads as a village that has just begun.
         JsonValue village = root.get("village");
         if (village != null && village.isObject()) {
             readVillage(village, p.village);
         }
+        p.savedRun = readSavedRun(root.get("savedRun"));
         return p;
+    }
+
+    private static void readQuests(JsonValue object, Profile p) {
+        if (object == null || !object.isObject()) {
+            return;
+        }
+        for (JsonValue e = object.child; e != null; e = e.next) {
+            String name = e.getString("state", null);
+            QuestLog.State state = null;
+            for (QuestLog.State s : QuestLog.State.values()) {
+                if (s.name().equals(name)) {
+                    state = s;
+                }
+            }
+            if (state == null) {
+                // A state this build does not know is a file from a later one,
+                // or a hand edit. Skipped rather than guessed: an unknown state
+                // read as ACTIVE would put a finished quest back on the board.
+                continue;
+            }
+            p.quests.set(e.name, state);
+            JsonValue steps = e.get("steps");
+            if (steps == null || !steps.isArray()) {
+                continue;
+            }
+            int i = 0;
+            for (JsonValue s = steps.child; s != null; s = s.next, i++) {
+                p.quests.advance(e.name, i, s.asInt());
+            }
+        }
+    }
+
+    private static void readStash(JsonValue array, Profile p) {
+        if (array == null || !array.isArray()) {
+            return;
+        }
+        for (JsonValue e = array.child; e != null; e = e.next) {
+            String def = e.getString("def", null);
+            int instance = e.getInt("instance", 0);
+            if (def == null || instance <= 0) {
+                continue;
+            }
+            JsonValue sockets = e.get("sockets");
+            int count = sockets != null && sockets.isArray() ? sockets.size : 0;
+            String[] set = new String[count];
+            int i = 0;
+            for (JsonValue s = sockets == null ? null : sockets.child; s != null; s = s.next, i++) {
+                String id = s.asString();
+                set[i] = id == null || id.isEmpty() ? null : id;
+            }
+            p.stash.add(new OwnedGear(instance, def, set));
+        }
+    }
+
+    /**
+     * The largest instance id in the stash.
+     *
+     * <p>{@code gearSeq} is taken as the higher of what was written and this,
+     * so a hand-edited file that added a piece with a big number cannot go on
+     * to hand out an id that is already in use - two pieces with one id would
+     * make the equipped slot ambiguous.
+     */
+    private static int highestInstance(Profile p) {
+        int highest = 0;
+        for (OwnedGear g : p.stash) {
+            highest = Math.max(highest, g.instance);
+        }
+        return highest;
     }
 
     private static void addAll(JsonValue array, ObjectSet<String> into) {
@@ -282,6 +611,32 @@ public final class SaveManager {
         for (JsonValue e = array.child; e != null; e = e.next) {
             into.add(e.asString());
         }
+    }
+
+    /**
+     * The same, dropping ids that are not characters in this build.
+     *
+     * <p>A migration renames what it knows about; this catches the rest - a
+     * hand-edited file, a profile from a branch, a character removed after the
+     * migration that removed its neighbours was written. Everything else in
+     * this file is checked against what exists before it is trusted, and the
+     * roster was the one set that was not.
+     */
+    private static void addKnownCharacters(JsonValue array, ObjectSet<String> into) {
+        if (array == null) {
+            return;
+        }
+        for (JsonValue e = array.child; e != null; e = e.next) {
+            String id = knownCharacter(e.asString());
+            if (id != null) {
+                into.add(id);
+            }
+        }
+    }
+
+    /** The id, or null if no such character ships. */
+    private static String knownCharacter(String id) {
+        return id != null && Assets.Actor.indexOf(id) >= 0 ? id : null;
     }
 
     // ---- the village ---------------------------------------------------------------

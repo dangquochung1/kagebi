@@ -1,5 +1,6 @@
 package com.kagebi.save;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -42,6 +43,14 @@ class SaveManagerTest {
         p.unlockedWeapons.add("axe");
         p.bestiary.add("slime");
         p.bestiary.add("tengured");
+        // A worn piece with a stone in its second hole and its first left
+        // empty: the case where socket order matters.
+        OwnedGear hood = new OwnedGear(p.nextGearId(), "head_t3", 2);
+        hood.sockets[1] = "red_t1";
+        p.stash.add(hood);
+        p.stash.add(new OwnedGear(p.nextGearId(), "feet_t1", 0));
+        p.equipped.put("HEAD", hood.instance);
+        p.materials.put("green_t1", 7);
         return p;
     }
 
@@ -55,6 +64,17 @@ class SaveManagerTest {
         assertEquals(a.unlockedCharacters, b.unlockedCharacters, "characters");
         assertEquals(a.unlockedWeapons, b.unlockedWeapons, "weapons");
         assertEquals(a.bestiary, b.bestiary, "bestiary");
+        assertEquals(a.materials, b.materials, "materials");
+        assertEquals(a.equipped, b.equipped, "equipped");
+        assertEquals(a.gearSeq, b.gearSeq, "gearSeq");
+        assertEquals(a.stash.size, b.stash.size, "stash size");
+        for (OwnedGear one : a.stash) {
+            OwnedGear other = b.gear(one.instance);
+            assertTrue(other != null, "piece #" + one.instance + " came back");
+            assertEquals(one.defId, other.defId, "piece #" + one.instance);
+            assertArrayEquals(one.sockets, other.sockets,
+                "stones stay in the holes they were set into");
+        }
     }
 
     // ---- the ordinary path ---------------------------------------------------------
@@ -243,7 +263,8 @@ class SaveManagerTest {
         Files.writeString(file(SaveManager.FILE),
             "{ \"version\": 1, \"unlockedCharacters\": [], \"unlockedWeapons\": [] }", StandardCharsets.UTF_8);
         Profile p = new SaveManager(dir).load();
-        assertTrue(p.unlockedCharacters.contains("ninjagreen"));
+        assertTrue(p.unlockedCharacters.contains("ninjagreen"),
+                   "green is free and always was");
         assertTrue(p.unlockedWeapons.contains("katana"));
     }
 }

@@ -28,8 +28,10 @@ import com.kagebi.ui.I18n;
  * <p>The game used to be one descent: the village gate opened onto floor one
  * and the only way to see floor four was to survive the three above it in a
  * single sitting. Stages break that into five, each played from full health
- * and banked on its own, and this is the screen that holds them - five nodes
- * on a map, opening one at a time as the one before it is cleared.
+ * and banked on its own, and this is the screen that holds them - nodes on a
+ * map, opening one at a time as the one before it is cleared. Two more hang
+ * off the trail rather than extending it: a side stage is open from the first
+ * run and clearing it opens nothing, so the five stay a sequence.
  *
  * <p><b>The panel is a state of this screen, not a second screen.</b> The map
  * behind it is the context for the choice being made, the keys that move
@@ -61,6 +63,9 @@ public class WorldMapScreen extends SimScreen {
         // The five are a sequence; the cove is a side stage, and a node in
         // line with the others would say it is the step after the Flame Core.
         {56, 40},
+        // Stage 7 beside stage 6 rather than past it: the two side stages are
+        // one detour with two rooms in it, not a longer descent.
+        {120, 24},
     };
 
     // The detail panel, centred. 200x128 is the largest box that still leaves

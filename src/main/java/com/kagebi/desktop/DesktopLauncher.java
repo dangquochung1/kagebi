@@ -79,6 +79,14 @@ public final class DesktopLauncher {
                         boot.seed = Long.parseLong(args[++i]);
                     }
                 }
+                // Who to look at. The roster is four bodies in two animation
+                // shapes, so a shot of the default one says nothing about the
+                // other three.
+                case "--hero" -> {
+                    if (hasValue) {
+                        boot.hero = args[++i];
+                    }
+                }
                 default -> { }
             }
         }

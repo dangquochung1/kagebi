@@ -160,7 +160,7 @@ public class ShopScreen extends SimScreen {
         if (flash > 0) {
             flash--;
         }
-        if (input().justPressed(GameAction.PAUSE) || input().justPressed(GameAction.INVENTORY)) {
+        if (input().justPressed(GameAction.PAUSE) || input().justPressed(GameAction.BAG)) {
             game.audio().playSfx(Assets.SFX_CANCEL);
             stack().pop();
             return;
@@ -253,6 +253,8 @@ public class ShopScreen extends SimScreen {
         }
         ShopCatalog.Unlock u = e.unlock;
         if (u.kind == ShopCatalog.UnlockKind.CHARACTER) {
+            // Worn straight away, so buying a ninja shows the moment the player
+            // walks back out of the shop.
             run.characterId = u.id;
         } else if (thrown(u.id)) {
             run.throwWeaponId = u.id;
@@ -349,7 +351,7 @@ public class ShopScreen extends SimScreen {
         batch.setColor(GOLD);
         Hud.right(batch, font, gold, right, TITLE_TOP);
         batch.setColor(Color.WHITE);
-        TextureRegion coin = game.skin().getRegion(Assets.Ui.COIN);
+        TextureRegion coin = Preload.coin();
         batch.draw(coin, Math.round(right - Hud.width(font, gold) - coin.getRegionWidth() - 2),
                    TITLE_TOP - Hud.LINE + 2);
     }

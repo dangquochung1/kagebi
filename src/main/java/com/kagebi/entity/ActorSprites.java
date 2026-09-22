@@ -108,6 +108,19 @@ public final class ActorSprites {
     public int figureW;
     public int figureH;
 
+    /**
+     * Empty rows above the figure's head, which is where a portrait crop starts.
+     *
+     * <p>Derived rather than stored: the measurement already knows where the
+     * feet are and how tall the figure is, and a fourth number kept alongside
+     * them is a fourth number that can disagree with them. Clamped at zero for
+     * the sprites whose box is declared rather than measured - the 16px trash
+     * fills its cell, so there is nothing above it.
+     */
+    public int figureTop() {
+        return Math.max(0, cell - footInset - figureH);
+    }
+
     private ActorSprites(int cell, boolean singleFacing, Anim idle, Anim walk, Anim attack,
                          Anim hurt, Anim roll, Anim death, TextureRegion[] dead,
                          TextureRegion shadow) {
@@ -132,7 +145,14 @@ public final class ActorSprites {
         this.shadow = shadow;
     }
 
-    /** The six playable ninjas, the only sheets with a full animation set. */
+    /**
+     * A playable character: a 32px four-column sheet with a full animation set.
+     *
+     * <p>There used to be a {@code forCharacter} in front of this that picked
+     * between two shapes, because three of the heroes were 48px side-view
+     * strips. One shape is left, so the chooser was a layer that could only be
+     * got wrong - and was, three times.
+     */
     public static ActorSprites player(TextureAtlas atlas, String characterId) {
         if (atlas == null) {
             return null;

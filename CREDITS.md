@@ -17,6 +17,8 @@ below was obtained free. Licences are reproduced verbatim in `LICENSES/`.
 | [Slime Enemy Sprites](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The Drowned Cove's three slimes |
 | [Pirate Characters](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The Drowned Captain, and the two things he becomes |
 | [Fire and Water Spell Effects](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The cove boss's spells, balls and arrows |
+| [RPG Fantasy GUI](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The forge, equipment and bag windows on the character sheet |
+| Pixel Art Skill Animations - Lightning | Frostwindz | Pack licence agreement, see `LICENSES/` | The three lightning skills, their bolts and their icons |
 
 ## Audio
 
@@ -43,12 +45,20 @@ out of git (`assets/packs/miniworld/`, under `assets/packs/` in `.gitignore`), a
 are derived from it. As with the house, this row and the `credits.sunnyside.*`
 strings are the places to correct if its terms turn out to need more.
 
-The four CraftPix packs share one licence, and it is not CC0: it allows the
+The five CraftPix packs share one licence, and it is not CC0: it allows the
 art in a game and forbids redistributing the art itself. So they sit in
-`assets/packs/{dungeon6,slimes6,bosses6,bossfx6}/`, which `.gitignore` already
-excludes, and only what `tools/build_cove.py` derives from them reaches
-`assets/gfx/` — which is itself derived and untracked. The licence text each
-one ships is copied into `LICENSES/Craftpix-*.txt` by `build_assets.py`.
+`assets/packs/{dungeon6,slimes6,bosses6,bossfx6,heroui}/`, which `.gitignore`
+already excludes, and only what `tools/build_cove.py` and
+`tools/slice_heroui.py` derive from them reaches `assets/gfx/` - which is
+itself derived and untracked. The licence text each one ships is copied into
+`LICENSES/Craftpix-*.txt`.
+
+There was a sixth, the Japanese Fantasy Characters, which three of the four
+playable heroes came out of. They were drawn side-on in one facing at four
+times this game's size, so they arrived as 48px single-row strips with no back
+view - a second animation shape that every screen drawing a hero had to know
+about, and three of them did not. The roster is six ninja now and the pack is
+no longer used.
 
 Pixeloid ships without the 32 Vietnamese letters that stack a tone mark on a
 circumflex or breve. `tools/make_font.py` synthesises them from the font's own

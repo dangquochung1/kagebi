@@ -217,7 +217,16 @@ public abstract class Entity implements Updatable, Damageable {
             Math.round(w), Math.round(h));
     }
 
-    /** Single-facing art is mirrored for LEFT; directional sheets have a real left column. */
+    /**
+     * Single-facing art is mirrored for LEFT; directional sheets have a real
+     * left column.
+     *
+     * <p>{@link #facing} is the honest answer for a sheet drawn side-on, but
+     * only two of its four values mean anything to one: walking UP or DOWN,
+     * there is nothing in the art to turn. Subclasses that keep a last
+     * horizontal heading override this so a hero who walks left and then up
+     * does not snap round to face east. See {@code Player.flipX}.
+     */
     protected boolean flipX() {
         return sprites != null && sprites.singleFacing && facing == Dir.LEFT;
     }

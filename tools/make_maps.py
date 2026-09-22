@@ -631,11 +631,134 @@ def _vault(rng):
     return [(7, 3, 6, 2)], []
 
 
+# --------------------------------------------------------------------------
+#
+# The layouts below are written in fractions of the room rather than in tiles,
+# because the Sunken Vault's rooms are 30x17 and every table above is a 20x11
+# one. Scaling those tables was the other option and is the worse one: a block
+# has to keep even sides, and a rounded-up rectangle can land on a doorway,
+# which is a generate-and-crash rather than a wrong-looking room.
+#
+# Each of these keeps both door corridors clear by construction. check_room
+# still proves it, and still proves every tile reachable - it is what caught a
+# brazier cutting a corridor in half when the cove was built.
+
+
+def even(v):
+    """The nearest even tile at or above two: where a block corner may sit."""
+    return max(2, (int(v) // 2) * 2)
+
+
+def clear_of_doors(x, w, span):
+    """True if a block's columns (or rows) miss the opening in that wall."""
+    return not (set(range(x, x + w)) & set(span))
+
+
+def door_jambs(depth=2):
+    """Stone shoulders beside each of the four openings.
+
+    This is what a doorway reads as when the room is bigger than the screen.
+    At 20x11 the whole room is in view and the wall is legibly a boundary; at
+    30x17 the player only ever sees part of it, and a bare one-tile notch in a
+    one-tile wall reads as a hole in a box. Two tiles of stone either side
+    turns the same gap into a passage cut through something thick.
+
+    Not an arch: the cove pack's arches are all two tiles wide and the doorway
+    is three, so there is no sprite that fits - and a front-facing arch in a
+    top-down side wall reads as a wall that fell over.
+    """
+    lo_x, hi_x = DOOR_X[0], DOOR_X[-1]
+    lo_y, hi_y = DOOR_Y[0], DOOR_Y[-1]
+    return [
+        (lo_x - 1, 1, 1, depth), (hi_x + 1, 1, 1, depth),
+        (lo_x - 1, ROOM_H - 1 - depth, 1, depth),
+        (hi_x + 1, ROOM_H - 1 - depth, 1, depth),
+        (1, lo_y - 1, depth, 1), (1, hi_y + 1, depth, 1),
+        (ROOM_W - 1 - depth, lo_y - 1, depth, 1),
+        (ROOM_W - 1 - depth, hi_y + 1, depth, 1),
+    ]
+
+
+def _deep_hall(rng):
+    """A colonnade down both long walls: a nave, not a box."""
+    y1 = even(ROOM_H * 0.16)
+    y2 = even(ROOM_H * 0.70)
+    blocks = list(door_jambs())
+    for i in range(1, 6):
+        x = even(ROOM_W * i / 6.0)
+        if not clear_of_doors(x, 2, DOOR_X):
+            continue
+        blocks += [(x, y1, 2, 2), (x, y2, 2, 2)]
+    return blocks, []
+
+
+def _deep_cross(rng):
+    """Four chambers around a crossing, built out of the corners."""
+    bw = even(ROOM_W * 0.22)
+    bh = even(ROOM_H * 0.20)
+    x2 = ROOM_W - 1 - bw
+    y2 = ROOM_H - 1 - bh
+    return list(door_jambs()) + [
+        (2, 2, bw, bh), (x2, 2, bw, bh), (2, y2, bw, bh), (x2, y2, bw, bh),
+    ], []
+
+
+def _deep_cistern(rng):
+    """Two sunken pools with the walking room between them."""
+    pw, ph = COVE_POOL[2], COVE_POOL[3]
+    y = (ROOM_H - ph) // 2
+    pools = [(even(ROOM_W * 0.16), y, pw, ph),
+             (even(ROOM_W * 0.72), y, pw, ph)]
+    return list(door_jambs()) + pools, [], pools
+
+
+def _deep_basin(rng):
+    """One pool, off to a side, and a spine of stone down the other."""
+    pw, ph = COVE_POOL[2], COVE_POOL[3]
+    pools = [(even(ROOM_W * 0.18), even(ROOM_H * 0.22), pw, ph)]
+    spine = even(ROOM_W * 0.70)
+    return list(door_jambs()) + pools + [
+        (spine, 2, 2, even(ROOM_H * 0.28)),
+        (spine, ROOM_H - 2 - even(ROOM_H * 0.28), 2, even(ROOM_H * 0.28)),
+    ], [], pools
+
+
+def _deep_vault(rng):
+    """A plinth behind where the chest lands, and nothing else to hide behind."""
+    w = even(ROOM_W * 0.24)
+    return list(door_jambs()) + [
+        (ROOM_W // 2 - w // 2, DOOR_Y[0] - 3, w, 2),
+    ], []
+
+
+def _deep_shop(rng):
+    """Counters either side of the top door, stock laid out in front."""
+    w = even(ROOM_W * 0.16)
+    return list(door_jambs()) + [
+        (even(ROOM_W * 0.12), 2, w, 2), (even(ROOM_W * 0.72), 2, w, 2),
+    ], []
+
+
+def _deep_open(rng):
+    """Nothing but the jambs: arenas, and the room a run starts in."""
+    return list(door_jambs()), []
+
+
+def _deep_scatter(rng):
+    """Seeded clutter at the larger size, for the rooms that must not compose."""
+    blocks, singles = _scatter(rng)
+    return list(door_jambs()) + blocks, singles
+
+
 LAYOUTS = {
     "open": _open, "pillars4": _pillars4, "pillars6": _pillars6,
     "corners": _corners, "pinch": _pinch, "pinch_mirror": _pinch_mirror,
     "bar": _bar, "chevron": _chevron, "alcoves": _alcoves, "ring": _ring,
     "diagonal": _diagonal, "scatter": _scatter, "shop": _shop, "vault": _vault,
+    "deep_open": _deep_open, "deep_hall": _deep_hall, "deep_cross": _deep_cross,
+    "deep_cistern": _deep_cistern, "deep_basin": _deep_basin,
+    "deep_vault": _deep_vault, "deep_shop": _deep_shop,
+    "deep_scatter": _deep_scatter,
 }
 
 
@@ -1023,7 +1146,22 @@ COVE_SHEETS = {
     "wallcracks": ("cracks_walls.png", "decorative_cracks_walls.png"),
     "objects": ("objects.png", "Objects.png"),
     "fire": ("fire.png", "fire_animation.png"),
+    "water": ("water_coasts.png", "Water_coasts_animation.png"),
 }
+
+#: A sunken pool, as (column, row, width, height) in water_coasts.png.
+#:
+#: Stamped whole rather than autotiled. The sheet is a coast set with corner
+#: and edge pieces for water of any shape, and wiring that up means a 9-slice
+#: and a pass of neighbour tests; these two are complete closed shapes sitting
+#: in the same sheet, and every tile of their rim is already animated by the
+#: pack. A room wants two or three pools, not a lake, so the whole of that
+#: machinery would buy nothing this uses.
+#: The dark one of the two. The pack's light variant is the same shape in the
+#: pale colourway, and on the cove's grey flagstone it reads as a raised stone
+#: platform with a blue kerb rather than as water - the dark one reads as a
+#: hole with water in it, which is what a pool is for here.
+COVE_POOL = (1, 1, 3, 5)
 
 
 def cove_fire_spots():
@@ -1107,12 +1245,18 @@ def place_fires(dressing, props, fire, solid, rng, count):
     return taken, footprint
 
 
-def paint_cove(blocks, singles, rng):
-    """Ground, walls and props for one Drowned Cove room.
+def paint_cove(blocks, singles, rng, pools=()):
+    """Ground, walls and props for one room of either cove biome.
 
     Returns the tilesets, the layers, the tileset map, and the cells this
     painter made solid on its own - the braziers - so make_room can keep
     spawns off them.
+
+    {@code pools} are rectangles already present in {@code blocks}: they are
+    solid like any other block and are drawn as sunken water instead of as
+    stone. Passed in rather than inferred, because "a block this size is a
+    pool" is the kind of rule that is wrong the first time a layout wants a
+    wide low wall.
     """
     anims = cove_animations()
     sets, gid = {}, 1
@@ -1134,7 +1278,14 @@ def paint_cove(blocks, singles, rng):
 
     perimeter(walls, lambda piece: wall.gid(*COVE_FRAME[piece]))
 
+    pool_at = {(x, y): (w, h) for (x, y, w, h) in pools}
     for (x, y, w, h) in blocks:
+        if pool_at.get((x, y)) == (w, h):
+            for dy in range(h):
+                for dx in range(w):
+                    props.put(x + dx, y + dy,
+                              sets["water"].gid(COVE_POOL[0] + dx, COVE_POOL[1] + dy))
+            continue
         for dy in range(h):
             for dx in range(w):
                 if dy == h - 1:
@@ -1159,7 +1310,16 @@ def paint_cove(blocks, singles, rng):
     scatter_floor(dressing, wall, cracks, solid, rng, set(lit))
     scatter_gold(dressing, objects, solid, rng, set(lit))
     crack_far_wall(dressing, sets["wallcracks"], rng)
-    return ([wall, cracks, sets["wallcracks"], objects, sets["fire"]],
+    # The water sheet is declared only by the rooms that stand in it. It is
+    # 928 tiles carrying about 570 lines of the pack's own <animation> nodes,
+    # and every .tmx repeats its tileset block in full - so declaring it
+    # everywhere would put fourteen thousand lines of metadata into the
+    # twenty-five cove rooms that have no water in them. Water is last in
+    # COVE_SHEETS, so leaving it out moves no other tileset's firstgid.
+    tilesets = [wall, cracks, sets["wallcracks"], objects, sets["fire"]]
+    if pools:
+        tilesets.append(sets["water"])
+    return (tilesets,
             [ground, dressing, decor, walls, props, overhead], sets, fires)
 
 
@@ -1450,8 +1610,13 @@ def spawns_for(kind, walkable, rng):
         x, y = nearest_free(walkable, tx, ty, used)
         out.append(("ENEMY", *at(x, y), ""))
 
-    chest_anchors = ([(5, 6), (9, 7), (14, 6)] if kind == "shop"
-                     else [(ROOM_W // 2, ROOM_H // 2)])
+    # In fractions of the room, not tiles: the shop's three anchors were a
+    # 20x11 table, which in a 30x17 room put all three of them in the left
+    # half with the counters nowhere near them.
+    chest_anchors = ([(round(ROOM_W * 0.25), round(ROOM_H * 0.55)),
+                      (ROOM_W // 2, round(ROOM_H * 0.64)),
+                      (round(ROOM_W * 0.72), round(ROOM_H * 0.55))]
+                     if kind == "shop" else [(ROOM_W // 2, ROOM_H // 2)])
     tag = {"locked": "locked", "secret": "secret", "shop": "stock"}.get(kind, "")
     for tx, ty in chest_anchors[:chests]:
         x, y = nearest_free(walkable, tx, ty, used)
@@ -1502,6 +1667,7 @@ BIOMES = [
     ("ruins_orange", "ruins", "orange"),
     ("depths", "depths", None),
     ("cove", "cove", None),
+    ("cove_deep", "cove", None),
 ]
 
 # Stage 6's arena, in tiles. Four screens, and the only room in the game that
@@ -1517,14 +1683,48 @@ COVE_PLAN = [entry for entry in ROOM_PLAN if entry[0] != "boss"] + [
     ("boss", "open", (ARENA_W, ARENA_H)),
 ]
 
+# Stage 7's grid. A screen is 20x11, so this is half again in each direction
+# and about two and a third screens of floor: enough that the room is never
+# all in view at once, which is the whole point of it, and not so much that
+# crossing one is a walk. The camera scrolls at 1x rather than zooming out -
+# see DungeonScreen.enter, which now only pulls back for a room of two whole
+# screens or more, i.e. the arena and nothing else.
+DEEP_W, DEEP_H = 30, 17
+DEEP = (DEEP_W, DEEP_H)
+
+#: The Sunken Vault: every room oversized, and every layout written for it.
+DEEP_PLAN = [
+    ("start", "deep_open", DEEP), ("start", "deep_cross", DEEP),
+    ("normal", "deep_hall", DEEP), ("normal", "deep_cross", DEEP),
+    ("normal", "deep_cistern", DEEP), ("normal", "deep_basin", DEEP),
+    ("normal", "deep_scatter", DEEP), ("normal", "deep_scatter", DEEP),
+    ("normal", "deep_scatter", DEEP), ("normal", "deep_hall", DEEP),
+    ("normal", "deep_cistern", DEEP), ("normal", "deep_cross", DEEP),
+    ("normal", "deep_basin", DEEP), ("normal", "deep_scatter", DEEP),
+    ("normal", "deep_hall", DEEP),
+    ("treasure", "deep_vault", DEEP), ("treasure", "deep_cross", DEEP),
+    ("locked", "deep_vault", DEEP), ("locked", "deep_cistern", DEEP),
+    ("shop", "deep_shop", DEEP),
+    ("secret", "deep_open", DEEP), ("secret", "deep_basin", DEEP),
+    # One boss template, for the reason the cove has one: FloorGenerator picks
+    # at random within (biome, kind), so a second would halve how often the
+    # one that was designed for the fight turns up.
+    ("boss", "deep_open", DEEP),
+    ("exit", "deep_open", DEEP), ("exit", "deep_hall", DEEP),
+]
+
 #: Biome folder -> its room plan. Anything not named here uses ROOM_PLAN.
-PLANS = {"cove": COVE_PLAN}
+PLANS = {"cove": COVE_PLAN, "cove_deep": DEEP_PLAN}
 
 
 def make_room(folder, pack, variant, kind, layout, index, seed, size=None):
     rng = random.Random(seed)
     set_room_size(*(size or (DEFAULT_W, DEFAULT_H)))
-    blocks, singles = LAYOUTS[layout](rng)
+    # A layout may name some of its blocks as pools, which only the cove
+    # painter knows what to do with. Two values or three, so the fourteen
+    # layouts that have no pools stay two-value.
+    made = LAYOUTS[layout](rng)
+    blocks, singles, pools = (made if len(made) == 3 else (made[0], made[1], ()))
     name = "%s_%02d" % (kind, index)
     solid = solid_grid(blocks, singles)
     walkable = check_room("%s/%s" % (folder, name), solid)
@@ -1539,7 +1739,7 @@ def make_room(folder, pack, variant, kind, layout, index, seed, size=None):
     if pack == "ruins":
         tilesets, layers, sets = paint_ruins(variant, blocks, singles, rng)
     elif pack == "cove":
-        tilesets, layers, sets, extra = paint_cove(blocks, singles, rng)
+        tilesets, layers, sets, extra = paint_cove(blocks, singles, rng, pools)
     else:
         tilesets, layers, sets = paint_depths(blocks, singles, rng)
 

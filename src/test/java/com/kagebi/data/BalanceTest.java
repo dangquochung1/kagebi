@@ -101,12 +101,21 @@ class BalanceTest {
     }
 
     static double avgHp(FloorDef f) {
-        return weighted(f, e -> e.maxHp);
+        // Scaled, because the floor's multiplier is applied where an enemy is
+        // spawned and never written back into the def. Reading maxHp straight
+        // off the def says a stage that reuses an easier stage's roster is as
+        // easy as it, which is the opposite of what hpScale was added to say.
+        return weighted(f, e -> e.maxHp) * f.hpScale;
+    }
+
+    /** A boss's health as the room will actually build it. */
+    static double bossHp(FloorDef f) {
+        return reg.enemy(f.boss).maxHp * f.hpScale;
     }
 
     /** A hit is the enemy's harder blow: most hits taken are from its attack, if it has one. */
     static double avgHit(FloorDef f) {
-        return weighted(f, e -> Math.max(e.contactDamage, e.attackDamage));
+        return weighted(f, e -> Math.max(e.contactDamage, e.attackDamage)) * f.damageScale;
     }
 
     static double dps(int floor) {
@@ -138,7 +147,7 @@ class BalanceTest {
 
     /** Wall-clock seconds of one boss fight, for a player who brought only a stage. */
     static double bossSeconds(FloorDef f) {
-        return f.hasBoss() ? reg.enemy(f.boss).maxHp / stageDps() * OVERHEAD_BOSS : 0;
+        return f.hasBoss() ? bossHp(f) / stageDps() * OVERHEAD_BOSS : 0;
     }
 
     static double theoretical(WeaponDef w) {
@@ -149,7 +158,7 @@ class BalanceTest {
         double s = kills(f) * avgHp(f) / dps(f.number) * OVERHEAD_TRASH
             + avgRooms(f) * WALK_SECONDS_PER_ROOM;
         if (f.hasBoss()) {
-            s += reg.enemy(f.boss).maxHp / dps(f.number) * OVERHEAD_BOSS;
+            s += bossHp(f) / dps(f.number) * OVERHEAD_BOSS;
         }
         return s;
     }
@@ -205,17 +214,26 @@ class BalanceTest {
         return g;
     }
 
-    /** The floor a player of this skill dies on, or 6 if they win. */
+    /**
+     * The floor a player of this skill dies on, or one past the last if they
+     * win.
+     *
+     * <p>Down the descent only. A run is one stage picked off the map, not a
+     * march through every floor that exists, and the side stages are neither
+     * survived on the way to the ending nor in the order their numbers
+     * suggest - walking them here would say a player dies in the Drowned Cove
+     * on the way to the Flame Core, which is not a journey anyone makes.
+     */
     static int deathFloor(double hits, double bossHits, int maxHp) {
         double hp = maxHp;
-        for (FloorDef f : reg.allFloors()) {
+        for (FloorDef f : descent()) {
             hp = hp - damage(f, hits, bossHits) + healing(f);
             if (hp <= 0) {
                 return f.number;
             }
             hp = Math.min(hp, maxHp);
         }
-        return 6;
+        return descent().size() + 1;
     }
 
     /** Banked gold for a run that dies halfway through {@code floor}. */
@@ -268,7 +286,7 @@ class BalanceTest {
         sb.append(String.format("five stages %.0fs = %.1f min%n", total, total / 60));
         sb.append(String.format("first-timer dies on floor %d; competent player: %s%n",
             deathFloor(FIRST_TIMER_HITS, FIRST_TIMER_BOSS_HITS, BASE_HP),
-            deathFloor(COMPETENT_HITS, COMPETENT_BOSS_HITS, BASE_HP) == 6 ? "wins"
+            deathFloor(COMPETENT_HITS, COMPETENT_BOSS_HITS, BASE_HP) > descent().size() ? "wins"
                 : "dies on " + deathFloor(COMPETENT_HITS, COMPETENT_BOSS_HITS, BASE_HP)));
         // What a stage pays, which is what the shop is now priced against. The
         // cumulative column is what the same table used to report, and is kept
@@ -494,14 +512,24 @@ class BalanceTest {
             "stage one alone banks " + stageBank(1, true));
     }
 
+    /**
+     * A first full clear of the map pays for something on the unlock shelf.
+     *
+     * <p>This used to measure the cheapest character. The ninja recolours were
+     * folded into skins, so the shelf's dearest tier is now a colour - priced
+     * exactly as the characters were, because it is the same shelf with the
+     * pretence removed. What is being asserted has not changed: a player who
+     * works through the whole map can afford the next thing on it.
+     */
     @Test
-    void aFullClearPaysForACharacter() {
+    void aFullClearPaysForTheCheapestPrize() {
         int cheapest = Integer.MAX_VALUE;
         for (ShopCatalog.Unlock u : shop.unlocks()) {
-            if (u.kind == ShopCatalog.UnlockKind.CHARACTER) {
+            if (u.kind != ShopCatalog.UnlockKind.WEAPON) {
                 cheapest = Math.min(cheapest, u.cost);
             }
         }
+        assertTrue(cheapest < Integer.MAX_VALUE, "the shelf has nothing but weapons on it");
         // Every stage cleared once, which is what a first full run through the
         // map is. banked(6) is the same sum for the descent this used to be.
         double all = 0;
@@ -509,7 +537,7 @@ class BalanceTest {
             all += stageBank(f.number, true);
         }
         assertTrue(all >= cheapest, "clearing every stage banks " + all
-            + ", cheapest character " + cheapest);
+            + ", cheapest prize " + cheapest);
     }
 
     // ---- the village -----------------------------------------------------------------------------
@@ -646,10 +674,20 @@ class BalanceTest {
         }
     }
 
+    /**
+     * One sword, and it has to be a weapon the content actually defines.
+     *
+     * <p>It was three: the katana plus two spells that came free with the fox
+     * rather than being bought, because the validator wants everything in the
+     * content to be reachable and "it comes with the character" was how they
+     * were reached. The fox is gone and so are they.
+     */
     @Test
     void theStarterKitIsWhatProfileSaysItIs() {
         Profile p = new Profile();
         assertEquals(1, p.unlockedWeapons.size);
-        assertTrue(reg.weapon(p.unlockedWeapons.first()) != null);
+        for (String id : p.unlockedWeapons) {
+            assertTrue(reg.weapon(id) != null, id);
+        }
     }
 }

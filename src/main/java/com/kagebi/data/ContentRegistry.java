@@ -2,10 +2,15 @@ package com.kagebi.data;
 
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectMap;
+import com.kagebi.data.def.CraftDef;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.FloorDef;
+import com.kagebi.data.def.GearDef;
+import com.kagebi.data.def.GemDef;
 import com.kagebi.data.def.ItemDef;
 import com.kagebi.data.def.LootTableDef;
+import com.kagebi.data.def.QuestDef;
+import com.kagebi.data.def.SkillDef;
 import com.kagebi.data.def.RelicDef;
 import com.kagebi.data.def.WeaponDef;
 
@@ -30,6 +35,20 @@ public final class ContentRegistry {
     private final ObjectMap<String, ItemDef> items = new ObjectMap<>();
     private final ObjectMap<String, LootTableDef> lootTables = new ObjectMap<>();
     private final ObjectMap<Integer, FloorDef> floors = new ObjectMap<>();
+    private final ObjectMap<String, GearDef> gear = new ObjectMap<>();
+    private final ObjectMap<String, GemDef> gems = new ObjectMap<>();
+    private final ObjectMap<String, CraftDef> crafts = new ObjectMap<>();
+    private final ObjectMap<String, QuestDef> quests = new ObjectMap<>();
+    private final ObjectMap<String, SkillDef> skills = new ObjectMap<>();
+    /** Icon name to grid index, as icons.json spells it. */
+    private final com.badlogic.gdx.utils.ObjectIntMap<String> icons =
+        new com.badlogic.gdx.utils.ObjectIntMap<>();
+
+    /** Filled once by the loader, from the icons section read before everything else. */
+    public void putIcons(com.badlogic.gdx.utils.ObjectIntMap<String> from) {
+        icons.clear();
+        icons.putAll(from);
+    }
 
     public void put(EnemyDef d) {
         enemies.put(d.id, d);
@@ -53,6 +72,26 @@ public final class ContentRegistry {
 
     public void put(FloorDef d) {
         floors.put(d.number, d);
+    }
+
+    public void put(GearDef d) {
+        gear.put(d.id, d);
+    }
+
+    public void put(GemDef d) {
+        gems.put(d.id, d);
+    }
+
+    public void put(CraftDef d) {
+        crafts.put(d.id, d);
+    }
+
+    public void put(SkillDef d) {
+        skills.put(d.id, d);
+    }
+
+    public void put(QuestDef d) {
+        quests.put(d.id, d);
     }
 
     public EnemyDef enemy(String id) {
@@ -79,6 +118,26 @@ public final class ContentRegistry {
         return require(floors.get(number), "floor", String.valueOf(number));
     }
 
+    public GearDef gear(String id) {
+        return require(gear.get(id), "gear", id);
+    }
+
+    public GemDef gem(String id) {
+        return require(gems.get(id), "gem", id);
+    }
+
+    public CraftDef craft(String id) {
+        return require(crafts.get(id), "craft", id);
+    }
+
+    public SkillDef skill(String id) {
+        return require(skills.get(id), "skill", id);
+    }
+
+    public QuestDef quest(String id) {
+        return require(quests.get(id), "quest", id);
+    }
+
     public boolean hasEnemy(String id) {
         return enemies.containsKey(id);
     }
@@ -93,6 +152,34 @@ public final class ContentRegistry {
 
     public boolean hasLootTable(String id) {
         return lootTables.containsKey(id);
+    }
+
+    /**
+     * The grid index for a named icon, or -1.
+     *
+     * <p>Defs resolve their own icons at parse time, so this exists for the
+     * screens: a badge that wants "the armour icon" should name it the way the
+     * content files do rather than writing down a number that moves the next
+     * time {@code icons.json} is re-sorted.
+     */
+    public int icon(String name) {
+        return icons.get(name, -1);
+    }
+
+    public boolean hasGear(String id) {
+        return gear.containsKey(id);
+    }
+
+    public boolean hasGem(String id) {
+        return gems.containsKey(id);
+    }
+
+    public boolean hasSkill(String id) {
+        return skills.containsKey(id);
+    }
+
+    public boolean hasQuest(String id) {
+        return quests.containsKey(id);
     }
 
     public Array<EnemyDef> allEnemies() {
@@ -113,6 +200,26 @@ public final class ContentRegistry {
 
     public Array<LootTableDef> allLootTables() {
         return values(lootTables);
+    }
+
+    public Array<GearDef> allGear() {
+        return values(gear);
+    }
+
+    public Array<GemDef> allGems() {
+        return values(gems);
+    }
+
+    public Array<CraftDef> allCrafts() {
+        return values(crafts);
+    }
+
+    public Array<SkillDef> allSkills() {
+        return values(skills);
+    }
+
+    public Array<QuestDef> allQuests() {
+        return values(quests);
     }
 
     public Array<FloorDef> allFloors() {

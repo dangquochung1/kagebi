@@ -67,6 +67,18 @@ public interface World extends Disposable {
     boolean playerDead();
 
     /**
+     * How long the player's death animation runs, in fixed steps.
+     *
+     * <p>The screen owns time, so it is the screen that waits - but how long to
+     * wait is a property of the art, which only the world has. Zero by default
+     * so a test double that has no actors ends a run the instant it says the
+     * player is dead, which is what every existing test expects.
+     */
+    default int playerDeathSteps() {
+        return 0;
+    }
+
+    /**
      * The door the player is standing in, or null. The screen owns room
      * transitions because it owns the maps, so the world only reports this.
      */

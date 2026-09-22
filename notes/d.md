@@ -138,6 +138,11 @@ keeps region names out of the content files that do not need them.
 | `sporecloud` | `fx/elemental/plant/spritesheet` |
 | `flamewave` | `fx/elemental/flam/spritesheet` |
 
+There were two more, `fireball` and `waterball`, which were Kitsune's off hand
+and only hers. They went when she did: the rule that one character could hold
+them and nobody else was enforced in four places, was enforced correctly in
+two, and existed at all to give one roster entry a reason to be picked.
+
 The cove's boss names its own art directly in `EnemyDef.projectile`, because
 its six regions are its own and nothing else in the game shoots them:
 `fx/skill6/{fire,water}_{ball,spell,arrow}`. Two more are derived rather than
@@ -166,6 +171,125 @@ a fourth:
   appears on the floor reads as something climbing out of it.
 
 ---
+
+## 3b. Gear and stone effects
+
+`GearDef.effects` and `GemDef.effect` name these, and
+`ContentValidator.GEAR_EFFECTS` is the list. A shorter list than the relics
+get, on purpose: a relic is a run-long surprise out of a chest and may do
+something strange, while gear is bought and forged between runs and is
+deliberately dull - eight numbers that go up. Nothing here needs new combat
+code. `Loadout.of` folds worn gear and set stones into the same `Modifiers`
+that relics, village upgrades and character perks already write to.
+
+| effect | what it does | was it already implemented |
+|---|---|---|
+| `max_hp_add` | maximum health | yes |
+| `armour_add` | flat soak before percentages | **no - see below** |
+| `damage_mult` | main hand and off hand | yes |
+| `crit_chance_add` | crit roll | yes |
+| `crit_damage_mult` | crit multiplier | yes |
+| `throw_damage_mult` | off hand only | **no - see below** |
+| `attack_speed_mult` | windup and recover | yes |
+| `move_speed_mult` | walking | yes |
+| `lifesteal` | health back on a hit | yes |
+| `gold_mult` | coin picked up | yes |
+
+Two of those had no source at all before gear existed:
+
+* **`armour_add`.** `Combatant.armour()` and `Player.armour` have been in the
+  code since combat was written and nothing ever wrote to them, so armour was
+  permanently zero and `Damage.incoming` subtracted nothing on every hit in the
+  game. `Modifiers.armourAdd` is what fills it. `Combatant.resist()` was the
+  same story one step further along - `HitResolver` passed `Damage.incoming` a
+  literal `0f` for it - and is now a real default method, still zero, ready for
+  whatever wants a percentage rather than a flat soak.
+* **`throw_damage_mult`.** The off hand used to share `outgoingMult` with the
+  main hand, so `melee_damage_mult` - a name that says melee twice - was
+  sharpening thrown kunai. `Modifiers.throwMult` is the off hand's own.
+
+### Stone colours
+
+A stone carries exactly one effect and its colour says which family, which is a
+rule the player learns once. `ContentValidator.GEM_COLOURS` holds it and fails
+the build when content breaks it, because a red stone that made you faster
+would teach the player that the colours are decoration.
+
+| colour | effects |
+|---|---|
+| RED | `damage_mult`, `crit_chance_add` |
+| GREEN | `max_hp_add`, `armour_add` |
+| BLUE | `attack_speed_mult`, `move_speed_mult` |
+| YELLOW | `crit_damage_mult`, `throw_damage_mult` |
+| PURPLE | `lifesteal`, `gold_mult` |
+
+## 3c. Quest step kinds
+
+`QuestDef.Step.kind` names these, and every one of them is a place the game
+already counts something. Nothing a quest asks for needs new simulation code;
+what was added is four one-line calls into `Quests.record`.
+
+| kind | target | counted where |
+|---|---|---|
+| `KILL` | an enemy id | `EntityWorld.countDeaths`, beside the bestiary |
+| `COLLECT` | an item id | `EntityWorld.collect`, on every pickup that has an id |
+| `REACH` | a floor number, as text | `DungeonScreen.enterFloor` |
+| `TALK` | a villager id | `HubScreen.talk` |
+
+`REACH` compares as a number rather than for equality, so arriving on floor 5
+satisfies a step asking for floor 3 - a player who went deeper has plainly been
+there, and sending them back up would be asking for nothing.
+
+Counted into the profile as it happens rather than banked at the end of the
+run, which is the opposite of how the bestiary works and is deliberate: the
+book is a record of the run and a quest is a job. A player who kills nine of
+ten and dies has still killed nine.
+
+`Quests` is pure - a registry, a profile and some numbers, like `Progression`
+and `LootRoller`. The village and the dungeon call in with "this happened" and
+neither of them is named anywhere in it.
+
+## 3d. Skill effects, and what a skill is made of
+
+`SkillDef.effects` names these and `ContentValidator.SKILL_EFFECTS` is the
+list. Only an `AVATAR` carries any: it is a timed transformation, and these are
+what it changes while it is up. A short list on purpose - a state that lasts
+eight seconds has to be legible in one line, and eight numbers moving at once
+is not.
+
+| effect | what it does | was it already implemented |
+|---|---|---|
+| `damage_mult` | main hand and off hand | yes |
+| `crit_chance_add` | crit roll | yes |
+| `crit_damage_mult` | crit multiplier | yes |
+| `throw_damage_mult` | off hand only | yes |
+| `attack_speed_mult` | windup and recover | yes |
+| `move_speed_mult` | walking | yes |
+| `armour_mult` | share of armour kept | **no - see below** |
+
+`armour_mult` is new to the game and is the only reducing effect there is.
+Everything else in the content makes a number go up; an ultimate is a trade,
+so it needed a name for the other direction. It folds into `Modifiers.armourAdd`
+rather than being read on its own, so nothing outside `Modifiers` has to know
+armour has two halves, and it compounds like every other `_mult`.
+
+The rest of a skill is not an effect name. `SkillDef.Kind` is the one part
+written in code, because it is a shape rather than a number:
+
+| kind | what the player sees | where it lives |
+|---|---|---|
+| `LUNGE` | a thrust along the aim, through whatever is crossed | `Player.beginSkill` |
+| `NOVA` | a ring around the caster that hurts and shoves | `EntityWorld.castNova` |
+| `AVATAR` | a timed transformation that also changes the dash | `Player.ultimate` |
+
+Everything else - cooldown, duration, damage, range, knockback, the health it
+costs and the health below which it is free - is a number in
+`assets/data/skills.json`, in seconds and virtual pixels. Balance is argued
+about for weeks and a rebuild per argument is how tuning stops happening.
+
+`SkillDef.vfx` and `SkillDef.icon` name strips that `tools/make_skillfx.py`
+writes; `SKILL_VFX` and `SKILL_ICONS` are the lists, and a misspelt one fails
+at boot rather than drawing nothing.
 
 ## 4. Seams other agents call
 
@@ -280,20 +404,37 @@ happens. In the order I would add them.
   first death buys exactly one. `BalanceTest` pins that.
 - **`Progression.MAX_DARKNESS` is 10** - my guess at how many dimming steps the
   hub can show before the art is unreadable. It is the hub's number to change.
-- **Biomes are `ruins`, `ruins_green`, `ruins_orange`, `depths`, `cove`** -
-  the folder names procgen writes under `assets/maps/rooms/`. Floors 1/2/3
-  take one ruins colourway each, 4/5 share `depths`, and 6 has `cove` to
-  itself. `ContentValidator.BIOMES` holds the five names; a sixth biome folder
-  needs adding there too.
-- **Floor 6 is a side stage.** `FloorDef.side` means the world map opens it
+- **Biomes are `ruins`, `ruins_green`, `ruins_orange`, `depths`, `cove`,
+  `cove_deep`** - the folder names procgen writes under `assets/maps/rooms/`.
+  Floors 1/2/3 take one ruins colourway each, 4/5 share `depths`, 6 has `cove`
+  and 7 has `cove_deep`. The last two are the same tile pack in two folders:
+  a biome folder is a room *size* and a room *plan* as much as it is a set of
+  tiles, and stage 7's rooms are 30x17. `ContentValidator.BIOMES` holds the
+  six names; a seventh biome folder needs adding there too.
+- **Floors 6 and 7 are side stages.** `FloorDef.side` means the world map opens it
   from the first run rather than one past the last stage cleared, and that
   clearing it gives the stage-clear screen rather than the ending. The win
   still belongs to the deepest floor with `side: false`.
-- **`cove/boss_01` is 40x22, and it is the only room that is not 20x11.**
-  `RoomTemplate.width` and `height` are per template now; the constants are
-  the default a .tmx gets for saying nothing. Read the template, never the
-  constants, for anything that touches a wall or a door.
-- **Floors 3, 5 and 6 are the only floors with a boss.** `FloorDef.boss` is
+- **Two room sizes are not 20x11: `cove/boss_01` is 40x22, and every room of
+  `cove_deep` is 30x17.** `RoomTemplate.width` and `height` are per template;
+  the constants are the default a .tmx gets for saying nothing. Read the
+  template, never the constants, for anything that touches a wall or a door.
+  A room that is not one screen fades rather than slides into its neighbours
+  (`DungeonScreen.startSlide`), and one of two whole screens or more opens on
+  a wide shot of itself (`WIDE_SHOT`) - the 30x17 rooms scroll instead, which
+  is the point of them.
+- **`FloorDef.hpScale` and `damageScale` exist now**, which is item 1 of the
+  list above. Floor 7 fights floor 6's three slimes at 1.5x hit points and
+  1.25x damage rather than through three more defs on the same three sprites.
+  Applied in `EntityWorld.buildEnemy`, never baked into the `EnemyDef`, which
+  is shared by every floor that names it.
+- **The boss brains are `boss_frog`, `boss_tengu`, `boss_pirateleader`,
+  `boss_piratezombie`, `boss_squidman`, `boss_squidlord` and `boss_orb` /
+  `boss_orb_tide`.** `boss_squidlord` is stage 7's, and the only one that
+  fights in two elements: it shoots what `EnemyDef.projectile` names and rains
+  what the brain's own `rains()` names, so water comes at you level and fire
+  comes down.
+- **Floors 3, 5, 6 and 7 are the only floors with a boss.** `FloorDef.boss` is
   null on 1, 2 and 4, and `hasBoss()` already answers that.
 - **`assets/data/icons.json` is a name-to-index map, not a def.** It is loaded
   into `ContentRegistry`'s item and relic icons at parse time - `icons.json`

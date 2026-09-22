@@ -1,5 +1,6 @@
 package com.kagebi.ai;
 
+import com.kagebi.Cfg;
 import com.kagebi.Dir;
 import com.kagebi.combat.Damage;
 import com.kagebi.combat.Faction;
@@ -246,6 +247,44 @@ public abstract class BaseBrain implements AiBrain {
         self.aimX = dx / len;
         self.aimY = dy / len;
         self.facing = Dir.of(dx, dy);
+    }
+
+    /**
+     * How far ahead of the player a brain may aim, in pixels.
+     *
+     * <p>A full lead is not the goal and never was. The player sprints at 78
+     * px/s and rolls at 165, so an unbounded guess over a forty-step fall lands
+     * a hundred pixels outside the room - and, worse, it is exactly correct
+     * against anyone holding one direction, which turns a dodge into a coin
+     * flip rather than a skill. Capped, the lead is beaten by turning and only
+     * by turning, which is the behaviour this is here to reward.
+     */
+    public static final float LEAD_MAX = 52f;
+
+    /**
+     * Where the player will be in {@code steps} steps if they keep going.
+     *
+     * <p>Straight-line extrapolation on purpose. Anything cleverer models a
+     * player who has already decided, and the whole value of leading a shot is
+     * that it punishes not deciding.
+     */
+    protected static float leadX(AiContext ctx, int steps) {
+        return ctx.playerX() + lead(ctx.playerVelX(), ctx.playerVelY(), steps, true);
+    }
+
+    protected static float leadY(AiContext ctx, int steps) {
+        return ctx.playerY() + lead(ctx.playerVelX(), ctx.playerVelY(), steps, false);
+    }
+
+    private static float lead(float vx, float vy, int steps, boolean wantX) {
+        float dx = vx * steps * Cfg.STEP;
+        float dy = vy * steps * Cfg.STEP;
+        float len = (float) Math.sqrt(dx * dx + dy * dy);
+        if (len > LEAD_MAX) {
+            dx *= LEAD_MAX / len;
+            dy *= LEAD_MAX / len;
+        }
+        return wantX ? dx : dy;
     }
 
     /**

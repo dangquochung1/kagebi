@@ -88,30 +88,46 @@
     }
   ],
 
-  // Characters and weapons. Both need gold AND a requirement met, so money
-  // alone never opens the whole roster on run two - and a requirement alone
-  // never does either, which keeps banked gold worth having late.
+  // Ninja and weapons. Both need gold AND a requirement met, so money alone
+  // never opens the whole rack on run two - and a requirement alone never does
+  // either, which keeps banked gold worth having late.
   //
   // requirement is one of: none, deepest_floor, wins, runs, bestiary.
-  // Each character carries a small run-start perk so that choosing one is a
-  // decision rather than a colour swap. The perks reuse the upgrade effect
-  // names and stack with the upgrade of the same name.
+  //
+  // The five ninja below spent a while as SKIN entries, on the argument that a
+  // recolour is a palette rather than a roster. They are characters again, and
+  // the difference this time is that the perks are real ones drawn from the
+  // same seven names the upgrades use, one each, no two alike - rather than a
+  // statistic invented to justify charging for a hue. The green one keeps no
+  // perk at all, which is the choice the other five are measured against.
   "unlocks": [
+    // The five ninja that have to be bought, and what each one is for. The
+    // green one is not here: it is free, so it has no row, which is how the
+    // validator lets it be the only character with no perk. "No perk. What you
+    // get is your own" is the starting position, and every other colour is a
+    // departure from it.
+    //
+    // Prices and requirements are the ones these carried as colours, unchanged.
+    // They are worth more now - a perk is not a hue - but a player who already
+    // paid for a colour owns the ninja, and raising the price after the fact
+    // would be charging twice for the same purchase.
     {
       "id": "ninjared", "kind": "CHARACTER",
       "nameKey": "char.ninjared.name", "descKey": "character.ninjared.desc",
       "icon": "stat_strength", "cost": 600,
       "requirement": "deepest_floor", "requirementValue": 3,
+      // The cheapest, and the one whose perk is easiest to feel: damage is the
+      // statistic a player can watch work on the very next enemy.
       "effect": "melee_damage_mult", "magnitude": 1.10
     },
     {
       "id": "ninjablue", "kind": "CHARACTER",
       "nameKey": "char.ninjablue.name", "descKey": "character.ninjablue.desc",
-      "icon": "stat_armour", "cost": 900,
+      "icon": "runner_orange", "cost": 900,
       // Twelve of the twenty-two enemies, which is everything on floors 1 to 3
       // plus one of the depths. It asks the player to have looked around.
       "requirement": "bestiary", "requirementValue": 12,
-      "effect": "max_hp_add", "magnitude": 20
+      "effect": "move_speed_mult", "magnitude": 1.10
     },
     {
       "id": "ninjawater", "kind": "CHARACTER",
@@ -119,26 +135,25 @@
       "icon": "drop_blue", "cost": 1200,
       // Fifteen runs. The consolation unlock: it arrives for persistence
       // rather than for skill, and it is the one that catches a player who is
-      // stuck.
+      // stuck - which is why an extra flask is the right thing behind it.
       "requirement": "runs", "requirementValue": 15,
-      "effect": "gold_mult", "magnitude": 1.15
+      "effect": "potion_capacity_add", "magnitude": 1
     },
     {
       "id": "ninjadark", "kind": "CHARACTER",
       "nameKey": "char.ninjadark.name", "descKey": "character.ninjadark.desc",
       "icon": "tail_purple", "cost": 1400,
       "requirement": "deepest_floor", "requirementValue": 5,
-      "effect": "move_speed_mult", "magnitude": 1.08
+      "effect": "gold_mult", "magnitude": 1.20
     },
     {
       "id": "ninjafire", "kind": "CHARACTER",
       "nameKey": "char.ninjafire.name", "descKey": "character.ninjafire.desc",
       "icon": "flame_orange", "cost": 2000,
-      // Requires a win. The master's own colours, and the only thing in the
-      // game gated behind finishing it.
-      // A winning run banks about 2,900, so the run that earns this pays for it.
+      // The master's own colours, the only thing in the game gated behind
+      // finishing it, and the only perk that hands back a death.
       "requirement": "wins", "requirementValue": 1,
-      "effect": "revive_once", "magnitude": 0.30
+      "effect": "revive_once", "magnitude": 1
     },
 
     {

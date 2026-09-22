@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.kagebi.Cfg;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.entity.Boss;
 import com.kagebi.entity.Enemy;
@@ -357,7 +358,10 @@ class AiStateMachineTest {
         assertTrue(tide.lobs >= OrbBrain.FOUNTAIN_ARMS * 3,
             "the water orb threw only " + tide.lobs + " arcs");
 
-        // Aimed where the player is, against thrown around itself.
+        // Aimed where the player is, against thrown around itself. Both
+        // ceilings are the standing-still ones: neither arena moved its
+        // player, so the fire scatter never widens and the fountain never
+        // stretches. The two tests below are what pins those.
         for (float[] at : rain.hazards) {
             assertTrue(Math.hypot(at[0] - rain.px, at[1] - rain.py) <= OrbBrain.DROP_RADIUS + 1,
                 "a fire spell fell nowhere near the player");
@@ -365,6 +369,72 @@ class AiStateMachineTest {
         for (float[] at : tide.hazards) {
             assertTrue(Math.hypot(at[0] - water.x, at[1] - water.y) <= OrbBrain.FOUNTAIN_MAX + 1,
                 "a water arc landed outside its own fountain");
+        }
+    }
+
+    /**
+     * Running in a straight line is not a dodge.
+     *
+     * <p>The fire orb used to scatter its rain in a ring around wherever the
+     * player was standing at the moment each spell was thrown. That ring never
+     * closes: by the time the spell lands the player has left it, whichever
+     * way they went, without looking. One drop in three is now thrown at where
+     * they are going instead, so holding a direction is the thing that gets
+     * hit and turning is the thing that does not - which is the whole reason
+     * the intermission exists.
+     */
+    @Test
+    void aFireDropLandsWhereTheRunnerIsGoing() {
+        FakeArena arena = new FakeArena();
+        Enemy fire = spawn(orbDef("boss_orb"), 160f, 88f);
+        float speed = 70f;              // a shade under the player's 78
+
+        float closest = Float.MAX_VALUE;
+        for (int t = 0; t < OrbBrain.DROP_INTERVAL * 12; t++) {
+            arena.px += speed * Cfg.STEP;
+            arena.step(fire);
+            // Measured against where the runner will be when it lands, which
+            // is the only place a led shot is supposed to be near.
+            float willBe = arena.px + speed * OrbBrain.DROP_FALL * Cfg.STEP;
+            for (float[] at : arena.hazards) {
+                closest = Math.min(closest, (float) Math.hypot(at[0] - willBe, at[1] - arena.py));
+            }
+        }
+        assertTrue(closest <= 16f,
+            "the closest drop landed " + Math.round(closest)
+                + "px from where the runner was going; nothing led them");
+    }
+
+    /**
+     * Backing out of the fountain is not a dodge either.
+     *
+     * <p>The water orb threw a ring of a fixed 140px around itself, so a
+     * player standing 150px away was simply safe and the second intermission
+     * could be waited out from a corner. The ring now opens to wherever they
+     * are, which is why the ceiling in the test above is only the ceiling for
+     * someone who stayed inside it.
+     */
+    @Test
+    void theFountainStretchesToReachSomeoneWhoBackedOff() {
+        FakeArena arena = new FakeArena();
+        Enemy water = spawn(orbDef("boss_orb_tide"), 160f, 88f);
+        arena.px = 160f + OrbBrain.FOUNTAIN_MAX + 60f;
+        arena.py = 88f;
+
+        float nearest = Float.MAX_VALUE;
+        for (int t = 0; t < OrbBrain.DROP_INTERVAL * 6; t++) {
+            arena.step(water);
+        }
+        for (float[] at : arena.hazards) {
+            nearest = Math.min(nearest, (float) Math.hypot(at[0] - arena.px, at[1] - arena.py));
+        }
+        assertTrue(nearest <= 24f,
+            "the nearest arc landed " + Math.round(nearest)
+                + "px away from a player standing " + Math.round(OrbBrain.FOUNTAIN_MAX + 60f)
+                + "px out; the fountain never reached");
+        for (float[] at : arena.hazards) {
+            assertTrue(Math.hypot(at[0] - water.x, at[1] - water.y) <= OrbBrain.FOUNTAIN_FAR + 1,
+                "an arc landed past the fountain's ceiling");
         }
     }
 

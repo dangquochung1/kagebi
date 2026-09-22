@@ -56,13 +56,32 @@ public final class FloorDef {
      * <p>The five numbered floors are a sequence - each opens the next, and
      * clearing the deepest one is the win. A side stage is neither. It exists
      * so content can be added without renumbering the descent or moving where
-     * the story ends, which is what floor 6, the Drowned Cove, is.
+     * the story ends, which is what floors 6 and 7 - the Drowned Cove and the
+     * Sunken Vault - are.
      *
      * <p>Two screens read it: the world map, which unlocks it regardless of
      * what has been cleared, and the dungeon, which must not show the victory
      * screen for finishing it.
      */
     public final boolean side;
+
+    /**
+     * What this floor multiplies its roster's hit points and damage by.
+     *
+     * <p>One, unless a floor says otherwise. It exists because a roster and a
+     * difficulty are different things and the data could only say the first:
+     * floor 5 wanted floor 4's enemies at floor 5's numbers and had to be
+     * given four defs of its own instead, and stage 7 wants stage 6's slimes
+     * a floor deeper. Without this the only way to say "the same enemy, but
+     * harder" is a second id, a second name in two languages and a second row
+     * in every table that lists enemies - which is four places for one number
+     * to drift out of step.
+     *
+     * <p>Applied where an enemy is spawned, not baked into the def: the same
+     * {@code EnemyDef} is shared by every floor that names it.
+     */
+    public final float hpScale;
+    public final float damageScale;
 
     public FloorDef(int number, String nameKey, String descKey, String biome,
                     String music, String ambient, String bossMusic,
@@ -71,7 +90,7 @@ public final class FloorDef {
                     int[] enemyWeights, int packMin, int packMax, String boss) {
         this(number, nameKey, descKey, biome, music, ambient, bossMusic,
              roomsMin, roomsMax, treasureRooms, shopRooms, enemies, enemyWeights,
-             packMin, packMax, boss, false);
+             packMin, packMax, boss, false, 1f, 1f);
     }
 
     public FloorDef(int number, String nameKey, String descKey, String biome,
@@ -80,6 +99,17 @@ public final class FloorDef {
                     int treasureRooms, int shopRooms, String[] enemies,
                     int[] enemyWeights, int packMin, int packMax, String boss,
                     boolean side) {
+        this(number, nameKey, descKey, biome, music, ambient, bossMusic,
+             roomsMin, roomsMax, treasureRooms, shopRooms, enemies, enemyWeights,
+             packMin, packMax, boss, side, 1f, 1f);
+    }
+
+    public FloorDef(int number, String nameKey, String descKey, String biome,
+                    String music, String ambient, String bossMusic,
+                    int roomsMin, int roomsMax,
+                    int treasureRooms, int shopRooms, String[] enemies,
+                    int[] enemyWeights, int packMin, int packMax, String boss,
+                    boolean side, float hpScale, float damageScale) {
         this.number = number;
         this.nameKey = nameKey;
         this.descKey = descKey;
@@ -97,6 +127,8 @@ public final class FloorDef {
         this.packMax = packMax;
         this.boss = boss;
         this.side = side;
+        this.hpScale = hpScale;
+        this.damageScale = damageScale;
     }
 
     public boolean hasBoss() {

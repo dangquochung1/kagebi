@@ -1,7 +1,9 @@
-// The five floors, descending from the well under the village to the flame
-// that took the master.
+// The five floors of the descent, from the well under the village to the
+// flame that took the master - and, after them, the two side stages, which
+// are numbered 6 and 7 because ContentRegistry walks floors from 1 and stops
+// at the first gap. They read as optional everywhere else.
 //
-// nameKey points at floor.1 .. floor.5, which already exist in the interface
+// nameKey points at floor.1 .. floor.7, which already exist in the interface
 // strings and are not mine to move. descKey is the world map's blurb - the
 // sentence the player reads before choosing the stage, so it says what the
 // place is rather than what fights there.
@@ -31,9 +33,20 @@
 //   floor 2   14.5 rooms   42.0 kills          276s   4.6 min
 //   floor 3   14.5 rooms   38.3 kills + boss   389s   6.5 min
 //   floor 4   15.5 rooms   52.5 kills          446s   7.4 min
-//   floor 5   15.5 rooms   47.5 kills + boss   589s   9.8 min
+//   floor 5   15.5 rooms   47.5 kills + boss   522s   8.7 min
 //                                             -----  --------
 //                                             1890s  31.5 min
+//
+// The two side stages are not in that total and are not meant to be; each is
+// its own outing, and BalanceTest asks only that one lasts at least four
+// minutes and no more than ten.
+//
+//   floor 6   15.5 rooms   47.5 kills + boss   247s   4.1 min
+//   floor 7   15.5 rooms   47.5 kills + boss   300s   5.0 min
+//
+// Floor 7 fights floor 6's roster and is the longer of the two because of
+// hpScale and damageScale, not because of anything in enemies.json: see the
+// entry itself, and notes/d.md.
 //
 // A player who skips the optional rooms lands near 25; one who opens every
 // door and reads every relic lands near 40. If a playtest says otherwise the
@@ -145,6 +158,41 @@
       // are placed - naming them here instead would put the boss's later
       // bodies in the floor's ordinary rooms.
       "boss": "pirateleader"
+    },
+    {
+      // The Sunken Vault. The second side stage, and the one the cove's art
+      // was carried into rather than a new pack: what is new here is the
+      // shape of the place, not the stone.
+      //
+      // Every room is 30x17 instead of 20x11, which is a screen and a half
+      // each way. The camera stops being a slide projector and follows, the
+      // doors fade instead of sliding, and no room is ever all in view - the
+      // floor reads as somewhere continuous rather than as a row of boxes.
+      // That is the whole design; see tools/make_maps.py DEEP_PLAN.
+      "number": 7, "nameKey": "floor.7", "descKey": "floor.7.desc",
+      "biome": "cove_deep", "side": true,
+      // 2_the_cave for stone under water and 28_tension for the fight; both
+      // were unused, and 28 escalates without being MUSIC_FINAL, which is
+      // floor 5's and should stay floor 5's. wavefar rather than the cove's
+      // wave: the same sea, further off.
+      "music": "2_the_cave.ogg", "ambient": "ambient/wavefar.wav",
+      "bossMusic": "28_tension.ogg",
+      "roomsMin": 14, "roomsMax": 17,
+      "treasureRooms": 2, "shopRooms": 1,
+      // The cove's roster, at the cove's weights. What makes this floor
+      // harder is hpScale and damageScale below, not a second set of defs on
+      // the same three sprites - see notes/d.md, where that field is the
+      // first thing on the list of what the data cannot say.
+      "enemies":      ["slimespike", "slimetide", "slimeember"],
+      "enemyWeights": [40,           32,          28],
+      "packMin": 4, "packMax": 6,
+      // 1.5x the hit points and 1.25x the damage. The cove is entered at
+      // whatever strength the player brought; the vault is the room after it,
+      // and BalanceTest models a floor 7 as having four more floors of relics
+      // behind it than the cove does. Without a scalar the same slimes would
+      // measure as a shorter, easier stage than the one before it.
+      "hpScale": 1.5, "damageScale": 1.25,
+      "boss": "squidlord"
     }
   ]
 }

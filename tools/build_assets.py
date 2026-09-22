@@ -34,6 +34,9 @@ SUNNY = os.path.join(RAW, "SunnyLand Music")
 # .tmx files directly, and the paths inside those are relative to where they
 # sit, so the folder is moved as one piece or not at all.
 PACKS = os.path.join(OUT, "packs")
+#: Named once: the pack ships with spaces around the dash, and the word is
+#: "Lightning" rather than "lighting".
+SKILL_PACK = "Pixel Art Skill Animations - Lightning"
 HOME = os.path.join(PACKS, "homeassets", "Tiled_files")
 
 # Promo art, contact sheets and editor previews that ship alongside the real
@@ -335,14 +338,20 @@ def build_licenses():
          "SproutLands-NonCommercial.txt"),
         (os.path.join(RAW, "_fonts/Pixeloid_Font_1_0/License.txt"),
          "PixeloidFont-OFL.txt"),
-        # The Drowned Cove's four packs. All four carry the same Craftpix file
-        # licence, which is not CC0: it allows use in a game and forbids
-        # redistributing the art itself, which is why they sit in the
-        # gitignored assets/packs/ rather than in the repository.
+        # The six Craftpix packs. All carry the same file licence, which is not
+        # CC0: it allows use in a game and forbids redistributing the art
+        # itself, which is why they sit in the gitignored assets/packs/ rather
+        # than in the repository.
         (os.path.join(PACKS, "dungeon6/license.txt"), "Craftpix-Dungeon6.txt"),
         (os.path.join(PACKS, "slimes6/License.txt"), "Craftpix-Slimes6.txt"),
         (os.path.join(PACKS, "bosses6/license.txt"), "Craftpix-Bosses6.txt"),
         (os.path.join(PACKS, "bossfx6/license.txt"), "Craftpix-BossFx6.txt"),
+        # The pack spells this one "Licens.txt". Copied under a corrected name.
+        (os.path.join(PACKS, "heroui/License.txt"), "Craftpix-RpgGui.txt"),
+        # Frostwindz ships theirs as a Word document rather than a text file.
+        # Copied as it is: a licence is evidence, and retyping it is not.
+        (os.path.join(PACKS, SKILL_PACK, "Frostwindz Asset License Agreement.docx"),
+         "Frostwindz-LightningSkills.docx"),
     ]
     ensure(os.path.abspath(dst))
     for src, name in pairs:
@@ -403,6 +412,49 @@ def build_cove():
         stats["missing_sources"] += len(cove.build(report=print))
 
 
+def build_heroui():
+    """The windows on the character sheet.
+
+    A CraftPix pack shaped like nothing else here: finished GUI windows rather
+    than nine-patch parts, so tools/slice_heroui.py cuts out the three this
+    game uses and leaves the rest.
+
+    A clone that skips this has no `ui/hero/*` in its atlases and the game will
+    not boot: AssetsContractTest is what says so early.
+
+    There was a second pack here, the Japanese side-view characters, cut down
+    by a tools/make_jphero.py that no longer exists. Three of the four playable
+    characters came out of it, at a shape nothing else in the game had, and
+    every screen that drew a hero had to know which shape it was looking at.
+    """
+    print("the gui pack")
+    if not os.path.isdir(os.path.join(PACKS, "heroui")):
+        print("  ! missing source: %s" % os.path.join(PACKS, "heroui"))
+        stats["missing_sources"] += 1
+        return
+    if not DRY:
+        __import__("slice_heroui").build()
+
+
+def build_skillfx():
+    """The three lightning skills, from the Frostwindz pack.
+
+    Its own tool because nothing else here has to square up a strip: this
+    game's Anim.strip reads the cell size off the region height, and five of
+    the pack's six sheets are not square and one is a two-row grid. See
+    tools/make_skillfx.py.
+    """
+    print("lightning skills")
+    pack = os.path.join(PACKS, SKILL_PACK)
+    if not os.path.isdir(pack):
+        print("  ! missing source: %s" % pack)
+        stats["missing_sources"] += 1
+        return
+    if not DRY:
+        import make_skillfx
+        make_skillfx.build(report=True)
+
+
 def build_sunnyside():
     """The island village's images, from the Sunnyside World pack.
 
@@ -426,7 +478,7 @@ def build_sunnyside():
 
 STEPS = [build_player, build_actors, build_tiles, build_depth_actors,
          build_ui_fx_items, build_audio, build_licenses, build_cove,
-         enforce_tile_grid, build_sunnyside]
+         build_heroui, build_skillfx, enforce_tile_grid, build_sunnyside]
 
 
 def main():

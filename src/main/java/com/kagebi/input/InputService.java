@@ -93,6 +93,25 @@ public final class InputService extends InputAdapter {
     /** Whole wheel notches this step, positive towards the player. */
     private int scroll;
 
+    /**
+     * Where the mouse is, in window pixels, and whether it was clicked.
+     *
+     * <p>Kept in window pixels rather than virtual ones because this class has
+     * no viewport and must not acquire one: the window may be letterboxed, and
+     * only the viewport that drew a screen knows where its black bars are. See
+     * {@link com.kagebi.gfx.CameraController#toVirtual}, which every screen
+     * already has an instance of.
+     *
+     * <p>The click is promoted on the fixed step exactly like a key press, for
+     * the same reason: a click and release that both land between two steps
+     * would otherwise be seen twice or not at all.
+     */
+    private int pointerX;
+    private int pointerY;
+    private boolean pointerDown;
+    private boolean pendingClick;
+    private boolean justClicked;
+
     public InputService(InputMap map) {
         this.map = map;
         java.util.Arrays.fill(lastPressStep, Integer.MIN_VALUE / 2);
@@ -117,6 +136,8 @@ public final class InputService extends InputAdapter {
         // turned between two steps would otherwise be read twice or never.
         scroll = (int) pendingScroll;
         pendingScroll -= scroll;
+        justClicked = pendingClick;
+        pendingClick = false;
     }
 
     /**
@@ -179,6 +200,12 @@ public final class InputService extends InputAdapter {
         modifiersHeld = 0;
         pendingScroll = 0f;
         scroll = 0;
+        // The pointer position survives: it is where the mouse is, which is
+        // still true across a screen change. Only the click is dropped, so a
+        // press that opened a screen cannot also press something on it.
+        pointerDown = false;
+        pendingClick = false;
+        justClicked = false;
     }
 
     /** Whether a chord aimed at the window manager is in progress. */
@@ -236,5 +263,87 @@ public final class InputService extends InputAdapter {
         }
         pendingScroll += amountY;
         return true;
+    }
+
+    // ---- mouse ---------------------------------------------------------------
+
+    /** Where the pointer is, in window pixels with y running down. */
+    public int pointerX() {
+        return pointerX;
+    }
+
+    public int pointerY() {
+        return pointerY;
+    }
+
+    /** Whether the left button is held. */
+    public boolean pointerDown() {
+        return pointerDown;
+    }
+
+    /**
+     * Whether the left button went down during this step.
+     *
+     * <p>Spend it with {@link #consumeClick()} once a widget has acted on it,
+     * so one press cannot also press whatever is underneath.
+     */
+    public boolean justClicked() {
+        return justClicked;
+    }
+
+    public void consumeClick() {
+        justClicked = false;
+    }
+
+    /**
+     * Only the left button, and only when the desktop is not mid-chord.
+     *
+     * <p>Right and middle are left unclaimed rather than mapped to something:
+     * this game has no use for them, and swallowing them would stop anything
+     * else in the window from seeing them.
+     */
+    @Override
+    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+        pointerX = screenX;
+        pointerY = screenY;
+        if (button != com.badlogic.gdx.Input.Buttons.LEFT || modifiersHeld > 0) {
+            return false;
+        }
+        pointerDown = true;
+        pendingClick = true;
+        return true;
+    }
+
+    @Override
+    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+        pointerX = screenX;
+        pointerY = screenY;
+        if (button != com.badlogic.gdx.Input.Buttons.LEFT) {
+            return false;
+        }
+        pointerDown = false;
+        return true;
+    }
+
+    /**
+     * Tracked but never claimed.
+     *
+     * <p>Returning false matters: a screen that puts a scene2d {@code Stage}
+     * after this service in an {@link com.badlogic.gdx.InputMultiplexer} would
+     * otherwise never see the mouse move, and its buttons would never light up
+     * on hover.
+     */
+    @Override
+    public boolean mouseMoved(int screenX, int screenY) {
+        pointerX = screenX;
+        pointerY = screenY;
+        return false;
+    }
+
+    @Override
+    public boolean touchDragged(int screenX, int screenY, int pointer) {
+        pointerX = screenX;
+        pointerY = screenY;
+        return false;
     }
 }

@@ -19,7 +19,9 @@ import com.kagebi.ai.AiContext;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.def.LootTableDef;
 import com.kagebi.data.def.RelicDef;
+import com.kagebi.data.def.SkillDef;
 import com.kagebi.data.def.ItemDef;
+import com.kagebi.data.def.QuestDef;
 import com.kagebi.loot.LootRoller;
 import com.kagebi.save.Profile;
 import com.kagebi.data.ShopCatalog;
@@ -41,6 +43,7 @@ import com.kagebi.gen.RoomTemplate;
 import com.kagebi.gen.SpawnPoint;
 import com.kagebi.gfx.Anim;
 import com.kagebi.input.InputService;
+import com.kagebi.quest.Quests;
 import com.kagebi.run.RunState;
 import com.kagebi.settings.Settings;
 
@@ -172,6 +175,19 @@ public final class EntityWorld implements World, AiContext {
 
     /** Named fx regions, sliced once per room. Looked up by brains, by name. */
     private final ObjectMap<String, Anim> namedFx = new ObjectMap<>();
+    /**
+     * The skill strips, kept apart from {@link #namedFx} for their timing.
+     *
+     * <p>Everything in namedFx is sliced at a hard nine steps a frame, which is
+     * right for a hazard that has to keep burning and far too slow for a
+     * skill: four frames at nine steps is six tenths of a second, so a bolt
+     * meant to punctuate a thrust would still be on screen after the thrust
+     * had finished. These run at {@link #SKILL_STEPS_PER_FRAME}.
+     */
+    private final ObjectMap<String, Anim> skillFx = new ObjectMap<>();
+
+    /** Three steps a frame: a four-frame bolt lasts a fifth of a second. */
+    private static final int SKILL_STEPS_PER_FRAME = 3;
     private final Array<Entity> drawList = new Array<>();
 
     /**
@@ -201,6 +217,9 @@ public final class EntityWorld implements World, AiContext {
 
     private int hitstop;
     private int burnTick;
+    /** The player's drift over the last step, in pixels per second. */
+    private float playerVelX;
+    private float playerVelY;
     private float shake;
     private boolean descendRequested;
     private boolean shopRequested;
@@ -343,7 +362,8 @@ public final class EntityWorld implements World, AiContext {
         this.run = run;
         this.settings = settings;
         this.player = new Player(run, resolveWeapon(run.weaponId),
-            ActorSprites.player(actors, run.characterId), new Random(run.seed ^ 0x5DEECE66DL));
+            ActorSprites.player(actors, run.characterId),
+            new Random(run.seed ^ 0x5DEECE66DL));
         refreshMods();
         if (actors != null) {
             loadOwnAtlases();
@@ -414,8 +434,30 @@ public final class EntityWorld implements World, AiContext {
      * {@link RunState#baseMaxHp}. Recomputing after a second relic must add the
      * second relic rather than the first twice, and so must a second world.
      */
+    /**
+     * Tells the journal something happened, if there is a journal to tell.
+     *
+     * <p>Counted into the profile as it happens rather than banked at the end
+     * of the run, which is the opposite of how the bestiary works and is
+     * deliberate: the book is a record of the run and a quest is a job. A
+     * player who kills nine of the ten and dies has still killed nine, and
+     * making them do it again would be the game forgetting on purpose.
+     *
+     * <p>Silent with no profile, which is the case in every headless test that
+     * does not care about quests.
+     */
+    private void questRecord(QuestDef.Kind kind, String target, int amount) {
+        if (profile != null && content != null) {
+            Quests.record(content, profile, kind, target, amount);
+        }
+    }
+
     public void refreshMods() {
-        player.setMods(Loadout.of(run, content, shop, profile));
+        player.setMods(Loadout.of(run, content, shop, profile, player.activeAvatar()));
+        // Bound here too: the skills a character has and the numbers they have
+        // are the same question asked twice, and answering them in two places
+        // is how one of them ends up stale.
+        player.setSkills(content == null ? null : content.allSkills());
         int bonus = player.mods().maxHpAdd();
         if (bonus > 0 && run.maxHp < run.baseMaxHp + bonus) {
             int added = run.baseMaxHp + bonus - run.maxHp;
@@ -448,6 +490,8 @@ public final class EntityWorld implements World, AiContext {
         oneShots.clear();
         hitstop = 0;
         shake = 0f;
+        playerVelX = 0f;
+        playerVelY = 0f;
         descendRequested = false;
         shopRequested = false;
         // Seeded by run and room, so the same room in the same run plays out
@@ -504,7 +548,16 @@ public final class EntityWorld implements World, AiContext {
         }
         int hpBefore = run.hp;
 
+        float wasX = player.x;
+        float wasY = player.y;
         player.step(this);
+        // Differenced rather than read off the player, because the player does
+        // not keep one: Intent is consumed and thrown away every step, and a
+        // roll, a slide round a corner and a wall all change the distance
+        // actually covered. What a brain needs to lead a shot is where the
+        // body went, not where it was asked to go.
+        playerVelX = (player.x - wasX) / Cfg.STEP;
+        playerVelY = (player.y - wasY) / Cfg.STEP;
         if (player.hitsLandedThisStep > 0) {
             hitstop = Math.max(hitstop, HITSTOP_LAND);
             shake = Math.max(shake, SHAKE_LAND);
@@ -525,7 +578,7 @@ public final class EntityWorld implements World, AiContext {
             markers.get(i).step(this);
         }
         for (int i = oneShots.size - 1; i >= 0; i--) {
-            oneShots.get(i).steps++;
+            oneShots.get(i).step();
             if (oneShots.get(i).done()) {
                 oneShots.removeIndex(i);
             }
@@ -544,7 +597,9 @@ public final class EntityWorld implements World, AiContext {
         }
         sweep();
 
-        if (run.hp < hpBefore) {
+        // Minus what the player spent on purpose: the ultimate is bought
+        // with health, and a cost is not a wound.
+        if (run.hp < hpBefore - player.spentThisStep()) {
             hitstop = Math.max(hitstop, HITSTOP_HURT);
             shake = Math.max(shake, SHAKE_HURT);
             sfx(Assets.Sfx.HURT);
@@ -652,18 +707,50 @@ public final class EntityWorld implements World, AiContext {
      * impact on the floor belongs under the actors so they stand in it, and a
      * burst around a body belongs over them.
      */
+    /**
+     * A transient effect: an animation played once at a place, and gone.
+     *
+     * <p>Grew three fields when the skills arrived, and each is here because
+     * the alternative was a second effect system beside this one:
+     *
+     * <ul>
+     * <li><b>Rotation.</b> The lunge's bolt has to lie along the direction the
+     *     player threw themselves, which is any of eight and not any of four.
+     * <li><b>Scale.</b> The ultimate's opening stroke is one strip stretched
+     *     the width of the screen; every other use is 1.
+     * <li><b>A thing to follow.</b> The aura belongs to the player for as long
+     *     as it lasts, and an aura pinned to where the player was standing when
+     *     they cast it is a puddle rather than a glow.
+     * </ul>
+     */
     private static final class OneShot {
         final Anim anim;
-        final float x;
-        final float y;
+        float x;
+        float y;
         final boolean overhead;
+        final float rotation;
+        final float scaleX;
+        final float scaleY;
+        /** Followed each step, or null to stay where it was put. */
+        final Entity follow;
+        final float offsetY;
         int steps;
 
         OneShot(Anim anim, float x, float y, boolean overhead) {
+            this(anim, x, y, overhead, 0f, 1f, 1f, null, 0f);
+        }
+
+        OneShot(Anim anim, float x, float y, boolean overhead, float rotation,
+                float scaleX, float scaleY, Entity follow, float offsetY) {
             this.anim = anim;
             this.x = x;
             this.y = y;
             this.overhead = overhead;
+            this.rotation = rotation;
+            this.scaleX = scaleX;
+            this.scaleY = scaleY;
+            this.follow = follow;
+            this.offsetY = offsetY;
         }
 
         /**
@@ -680,11 +767,26 @@ public final class EntityWorld implements World, AiContext {
             return anim == null || steps >= anim.durationSteps();
         }
 
+        void step() {
+            steps++;
+            if (follow != null) {
+                x = follow.x;
+                y = follow.y + offsetY;
+            }
+        }
+
         void draw(SpriteBatch batch) {
             TextureRegion f = anim.frame(Dir.DOWN, steps);
-            if (f != null) {
-                batch.draw(f, x - f.getRegionWidth() / 2f, y - f.getRegionHeight() / 2f);
+            if (f == null) {
+                return;
             }
+            float w = f.getRegionWidth();
+            float h = f.getRegionHeight();
+            // The rotating overload even when nothing rotates: one call site is
+            // one thing to get wrong, and at scale 1 and angle 0 it draws the
+            // same pixels as the short form.
+            batch.draw(f, x - w / 2f, y - h / 2f, w / 2f, h / 2f, w, h,
+                       scaleX, scaleY, rotation);
         }
     }
 
@@ -741,6 +843,16 @@ public final class EntityWorld implements World, AiContext {
     }
 
     @Override
+    public float playerVelX() {
+        return playerVelX;
+    }
+
+    @Override
+    public float playerVelY() {
+        return playerVelY;
+    }
+
+    @Override
     public Dir playerFacing() {
         return player.facing;
     }
@@ -753,6 +865,11 @@ public final class EntityWorld implements World, AiContext {
     @Override
     public boolean playerDead() {
         return run.dead();
+    }
+
+    @Override
+    public int playerDeathSteps() {
+        return player == null ? 0 : player.deathDuration();
     }
 
     /**
@@ -922,23 +1039,23 @@ public final class EntityWorld implements World, AiContext {
             return null;
         }
         Array<ShopCatalog.Unlock> weapons = new Array<>();
-        Array<ShopCatalog.Unlock> characters = new Array<>();
+        Array<ShopCatalog.Unlock> prizes = new Array<>();
         for (ShopCatalog.Unlock u : shop.unlocks()) {
             if (ShopCatalog.owned(u, profile) || !ShopCatalog.requirementMet(u, profile)) {
                 continue;
             }
-            (u.kind == ShopCatalog.UnlockKind.CHARACTER ? characters : weapons).add(u);
+            (u.kind == ShopCatalog.UnlockKind.WEAPON ? weapons : prizes).add(u);
         }
-        if (weapons.isEmpty() && characters.isEmpty()) {
+        if (weapons.isEmpty() && prizes.isEmpty()) {
             return null;
         }
-        // Characters first and at a quarter of the chance: there are five of
-        // them against six weapons, they cost two to four times as much, and
-        // one arriving is the rarer thing to have happen.
+        // Prizes - characters and colours - first and at a quarter of the
+        // chance: they cost two to four times what a weapon does, and one
+        // arriving is the rarer thing to have happen.
         float roll = rng.nextFloat();
         Array<ShopCatalog.Unlock> from = null;
-        if (roll < CHARACTER_FROM_CHEST && !characters.isEmpty()) {
-            from = characters;
+        if (roll < CHARACTER_FROM_CHEST && !prizes.isEmpty()) {
+            from = prizes;
         } else if (roll < CHARACTER_FROM_CHEST + WEAPON_FROM_CHEST && !weapons.isEmpty()) {
             from = weapons;
         }
@@ -946,11 +1063,7 @@ public final class EntityWorld implements World, AiContext {
             return null;
         }
         ShopCatalog.Unlock won = from.get(rng.nextInt(from.size));
-        if (won.kind == ShopCatalog.UnlockKind.CHARACTER) {
-            profile.unlockedCharacters.add(won.id);
-        } else {
-            profile.unlockedWeapons.add(won.id);
-        }
+        ShopCatalog.grant(won, profile);
         return won;
     }
 
@@ -1114,15 +1227,37 @@ public final class EntityWorld implements World, AiContext {
     @Override
     public void lobProjectile(Enemy from, float toX, float toY, int damage,
                               int flightSteps, int lingerSteps, String fx) {
-        projectiles.add(Projectile.lob(Faction.ENEMY, from.x, from.y, toX, toY,
+        projectiles.add(Projectile.lob(Faction.ENEMY, from.x, from.y,
+            insideRoomX(toX), insideRoomY(toY),
             damage, flightSteps, lingerSteps,
             fxOr(fx, orbAnim), fxOr(Assets.Fx.burstOf(fx), cloudAnim)));
+    }
+
+    /**
+     * Keeps a thing falling out of the sky inside the floor it is aimed at.
+     *
+     * <p>Both of the callers below aim at a point derived from the player -
+     * scattered around them, or led ahead of them - and neither can see how
+     * big the room is, because a brain is not shown one. A lob ignores walls
+     * while it is airborne on purpose, so without this a spell thrown at
+     * someone standing in a corner lands in the stone behind it and burns
+     * where nobody can be hurt or even see it.
+     *
+     * <p>A margin of one tile rather than none: the burst is 32px wide, and a
+     * puddle centred exactly on the wall line is half buried.
+     */
+    private float insideRoomX(float x) {
+        return Math.max(CollisionGrid.TILE, Math.min(roomPixelWidth() - CollisionGrid.TILE, x));
+    }
+
+    private float insideRoomY(float y) {
+        return Math.max(CollisionGrid.TILE, Math.min(roomPixelHeight() - CollisionGrid.TILE, y));
     }
 
     @Override
     public void rainSpell(Enemy from, float x, float y, int damage,
                           int fallSteps, int lingerSteps, String fx) {
-        projectiles.add(Projectile.fall(Faction.ENEMY, x, y, damage,
+        projectiles.add(Projectile.fall(Faction.ENEMY, insideRoomX(x), insideRoomY(y), damage,
             fallSteps, lingerSteps,
             fxOr(fx, orbAnim), fxOr(Assets.Fx.burstOf(fx), cloudAnim)));
     }
@@ -1622,7 +1757,30 @@ public final class EntityWorld implements World, AiContext {
                 ActorSprites.transformation(actors, Assets.Actor.bossIdOf(def.sprite)))
             : new Enemy(def, brain, sprites);
         scaleHealth(e, def.boss);
+        scaleToFloor(e);
         return e;
+    }
+
+    /**
+     * Applies the floor's own multipliers, which are 1 on every floor but one.
+     *
+     * <p>Separate from {@link #scaleHealth}, which is the player's chosen
+     * difficulty and applies everywhere. This is the floor saying "these
+     * enemies, but a stage deeper": the Sunken Vault fights the cove's three
+     * slimes and has to be harder than the cove, and the alternative was three
+     * more defs on the same three sprites. {@code damageMult} is a field the
+     * brains already read for an enrage, so nothing downstream changes.
+     */
+    private void scaleToFloor(Enemy e) {
+        FloorDef floor = floorDef();
+        if (floor == null) {
+            return;
+        }
+        if (floor.hpScale != 1f) {
+            e.maxHp = Math.max(1, Math.round(e.maxHp * floor.hpScale));
+            e.hp = e.maxHp;
+        }
+        e.damageMult *= floor.damageScale;
     }
 
     /** Places an enemy. Public so a test, or a debug console, can populate a room. */
@@ -1661,6 +1819,9 @@ public final class EntityWorld implements World, AiContext {
      * the exception is nothing.
      */
     private FloorDef floorDef() {
+        if (content == null || run == null) {
+            return null;                // a unit test with no content around it
+        }
         try {
             return content.floor(run.floor);
         } catch (IllegalArgumentException missing) {
@@ -1754,6 +1915,14 @@ public final class EntityWorld implements World, AiContext {
                 popDamage((Enemy) c, damage, crit);
             }
         }
+        // A bolt on the head of everything struck, while the storm is up.
+        // Before this, a melee hit spawned no sprite at all - the only signs
+        // were a flash, a number and a sound - so this is the first time a
+        // sword landing looks like anything.
+        if (p.transformed()) {
+            shockStruck(struck);
+        }
+
         Modifiers mods = p.mods();
         float slow = mods.slowOnHit();
         int poison = mods.poisonOnHit();
@@ -1774,25 +1943,227 @@ public final class EntityWorld implements World, AiContext {
         }
     }
 
-    /** Arcs a hit to the nearest enemy that was not already caught by the swing. */
-    private void chainTo(java.util.List<com.kagebi.combat.Combatant> struck, int damage) {
-        Enemy best = null;
-        float bestDist = Float.MAX_VALUE;
+    /**
+     * The strips the ultimate casts on the player's behalf, and the sizes it
+     * casts them at.
+     *
+     * <p>Named here rather than in {@code skills.json} because these are not
+     * choices a skill makes - they are what the ultimate <em>is</em>, the same
+     * way a lunge moving is what a lunge is. The file decides the numbers; the
+     * shape is code, and this is the shape.
+     */
+    private static final String AVATAR_FLASH = "bolt";
+    private static final String TRAIL_FX = "trail";
+    private static final String CHAIN_FX = "strike";
+    private static final String SHOCK_FX = "shock";
+
+    /** How many enemies a dash arcs to while the ultimate is up. */
+    private static final int DASH_CHAIN_TARGETS = 3;
+    /** A bolt lands on the head, not the feet. */
+    private static final float CHAIN_LIFT = 10f;
+    /** How far behind the player the dash trail is dropped. */
+    private static final float TRAIL_BACK = 8f;
+    /** The box a lunge carries through the world with it. */
+    private static final float LUNGE_W = 14f;
+    private static final float LUNGE_H = 12f;
+
+    // ---- skills ----------------------------------------------------------------
+
+    /**
+     * Spawns one of the skill strips, with everything a skill needs of it.
+     *
+     * <p>A separate door from {@link #spawnFx} because the two draw from
+     * different maps: the named effects are a brain's business and run slowly,
+     * these are the player's and run fast.
+     *
+     * @param rotation degrees, counter-clockwise from pointing right
+     * @param follow   an entity to ride, or null to stay put
+     */
+    void skillFx(String name, float x, float y, boolean overhead, float rotation,
+                 float scaleX, float scaleY, Entity follow, float offsetY) {
+        Anim anim = skillFx.get(name);
+        if (anim != null) {
+            oneShots.add(new OneShot(anim, x, y, overhead, rotation,
+                                     scaleX, scaleY, follow, offsetY));
+        }
+    }
+
+    void skillFx(String name, float x, float y, boolean overhead) {
+        skillFx(name, x, y, overhead, 0f, 1f, 1f, null, 0f);
+    }
+
+    /**
+     * The ring: everything inside the radius is hurt and thrown outwards.
+     *
+     * <p>Straight to {@code takeHit} rather than through a {@link Hitbox},
+     * for the reason the chain arc does the same - the shape here is a circle
+     * and a hitbox is a rectangle, so building one would be answering a
+     * different question less accurately.
+     *
+     * <p>The shove comes from the player's own centre, so everything is pushed
+     * radially outward; {@link Knockback} has the fallback that stops an enemy
+     * standing exactly on the player from producing a NaN and vanishing.
+     */
+    int castNova(SkillDef skill, int damage) {
+        int hit = 0;
+        for (Enemy e : within(skill.range)) {
+            e.takeHit(damage, player.x, player.y, skill.knockback);
+            hit++;
+        }
+        skillFx(skill.vfx, player.x, player.y, false);
+        sfx(hit > 0 ? Assets.Sfx.HIT : Assets.Sfx.SWING);
+        if (hit > 0) {
+            hitstop = Math.max(hitstop, HITSTOP_LAND);
+            shake = Math.max(shake, SHAKE_LAND);
+        }
+        return hit;
+    }
+
+    /**
+     * The thrust: whatever the player passes through on the way is hurt once.
+     *
+     * <p>Resolved per step against a box around the player rather than as one
+     * long sweep at the end, so an enemy standing halfway along is hit as the
+     * player reaches it rather than after arriving. {@code struck} carries
+     * across the whole lunge, which is what stops the same enemy being hit
+     * eighteen times on the way past.
+     */
+    int lungeThrough(SkillDef skill, int damage, java.util.List<com.kagebi.combat.Combatant> struck) {
+        Hitbox box = Hitbox.body(player.x, player.y, LUNGE_W, LUNGE_H, damage,
+                                 skill.knockback, Faction.PLAYER);
+        int hit = 0;
         for (Enemy e : enemies) {
             if (!e.alive() || struck.contains(e)) {
                 continue;
             }
-            float dx = e.x - player.x;
-            float dy = e.y - player.y;
-            float d = dx * dx + dy * dy;
-            if (d < bestDist) {
-                bestDist = d;
-                best = e;
+            if (HitResolver.hit(box, e, null)) {
+                struck.add(e);
+                hit++;
             }
         }
-        if (best == null || bestDist > CHAIN_RANGE * CHAIN_RANGE) {
+        if (hit > 0) {
+            hitstop = Math.max(hitstop, HITSTOP_LAND);
+            shake = Math.max(shake, SHAKE_LAND);
+            sfx(Assets.Sfx.HIT);
+        }
+        return hit;
+    }
+
+    /**
+     * The ultimate's opening stroke: one bolt drawn the width of the screen.
+     *
+     * <p>Stretched rather than tiled. A bolt is a shape that has no natural
+     * length, so a viewer reads a long one as a long bolt and not as a short
+     * one pulled - which is exactly the property that makes tiling pointless
+     * and stretching free.
+     */
+    void avatarFlash() {
+        Anim anim = skillFx.get(AVATAR_FLASH);
+        if (anim == null) {
             return;
         }
+        TextureRegion frame = anim.frame(Dir.DOWN, 0);
+        float across = Cfg.VIRT_W * 1.5f / Math.max(1, frame.getRegionWidth());
+        skillFx(AVATAR_FLASH, player.x, player.y, true, 0f, across, 1.5f, player, 0f);
+        shake = Math.max(shake, SHAKE_LAND * 3f);
+    }
+
+    /** The aura that says the ultimate is still up, riding the player. */
+    void avatarAura(SkillDef skill) {
+        skillFx(skill.vfx, player.x, player.y, false, 0f, 1f, 1f, player, 0f);
+    }
+
+    /**
+     * The three nearest, zapped: what dashing does while the ultimate is up.
+     *
+     * @return how many were caught, which may be none if nothing is in range
+     */
+    int dashChain(SkillDef skill, int damage) {
+        int hit = 0;
+        for (Enemy e : within(skill.range, DASH_CHAIN_TARGETS, null)) {
+            e.takeHit(damage, player.x, player.y, skill.knockback);
+            skillFx(CHAIN_FX, e.x, e.y + CHAIN_LIFT, true);
+            hit++;
+        }
+        if (hit > 0) {
+            sfx(Assets.Sfx.HIT);
+        }
+        return hit;
+    }
+
+    /** The trail left behind a dash, pointing the way it went. */
+    void dashTrail(float dirX, float dirY) {
+        float angle = com.badlogic.gdx.math.MathUtils.atan2(dirY, dirX)
+            * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
+        skillFx(TRAIL_FX, player.x - dirX * TRAIL_BACK, player.y - dirY * TRAIL_BACK,
+                false, angle, 1f, 1f, null, 0f);
+    }
+
+    /** A bolt over the head of everything a swing landed on. */
+    void shockStruck(java.util.List<com.kagebi.combat.Combatant> struck) {
+        for (com.kagebi.combat.Combatant c : struck) {
+            skillFx(SHOCK_FX, c.centreX(), c.centreY() + CHAIN_LIFT, true);
+        }
+    }
+
+    // ---- who is close ----------------------------------------------------------
+
+    /**
+     * Living enemies within a radius of the player, nearest first.
+     *
+     * <p>Three places asked this question before, each with its own squared
+     * distance loop written out: the chain arc, the burning aura and now the
+     * skills. Four copies of the same loop is where they start to disagree -
+     * one of them counts a dying enemy, another measures from a corner - so it
+     * is written once and the callers say what they want rather than how.
+     *
+     * <p>The list is reused between calls, so read it before asking again.
+     */
+    private final Array<Enemy> nearby = new Array<>();
+
+    Array<Enemy> within(float range) {
+        return within(range, Integer.MAX_VALUE, null);
+    }
+
+    /**
+     * @param most    how many to take, nearest first
+     * @param exclude enemies already dealt with, or null for none
+     */
+    Array<Enemy> within(float range, int most, java.util.List<?> exclude) {
+        nearby.clear();
+        float limit = range * range;
+        for (Enemy e : enemies) {
+            if (!e.alive() || (exclude != null && exclude.contains(e))) {
+                continue;
+            }
+            float dx = e.x - player.x;
+            float dy = e.y - player.y;
+            if (dx * dx + dy * dy <= limit) {
+                nearby.add(e);
+            }
+        }
+        // Sorted so "the three nearest" means the three nearest rather than the
+        // first three the spawn order happens to hold.
+        nearby.sort((a, b) -> Float.compare(distanceSq(a), distanceSq(b)));
+        if (nearby.size > most) {
+            nearby.truncate(most);
+        }
+        return nearby;
+    }
+
+    private float distanceSq(Enemy e) {
+        float dx = e.x - player.x;
+        float dy = e.y - player.y;
+        return dx * dx + dy * dy;
+    }
+
+    /** Arcs a hit to the nearest enemy that was not already caught by the swing. */
+    private void chainTo(java.util.List<com.kagebi.combat.Combatant> struck, int damage) {
+        Array<Enemy> reachable = within(CHAIN_RANGE, 1, struck);
+        if (reachable.isEmpty()) {
+            return;
+        }
+        Enemy best = reachable.first();
         // Straight to takeHit rather than through a hitbox: the arc has no
         // geometry, and building one would only be a way of asking the resolver
         // a question this has already answered.
@@ -1816,15 +2187,8 @@ public final class EntityWorld implements World, AiContext {
             return;
         }
         burnTick = 0;
-        for (Enemy e : enemies) {
-            if (!e.alive()) {
-                continue;
-            }
-            float dx = e.x - player.x;
-            float dy = e.y - player.y;
-            if (dx * dx + dy * dy <= Modifiers.BURN_RANGE * Modifiers.BURN_RANGE) {
-                e.takeHit(burn, player.x, player.y, 0f);
-            }
+        for (Enemy e : within(Modifiers.BURN_RANGE)) {
+            e.takeHit(burn, player.x, player.y, 0f);
         }
     }
 
@@ -1857,6 +2221,11 @@ public final class EntityWorld implements World, AiContext {
             }
             e.deathCounted = true;
             run.kills++;
+            // Met, for the bestiary. On the kill rather than on the spawn: a
+            // book that filled itself from across a dark room would record
+            // things the player never actually saw.
+            run.met.add(e.def.id);
+            questRecord(QuestDef.Kind.KILL, e.def.id, 1);
             shake = Math.max(shake, SHAKE_KILL);
             sfx(Assets.Sfx.DEATH);
             e.brain().onDeath(e, this);
@@ -1930,6 +2299,12 @@ public final class EntityWorld implements World, AiContext {
      * was dropped, so a relic picked up after the coin still pays.
      */
     public void collect(Pickup p) {
+        // Every pickup counts towards a COLLECT step, whichever kind it is:
+        // the id is what a quest names, and a heart and a gem arrive by
+        // different branches below but are the same thing to the journal.
+        if (p.itemId != null) {
+            questRecord(QuestDef.Kind.COLLECT, p.itemId, Math.max(1, p.amount));
+        }
         switch (p.kind) {
             case GOLD:
                 run.gold += Math.max(1, Math.round(p.amount * player.mods().goldMult()));
@@ -2189,6 +2564,7 @@ public final class EntityWorld implements World, AiContext {
         orbAnim = null;
         cloudAnim = null;
         namedFx.clear();
+        skillFx.clear();
         thrownStill.clear();
         thrownSpin.clear();
         torchAnim = null;
@@ -2200,6 +2576,12 @@ public final class EntityWorld implements World, AiContext {
             }
             if (fxAtlas.findRegion(Assets.Fx.HAZARD_CLOUD) != null) {
                 cloudAnim = Anim.strip(fxAtlas, Assets.Fx.HAZARD_CLOUD, 8, true);
+            }
+            for (String name : ContentValidator.SKILL_VFX) {
+                if (fxAtlas.findRegion(Assets.Fx.skill(name)) != null) {
+                    skillFx.put(name, Anim.strip(fxAtlas, Assets.Fx.skill(name),
+                                                 SKILL_STEPS_PER_FRAME, true));
+                }
             }
             for (String id : ContentValidator.PROJECTILES) {
                 String name = Assets.Fx.projectile(id);
