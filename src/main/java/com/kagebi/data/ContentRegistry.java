@@ -218,6 +218,53 @@ public final class ContentRegistry {
         return values(skills);
     }
 
+    /**
+     * The three skills one character actually carries.
+     *
+     * <p>Their own if the file gives them any, and the shared set otherwise.
+     * It is all or nothing on purpose: a character with a fire ultimate and
+     * two borrowed lightning skills is a bug that validates cleanly, and the
+     * one-per-slot check could not see it either, because it would be looking
+     * at two different sets.
+     *
+     * <p>This is the only place a character and a skill meet. The last rule
+     * that gave one character something of their own - a pair of spells only
+     * she could hold - was written into four places and right in two, and both
+     * the spells and the character went rather than the rule being fixed. One
+     * method, one caller.
+     */
+    public Array<SkillDef> skillsFor(String characterId) {
+        Array<SkillDef> mine = new Array<>();
+        Array<SkillDef> shared = new Array<>();
+        for (SkillDef s : allSkills()) {
+            if (s.character == null) {
+                shared.add(s);
+            } else if (s.character.equals(characterId)) {
+                mine.add(s);
+            }
+        }
+        return mine.size > 0 ? mine : shared;
+    }
+
+    /**
+     * The one thing a character has without pressing anything, or null.
+     *
+     * <p>Read out of the same set {@link #skillsFor} returns rather than out
+     * of a second table, so a passive belongs to a character the same way the
+     * three keys do and arrives and leaves with them. Nothing else in the
+     * game has to know it is different: it has no slot, so
+     * {@code Player.setSkills} drops it, and its effects reach the player the
+     * way an ultimate's do - through {@code Loadout}.
+     */
+    public SkillDef passiveFor(String characterId) {
+        for (SkillDef s : skillsFor(characterId)) {
+            if (s.kind == SkillDef.Kind.PASSIVE) {
+                return s;
+            }
+        }
+        return null;
+    }
+
     public Array<QuestDef> allQuests() {
         return values(quests);
     }

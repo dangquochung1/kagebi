@@ -40,7 +40,6 @@ class DetailStripTest {
     @Test
     void aChanceReadsAsAPercentageOfItself() {
         assertEquals("+2%", CharacterScreen.formatEffect("crit_chance_add", 0.02f));
-        assertEquals("+5%", CharacterScreen.formatEffect("lifesteal", 0.05f));
     }
 
     @Test

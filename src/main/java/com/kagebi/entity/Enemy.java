@@ -101,14 +101,25 @@ public class Enemy extends Entity {
     public float speedMult = 1f;
     public float damageMult = 1f;
 
-    // Statuses the player's relics and items apply. All three are "longest
-    // wins" rather than additive: a second application refreshes the timer
-    // instead of stacking, which is what stops a fast weapon from making an
-    // enemy permanently frozen and permanently dying.
+    // Statuses the player's relics, items and skills apply. All of them but
+    // one are "longest wins" rather than additive: a second application
+    // refreshes the timer instead of stacking, which is what stops a fast
+    // weapon from making an enemy permanently frozen and permanently dying.
+    //
+    // Venom is the one. It counts, and at three it detonates - so for it the
+    // fast weapon is the point rather than the problem, and what stops it
+    // running away is that filling the meter empties it.
     private int slowSteps;
     private int poisonSteps;
     private int poisonPerTick;
     private int poisonTick;
+    private int burnSteps;
+    private int burnPerTick;
+    private int burnTick;
+    private int venomSteps;
+    private int venomPerTick;
+    private int venomTick;
+    private int venomStacks;
     private int distractSteps;
 
     /** Set by the world once this death has been counted into the run. */
@@ -274,6 +285,70 @@ public class Enemy extends Entity {
         poisonSteps = Math.max(poisonSteps, steps);
     }
 
+    /**
+     * Sets this one alight for a while.
+     *
+     * <p>Poison's twin, and separate from it rather than another source of it,
+     * because the two have to be able to run at once and to show different
+     * marks. Refreshing rather than stacking, like every other status here:
+     * the ultimate that applies this reapplies it on every blow, and a
+     * stacking version would be a multiplication table by the third swing.
+     */
+    public void burn(int perTick, int steps) {
+        if (perTick <= 0 || steps <= 0) {
+            return;
+        }
+        burnPerTick = Math.max(burnPerTick, perTick);
+        burnSteps = Math.max(burnSteps, steps);
+    }
+
+    /** Whether it is alight, which is what decides if a mark is drawn on it. */
+    public boolean burning() {
+        return burnSteps > 0;
+    }
+
+    /**
+     * Adds a stack of venom, and says whether that was the one that fills it.
+     *
+     * <p>The only status here that counts rather than refreshes, and the
+     * exception is the whole point of it: burn is reapplied by every blow, so
+     * counting it would be a multiplication table by the third swing, while
+     * venom is *meant* to be a thing you build. Three of these detonate.
+     *
+     * <p>It returns the answer rather than detonating, because detonating is
+     * drawing and this class draws nothing. {@code EntityWorld.envenom} is the
+     * other half.
+     *
+     * @return true when this application reached {@link Modifiers#VENOM_STACKS}
+     */
+    public boolean venom(int perTick, int steps) {
+        if (perTick <= 0 || steps <= 0 || state == AiState.DEAD) {
+            return false;
+        }
+        venomPerTick = Math.max(venomPerTick, perTick);
+        venomSteps = Math.max(venomSteps, steps);
+        venomStacks = Math.min(Modifiers.VENOM_STACKS, venomStacks + 1);
+        return venomStacks >= Modifiers.VENOM_STACKS;
+    }
+
+    /** How many stacks are on it, 0 to {@link Modifiers#VENOM_STACKS}. */
+    public int venomStacks() {
+        return venomStacks;
+    }
+
+    /** Whether any are, which is what decides if a mark is drawn on it. */
+    public boolean venomed() {
+        return venomSteps > 0 && venomStacks > 0;
+    }
+
+    /** Spent: what detonating leaves behind, which is nothing. */
+    public void clearVenom() {
+        venomStacks = 0;
+        venomSteps = 0;
+        venomPerTick = 0;
+        venomTick = 0;
+    }
+
     public void distract(int steps) {
         distractSteps = Math.max(distractSteps, steps);
     }
@@ -285,7 +360,8 @@ public class Enemy extends Entity {
     /**
      * Damage over time bypasses i-frames on purpose. Poison that can be dodged
      * by being hit again is not poison, and at sixty ticks apart it cannot
-     * stack into anything unfair.
+     * stack into anything unfair. Burning works the same way and runs beside
+     * it rather than instead of it.
      */
     private void stepStatus() {
         if (barSteps > 0) {
@@ -301,15 +377,47 @@ public class Enemy extends Entity {
             poisonSteps--;
             if (++poisonTick >= Modifiers.TICK_STEPS) {
                 poisonTick = 0;
-                hp = Math.max(0, hp - poisonPerTick);
-                flashSteps = Math.max(flashSteps, 3);
-                if (hp <= 0) {
-                    setState(AiState.DEAD);
-                }
+                overTime(poisonPerTick);
             }
             if (poisonSteps == 0) {
                 poisonPerTick = 0;
             }
+        }
+        if (burnSteps > 0) {
+            burnSteps--;
+            if (++burnTick >= Modifiers.TICK_STEPS) {
+                burnTick = 0;
+                overTime(burnPerTick);
+            }
+            if (burnSteps == 0) {
+                burnPerTick = 0;
+            }
+        }
+        if (venomSteps > 0) {
+            venomSteps--;
+            if (++venomTick >= Modifiers.TICK_STEPS) {
+                venomTick = 0;
+                // Per stack, capped as a whole rather than each: a third stack
+                // on a boss should be worth stacking and should not be worth
+                // three times the second one.
+                overTime(Math.min(Modifiers.VENOM_TICK_CAP,
+                                  venomPerTick * venomStacks));
+            }
+            if (venomSteps == 0) {
+                clearVenom();
+            }
+        }
+    }
+
+    /** One tick of damage over time, from whichever status is running. */
+    private void overTime(int amount) {
+        if (amount <= 0 || state == AiState.DEAD) {
+            return;
+        }
+        hp = Math.max(0, hp - amount);
+        flashSteps = Math.max(flashSteps, 3);
+        if (hp <= 0) {
+            setState(AiState.DEAD);
         }
     }
 

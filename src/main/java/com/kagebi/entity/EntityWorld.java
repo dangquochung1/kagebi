@@ -27,6 +27,8 @@ import com.kagebi.save.Profile;
 import com.kagebi.data.ShopCatalog;
 import com.kagebi.audio.AudioService;
 import com.kagebi.combat.AttackState;
+import com.kagebi.combat.Combatant;
+import com.kagebi.combat.Damage;
 import com.kagebi.combat.Faction;
 import com.kagebi.combat.HitResolver;
 import com.kagebi.combat.Hitbox;
@@ -453,11 +455,19 @@ public final class EntityWorld implements World, AiContext {
     }
 
     public void refreshMods() {
-        player.setMods(Loadout.of(run, content, shop, profile, player.activeAvatar()));
+        // The character's own passive, if it has one. Folded in beside the two
+        // timed sources rather than beside the relics, because it arrives and
+        // leaves with the character the same way an ultimate does - and kept
+        // in a field because the per-step code that draws its mark cannot
+        // afford to ask the registry sixty times a second.
+        passive = content == null ? null : content.passiveFor(run.characterId);
+        player.setMods(Loadout.of(run, content, shop, profile,
+                                  player.activeAvatar(), player.activeCharge(),
+                                  passive));
         // Bound here too: the skills a character has and the numbers they have
         // are the same question asked twice, and answering them in two places
         // is how one of them ends up stale.
-        player.setSkills(content == null ? null : content.allSkills());
+        player.setSkills(content == null ? null : content.skillsFor(run.characterId));
         int bonus = player.mods().maxHpAdd();
         if (bonus > 0 && run.maxHp < run.baseMaxHp + bonus) {
             int added = run.baseMaxHp + bonus - run.maxHp;
@@ -568,6 +578,8 @@ public final class EntityWorld implements World, AiContext {
         }
         applyContactDamage();
         stepBurnAura();
+        stepStatusMarks();
+        stepWard();
         for (int i = 0; i < projectiles.size; i++) {
             projectiles.get(i).step(this);
         }
@@ -1475,12 +1487,28 @@ public final class EntityWorld implements World, AiContext {
      * shot doing more damage, which is what a damage relic is for.
      */
     void throwFrom(Player p, WeaponDef w, int damage, boolean crit) {
-        int life = Math.max(1, Math.round(w.reach / THROW_SPEED / Cfg.STEP));
+        // Reach is how far the thing flies before its life runs out, so a
+        // multiplier on it is the throwing arm rather than the blade.
+        float reach = w.reach * Math.max(0.1f, p.mods().throwReachMult());
+        int life = Math.max(1, Math.round(reach / THROW_SPEED / Cfg.STEP));
         int extra = Math.max(0, p.mods().throwExtra());
         sfx(Assets.Sfx.THROW);
         String id = w.projectile == null ? "kunai" : w.projectile;
         Anim spin = thrownSpin.get(id);
         TextureRegion still = spin != null ? null : thrownStill.get(id, thrownStill.get("kunai"));
+        // An ultimate that names a thrown strip replaces the picture, not the
+        // weapon: the same kunai, the same damage number, on fire. Replacing
+        // the weapon is the mistake the fox's two spells were - a rule that
+        // one character could hold something nobody else could, enforced in
+        // four places and correct in two.
+        SkillDef burning = p.avatar();
+        if (p.transformed() && burning != null && burning.fx.thrown != null) {
+            Anim lit = skillFx.get(burning.fx.thrown);
+            if (lit != null) {
+                spin = lit;
+                still = null;
+            }
+        }
         for (int i = 0; i <= extra; i++) {
             // 0, then +/-1, +/-2 ... spread of about nine degrees a step.
             int rank = (i + 1) / 2;
@@ -1864,18 +1892,18 @@ public final class EntityWorld implements World, AiContext {
 
     /**
      * Called by the player when a swing connects, once per step rather than
-     * once per target: a wide hammer that catches three enemies should not heal
-     * for three swings' worth.
+     * once per target: a hammer that catches three enemies is one landed blow
+     * and should sound like one.
+     *
+     * <p>It used to pay lifesteal as well, which is why it counts targets at
+     * all. Lifesteal is gone - it made healing a statistic to stack rather
+     * than a thing to go and find, and one trinket's whole-number magnitude
+     * met the relic's fractional one in the same sum and returned every point
+     * of damage as health. The count is kept because it costs nothing and the
+     * next thing that wants to know how wide a blow landed will want it.
      */
     public void onPlayerHitLanded(Player p, int damagePerTarget, int targets) {
         sfx(Assets.Sfx.HIT);
-        float steal = p.mods().lifesteal();
-        if (steal > 0f) {
-            int healed = Math.round(damagePerTarget * targets * steal);
-            if (healed > 0) {
-                p.heal(healed);
-            }
-        }
     }
 
     /**
@@ -1884,9 +1912,9 @@ public final class EntityWorld implements World, AiContext {
      * <p>Routed through both of the callbacks the main hand uses rather than
      * just the one that pops a number. The complaint that found this was "the
      * off hand shows no damage and no enemy health", but the cause was that a
-     * projectile told the world nothing at all - so it was also silent, also
-     * did not lifesteal, and also did not carry poison, a slow or a chain. Half
-     * a fix would have left a weapon that hurts things without ever saying so.
+     * projectile told the world nothing at all - so it was also silent and
+     * also did not carry poison, a slow or a chain. Half a fix would have left
+     * a weapon that hurts things without ever saying so.
      *
      * <p>One consequence worth naming: on-hit relics now work off the off hand.
      * That is what the relics say they do, and the bandolier is a relic for the
@@ -1896,6 +1924,53 @@ public final class EntityWorld implements World, AiContext {
     public void onThrownHitLanded(java.util.List<com.kagebi.combat.Combatant> struck,
                                   int damage, boolean crit) {
         onPlayerHitLanded(player, damage, struck.size());
+        applyOnHit(player, struck, damage, crit);
+    }
+
+    /**
+     * One enemy, hurt by something that is not a weapon swing.
+     *
+     * <p>Through {@link Damage#incoming} like every other hit. Three of the
+     * skill paths handed {@code takeHit} the raw number instead - a nova, a
+     * dash arc and a burning aura - which changes nothing today, because no
+     * enemy in the game carries armour, a resistance or a damage-taken
+     * multiplier. It is here so that the first one that does is not answered
+     * by three attacks that quietly ignore it.
+     *
+     * @param out collects who was actually hurt, or null if nobody is asking
+     * @return whether it landed
+     */
+    private boolean hurt(Enemy e, int damage, float knockback, java.util.List<Combatant> out) {
+        if (!e.alive() || e.invulnerable()) {
+            return false;
+        }
+        e.takeHit(Damage.incoming(damage, e.armour(), e.resist(), e.damageTakenMult()),
+                  player.x, player.y, knockback);
+        if (out != null) {
+            out.add(e);
+        }
+        return true;
+    }
+
+    /**
+     * A skill connected: the same event as a swing landing, minus the swing.
+     *
+     * <p>The third of these, and it exists for the reason the second one does.
+     * {@link #popDamage} only ever ran from {@link #applyOnHit}, and only the
+     * main hand and the off hand called that - so every skill in the game hurt
+     * things in silence, with no number, no health bar and no on-hit relic.
+     * That is the complaint that found this, and it is the same shape as the
+     * one {@link #onThrownHitLanded} was written for.
+     *
+     * <p>One consequence worth naming: poison, a slow and a chain now come off
+     * skills. That is what those relics say they do, and it is a change in
+     * balance as well as in feedback.
+     */
+    private void onSkillHitLanded(java.util.List<Combatant> struck, int damage, boolean crit) {
+        if (struck.isEmpty()) {
+            return;
+        }
+        sfx(Assets.Sfx.HIT);
         applyOnHit(player, struck, damage, crit);
     }
 
@@ -1920,14 +1995,16 @@ public final class EntityWorld implements World, AiContext {
         // were a flash, a number and a sound - so this is the first time a
         // sword landing looks like anything.
         if (p.transformed()) {
-            shockStruck(struck);
+            shockStruck(p.avatar(), struck, damage);
         }
 
         Modifiers mods = p.mods();
         float slow = mods.slowOnHit();
         int poison = mods.poisonOnHit();
         float chain = mods.chainLightning();
-        if (slow <= 0f && poison <= 0 && chain <= 0f) {
+        float burn = mods.burnOnHit();
+        float venom = mods.venomOnHit();
+        if (slow <= 0f && poison <= 0 && chain <= 0f && burn <= 0f && venom <= 0f) {
             return;
         }
         for (com.kagebi.combat.Combatant c : struck) {
@@ -1937,6 +2014,12 @@ public final class EntityWorld implements World, AiContext {
             Enemy e = (Enemy) c;
             e.slow(slow, Modifiers.SLOW_STEPS);
             e.poison(poison, Modifiers.POISON_STEPS);
+            setAlight(e, burn);
+            // Last, and it is the one that can kill: a detonation resolves
+            // inside this call, so anything reading `struck` afterwards has to
+            // cope with a corpse - which everything here already does, because
+            // a blow that killed leaves one too.
+            envenom(e, venom);
         }
         if (chain > 0f && rng.nextFloat() < chain) {
             chainTo(struck, damage);
@@ -1953,9 +2036,55 @@ public final class EntityWorld implements World, AiContext {
      * shape is code, and this is the shape.
      */
     private static final String AVATAR_FLASH = "bolt";
-    private static final String TRAIL_FX = "trail";
     private static final String CHAIN_FX = "strike";
+    /**
+     * What venom looks like, wherever it came from.
+     *
+     * <p>Constants rather than another pair of {@code SkillDef.Fx} roles,
+     * because there is one poisoner: a detonation looks like a detonation
+     * whoever caused it. The mark is overridable - a character's passive
+     * names its own through {@link #venomMarkFx} - and the day a second
+     * element stacks something, the burst should follow it.
+     */
+    private static final String VENOM_MARK_FX = "venommark";
+    private static final String VENOM_BURST_FX = "venomburst";
+    /** What the ward draws as it eats a blow. */
+    private static final String WARD_FX = "venomdrain";
+    /** How far apart stacked marks sit, so three read as three. */
+    private static final float VENOM_MARK_STEP = 5f;
+    /** How far a ward reaches for whatever just hit the player. */
+    private static final float WARD_RANGE = 22f;
     private static final String SHOCK_FX = "shock";
+
+    /** What a charge draws where it stops, and on what it ran into. */
+    private static final String CHARGE_END_FX = "fireburst";
+    private static final String CHARGE_HIT_FX = "fireblast";
+
+    /** How often the fire a charge runs in is relit; see {@link #chargeBegun}. */
+    private static final int CHARGE_AURA_EVERY = 10;
+    private int chargeAuraTick;
+
+    /**
+     * Who a skill caught, and who was standing in range when it was asked.
+     *
+     * <p>Both reused rather than allocated: these run inside the step loop.
+     * {@code caught} exists because {@link #within} hands back a list it owns
+     * and refills, and hurting an enemy can reach code that asks it again.
+     */
+    private final java.util.List<Combatant> skillStruck = new java.util.ArrayList<>();
+    private final Array<Enemy> caught = new Array<>();
+
+    /**
+     * The strip a dash arc draws on what it reaches.
+     *
+     * <p>A skill that names one uses it and a skill that does not gets the
+     * lightning pack's, which is what every skill got before there was a
+     * second element. The alternative was an {@code element} field switched on
+     * in half a dozen places, which is the same magic string with more of it.
+     */
+    private String chainFxOf(SkillDef skill) {
+        return skill != null && skill.fx.hit != null ? skill.fx.hit : CHAIN_FX;
+    }
 
     /** How many enemies a dash arcs to while the ultimate is up. */
     private static final int DASH_CHAIN_TARGETS = 3;
@@ -1963,6 +2092,8 @@ public final class EntityWorld implements World, AiContext {
     private static final float CHAIN_LIFT = 10f;
     /** How far behind the player the dash trail is dropped. */
     private static final float TRAIL_BACK = 8f;
+    /** How far in front of the player a burning weapon's arc is drawn. */
+    private static final float MELEE_TRAIL_OUT = 10f;
     /** The box a lunge carries through the world with it. */
     private static final float LUNGE_W = 14f;
     private static final float LUNGE_H = 12f;
@@ -2004,19 +2135,25 @@ public final class EntityWorld implements World, AiContext {
      * radially outward; {@link Knockback} has the fallback that stops an enemy
      * standing exactly on the player from producing a NaN and vanishing.
      */
-    int castNova(SkillDef skill, int damage) {
-        int hit = 0;
-        for (Enemy e : within(skill.range)) {
-            e.takeHit(damage, player.x, player.y, skill.knockback);
-            hit++;
+    int castNova(SkillDef skill, int damage, boolean crit) {
+        skillStruck.clear();
+        // Copied out first: within() hands back a list it reuses, and hurt()
+        // can reach code that asks the same question again.
+        Array<Enemy> inside = within(skill.range);
+        caught.clear();
+        caught.addAll(inside);
+        for (Enemy e : caught) {
+            hurt(e, damage, skill.knockback, skillStruck);
         }
         skillFx(skill.vfx, player.x, player.y, false);
-        sfx(hit > 0 ? Assets.Sfx.HIT : Assets.Sfx.SWING);
-        if (hit > 0) {
+        if (skillStruck.isEmpty()) {
+            sfx(Assets.Sfx.SWING);
+        } else {
+            onSkillHitLanded(skillStruck, damage, crit);
             hitstop = Math.max(hitstop, HITSTOP_LAND);
             shake = Math.max(shake, SHAKE_LAND);
         }
-        return hit;
+        return skillStruck.size();
     }
 
     /**
@@ -2028,25 +2165,89 @@ public final class EntityWorld implements World, AiContext {
      * across the whole lunge, which is what stops the same enemy being hit
      * eighteen times on the way past.
      */
-    int lungeThrough(SkillDef skill, int damage, java.util.List<com.kagebi.combat.Combatant> struck) {
+    int lungeThrough(SkillDef skill, int damage, boolean crit,
+                     java.util.List<Combatant> struck) {
         Hitbox box = Hitbox.body(player.x, player.y, LUNGE_W, LUNGE_H, damage,
                                  skill.knockback, Faction.PLAYER);
-        int hit = 0;
+        // Fresh each step. `struck` remembers the whole thrust so nobody is
+        // hit twice by it; this is who was caught just now, and only they
+        // should get a number and a relic's mark.
+        skillStruck.clear();
         for (Enemy e : enemies) {
             if (!e.alive() || struck.contains(e)) {
                 continue;
             }
             if (HitResolver.hit(box, e, null)) {
                 struck.add(e);
-                hit++;
+                skillStruck.add(e);
             }
         }
-        if (hit > 0) {
+        if (!skillStruck.isEmpty()) {
             hitstop = Math.max(hitstop, HITSTOP_LAND);
             shake = Math.max(shake, SHAKE_LAND);
-            sfx(Assets.Sfx.HIT);
+            onSkillHitLanded(skillStruck, damage, crit);
         }
-        return hit;
+        return skillStruck.size();
+    }
+
+    /**
+     * The fire a charge runs inside, relit as often as it needs to be.
+     *
+     * <p>Re-cast rather than held, because a {@code OneShot} has no length it
+     * can be told: {@code skillFx} spawns one and it ends when its strip does.
+     * The aura strip is four frames on purpose - it is the part of the dome
+     * that loops without a seam - so this fires often enough that the fire
+     * never gutters and rarely enough that it is not a new sprite every step.
+     */
+    void chargeBegun(SkillDef skill) {
+        chargeAuraTick = 0;
+        skillFx(skill.vfx, player.x, player.y, false, 0f, 1f, 1f, player, 0f);
+        sfx(Assets.Sfx.SWING_HEAVY);
+    }
+
+    /** The burst the charge leaves where it stops. */
+    void chargeEnded(SkillDef skill) {
+        String fx = skill.fx.cast != null ? skill.fx.cast : CHARGE_END_FX;
+        skillFx(fx, player.x, player.y, false, 0f, 1f, 1f, null, 0f);
+    }
+
+    /**
+     * What the charge does to whatever it runs into.
+     *
+     * <p>The same box a lunge carries, for the same reason, and the same
+     * {@code struck} rule - except that the player holds that list for half a
+     * second at a time rather than for the whole skill, because a charge is
+     * long enough to go back through something.
+     */
+    int chargeThrough(SkillDef skill, int damage, boolean crit,
+                      java.util.List<Combatant> struck) {
+        if (++chargeAuraTick >= CHARGE_AURA_EVERY) {
+            chargeAuraTick = 0;
+            skillFx(skill.vfx, player.x, player.y, false, 0f, 1f, 1f, player, 0f);
+        }
+        Hitbox box = Hitbox.body(player.x, player.y, LUNGE_W, LUNGE_H, damage,
+                                 skill.knockback, Faction.PLAYER);
+        skillStruck.clear();
+        for (Enemy e : enemies) {
+            if (!e.alive() || struck.contains(e)) {
+                continue;
+            }
+            if (HitResolver.hit(box, e, null)) {
+                struck.add(e);
+                skillStruck.add(e);
+                skillFx(chargeHitFx(skill), e.centreX(), e.centreY(), true);
+            }
+        }
+        if (!skillStruck.isEmpty()) {
+            shake = Math.max(shake, SHAKE_LAND);
+            onSkillHitLanded(skillStruck, damage, crit);
+        }
+        return skillStruck.size();
+    }
+
+    /** What a charge leaves on what it hit. */
+    private String chargeHitFx(SkillDef skill) {
+        return skill.fx.hit != null ? skill.fx.hit : CHARGE_HIT_FX;
     }
 
     /**
@@ -2074,36 +2275,111 @@ public final class EntityWorld implements World, AiContext {
     }
 
     /**
+     * The blast an ultimate opens with, for the ones that open with one.
+     *
+     * <p>Only a skill that names a {@code castVfx} has this - the lightning
+     * ultimate opens with a screen-wide flash instead and is untouched. It
+     * uses the skill's own range and knockback, which the ultimate already
+     * carries for the dash arc, so this needed no new number.
+     *
+     * <p>Bosses take the damage and do not move. That is not a rule written
+     * here: every boss in the game has {@code knockbackResist} of 1, and
+     * {@link com.kagebi.combat.Knockback#apply} returns without doing anything
+     * when a shove is entirely resisted.
+     *
+     * <p>It draws twice: once where the player stands, and once on each enemy
+     * it reaches. The second is what makes a room-wide opening readable -
+     * with a range that covers the floor, the burst is happening to things
+     * off the far side of the screen and a single sprite on the caster says
+     * nothing about them. An ultimate that names no {@code hitVfx} draws only
+     * the first, which is what the fire one did before there was a second.
+     */
+    void avatarBurst(SkillDef skill, int damage, boolean crit) {
+        if (skill.fx.cast == null && skill.fx.hit == null) {
+            return;
+        }
+        if (skill.fx.cast != null) {
+            skillFx(skill.fx.cast, player.x, player.y, false, 0f, 1f, 1f, null, 0f);
+        }
+        skillStruck.clear();
+        caught.clear();
+        caught.addAll(within(skill.range));
+        for (Enemy e : caught) {
+            if (hurt(e, damage, skill.knockback, skillStruck) && skill.fx.hit != null) {
+                skillFx(skill.fx.hit, e.centreX(), e.centreY() + CHAIN_LIFT, true);
+            }
+        }
+        if (!skillStruck.isEmpty()) {
+            hitstop = Math.max(hitstop, HITSTOP_LAND);
+            onSkillHitLanded(skillStruck, damage, crit);
+        }
+    }
+
+    /**
      * The three nearest, zapped: what dashing does while the ultimate is up.
      *
      * @return how many were caught, which may be none if nothing is in range
      */
-    int dashChain(SkillDef skill, int damage) {
-        int hit = 0;
-        for (Enemy e : within(skill.range, DASH_CHAIN_TARGETS, null)) {
-            e.takeHit(damage, player.x, player.y, skill.knockback);
-            skillFx(CHAIN_FX, e.x, e.y + CHAIN_LIFT, true);
-            hit++;
+    int dashChain(SkillDef skill, int damage, boolean crit) {
+        skillStruck.clear();
+        caught.clear();
+        caught.addAll(within(skill.range, DASH_CHAIN_TARGETS, null));
+        for (Enemy e : caught) {
+            if (hurt(e, damage, skill.knockback, skillStruck)) {
+                skillFx(chainFxOf(skill), e.x, e.y + CHAIN_LIFT, true);
+            }
         }
-        if (hit > 0) {
-            sfx(Assets.Sfx.HIT);
-        }
-        return hit;
+        onSkillHitLanded(skillStruck, damage, crit);
+        return skillStruck.size();
     }
 
-    /** The trail left behind a dash, pointing the way it went. */
-    void dashTrail(float dirX, float dirY) {
+    /**
+     * The trail left behind a dash, pointing the way it went.
+     *
+     * <p>Named by the caller rather than read from a constant here. It was a
+     * constant, and the constant was the lightning pack's streak: every
+     * ultimate in the game dashed in blue, including the one made of fire.
+     * Every strip this can draw is stored lying along +x, so the heading is
+     * the whole of the rotation - see {@code tools/make_poisonfx.py}, which
+     * straightens a diagonal comet at build time for exactly this reason.
+     */
+    void dashTrail(String fx, float dirX, float dirY) {
         float angle = com.badlogic.gdx.math.MathUtils.atan2(dirY, dirX)
             * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
-        skillFx(TRAIL_FX, player.x - dirX * TRAIL_BACK, player.y - dirY * TRAIL_BACK,
+        skillFx(fx, player.x - dirX * TRAIL_BACK, player.y - dirY * TRAIL_BACK,
                 false, angle, 1f, 1f, null, 0f);
     }
 
-    /** A bolt over the head of everything a swing landed on. */
-    void shockStruck(java.util.List<com.kagebi.combat.Combatant> struck) {
-        for (com.kagebi.combat.Combatant c : struck) {
-            skillFx(SHOCK_FX, c.centreX(), c.centreY() + CHAIN_LIFT, true);
+    /**
+     * A bolt over the head of everything a hit landed on, while the ultimate
+     * is up - and, now, the damage that bolt looks like it should do.
+     *
+     * <p>It drew and did nothing before, which is the one thing an effect must
+     * not do: a player who sees lightning strike an enemy and watches its
+     * health not move learns that the ultimate is decoration.
+     * {@code SkillDef.strikeMult} is the share of the blow that triggered it,
+     * so it is always the smaller half of the exchange and scales with the
+     * weapon rather than needing its own balance pass.
+     */
+    void shockStruck(SkillDef avatar, java.util.List<Combatant> struck, int damage) {
+        String fx = strikeFxOf(avatar);
+        for (Combatant c : struck) {
+            skillFx(fx, c.centreX(), c.centreY() + CHAIN_LIFT, true);
         }
+        if (avatar == null || avatar.strikeMult <= 0f) {
+            return;
+        }
+        int follow = Math.max(1, Math.round(damage * avatar.strikeMult));
+        for (Combatant c : struck) {
+            if (c instanceof Enemy && hurt((Enemy) c, follow, 0f, null)) {
+                popDamage((Enemy) c, follow, false);
+            }
+        }
+    }
+
+    /** The strip the ultimate lands on what it strikes. */
+    private String strikeFxOf(SkillDef avatar) {
+        return avatar != null && avatar.fx.hit != null ? avatar.fx.hit : SHOCK_FX;
     }
 
     // ---- who is close ----------------------------------------------------------
@@ -2157,6 +2433,160 @@ public final class EntityWorld implements World, AiContext {
         return dx * dx + dy * dy;
     }
 
+    /**
+     * Sets one enemy burning for a share of what it can take.
+     *
+     * <p>A share of maximum health rather than of the blow, because the thing
+     * it has to say - "this is on fire" - has to read the same on a goblin and
+     * on a boss, and a flat number says nothing on one of them. The cap is the
+     * other half of that: without it, a percentage of a nine-hundred point
+     * health bar is the best damage in the game and the ultimate's decoration
+     * becomes its weapon.
+     */
+    private void setAlight(Enemy e, float share) {
+        if (share <= 0f) {
+            return;
+        }
+        int perTick = Math.min(Modifiers.BURN_TICK_CAP,
+                               Math.max(1, Math.round(e.maxHp() * share)));
+        e.burn(perTick, Modifiers.BURN_STEPS);
+    }
+
+    /**
+     * Puts one stack of venom on an enemy, and detonates the third.
+     *
+     * <p>Shaped like {@link #setAlight} and priced the same way - a share of
+     * what the target can take, with a cap so that a share of a boss is not
+     * the best damage in the game - but it counts where the burn refreshes.
+     * {@code Enemy.venom} does the counting and says when the meter is full;
+     * the detonation is here because it is the half that draws.
+     *
+     * <p>Filling the meter empties it. That is what stops a fast weapon
+     * turning three stacks into thirty, and it is also what makes the third
+     * blow the one worth landing.
+     */
+    private void envenom(Enemy e, float share) {
+        if (share <= 0f) {
+            return;
+        }
+        int perTick = Math.max(1, Math.round(e.maxHp() * share));
+        if (!e.venom(perTick, Modifiers.VENOM_STEPS)) {
+            return;
+        }
+        int burst = Math.min(Modifiers.VENOM_BURST_CAP,
+                             Math.max(1, Math.round(e.maxHp() * Modifiers.VENOM_BURST_SHARE)));
+        e.clearVenom();
+        skillFx(VENOM_BURST_FX, e.centreX(), e.centreY(), true);
+        if (hurt(e, burst, 0f, null)) {
+            popDamage(e, burst, true);
+        }
+        shake = Math.max(shake, SHAKE_LAND);
+    }
+
+    /** The mark a character's passive leaves, or the pack default. */
+    private String venomMarkFx() {
+        return passive != null && passive.vfx != null ? passive.vfx : VENOM_MARK_FX;
+    }
+
+    /** The character's own always-on skill, or null; see refreshMods. */
+    private SkillDef passive;
+
+    /**
+     * The little flame a burning enemy carries.
+     *
+     * <p>Once a second rather than every step, on the same tick the burn does
+     * its damage: a mark spawned sixty times a second is sixty sprites, and
+     * the strip it draws runs longer than a step anyway.
+     */
+    private void markBurning(String fx) {
+        if (fx == null) {
+            return;
+        }
+        for (Enemy e : enemies) {
+            if (e.alive() && e.burning()) {
+                skillFx(fx, e.centreX(), e.centreY() + CHAIN_LIFT, true);
+            }
+        }
+    }
+
+    /**
+     * The mark venom leaves, one per stack, stepped up the body.
+     *
+     * <p>Stacked visibly rather than counted in a number. Three stacks
+     * detonate, so a player has to be able to see the third coming, and the
+     * only honest way to show a count in a game with no numbers over an
+     * enemy's head is to draw the count.
+     */
+    private void markVenom(String fx) {
+        if (fx == null) {
+            return;
+        }
+        for (Enemy e : enemies) {
+            if (!e.alive() || !e.venomed()) {
+                continue;
+            }
+            for (int i = 0; i < e.venomStacks(); i++) {
+                skillFx(fx, e.centreX(), e.centreY() + CHAIN_LIFT + i * VENOM_MARK_STEP,
+                        true);
+            }
+        }
+    }
+
+    /**
+     * The ward answering a blow: it heals, it flares, and it bites back.
+     *
+     * <p>Three things from one number, and the number is {@code heal_on_hurt}
+     * rather than a strip name, because all three are the same promise. A ward
+     * that only reduced damage would be invisible - the player would see a
+     * smaller number and have to take the game's word for why - so it heals to
+     * say so out loud, and it hurts whatever is close enough to be the reason.
+     *
+     * <p>Nothing here poisons anything. It does not have to: the bite is the
+     * player's own damage and it goes through {@link #onSkillHitLanded}, so a
+     * character whose every blow carries venom poisons with this one too, for
+     * free. That is the whole argument for the venom being a modifier rather
+     * than a branch.
+     */
+    private void stepWard() {
+        int heal = player.mods().healOnHurt();
+        if (heal <= 0 || !player.hurtThisStep || !player.alive()) {
+            return;
+        }
+        player.heal(heal);
+        skillFx(WARD_FX, player.x, player.y, false, 0f, 1f, 1f, player, 0f);
+        skillStruck.clear();
+        caught.clear();
+        caught.addAll(within(WARD_RANGE));
+        for (Enemy e : caught) {
+            hurt(e, heal, 0f, skillStruck);
+        }
+        if (!skillStruck.isEmpty()) {
+            onSkillHitLanded(skillStruck, heal, false);
+        }
+    }
+
+    /**
+     * Relights what every hurt enemy is carrying, once a second.
+     *
+     * <p>The burn mark belongs to an ultimate and only appears while one is
+     * up; the venom mark belongs to a character and is drawn whenever anything
+     * is venomed, ultimate or not - which is the difference between an
+     * ultimate's flourish and an element.
+     */
+    private void stepStatusMarks() {
+        if (++markTick < Modifiers.TICK_STEPS) {
+            return;
+        }
+        markTick = 0;
+        SkillDef avatar = player.avatar();
+        if (player.transformed() && avatar != null) {
+            markBurning(avatar.fx.burn);
+        }
+        markVenom(venomMarkFx());
+    }
+
+    private int markTick;
+
     /** Arcs a hit to the nearest enemy that was not already caught by the swing. */
     private void chainTo(java.util.List<com.kagebi.combat.Combatant> struck, int damage) {
         Array<Enemy> reachable = within(CHAIN_RANGE, 1, struck);
@@ -2164,12 +2594,15 @@ public final class EntityWorld implements World, AiContext {
             return;
         }
         Enemy best = reachable.first();
-        // Straight to takeHit rather than through a hitbox: the arc has no
-        // geometry, and building one would only be a way of asking the resolver
-        // a question this has already answered.
-        best.takeHit(Math.max(1, Math.round(damage * CHAIN_DAMAGE)),
-            player.x, player.y, 20f);
-        sfx(Assets.Sfx.HIT);
+        // Through hurt() rather than takeHit: the arc has no geometry, so a
+        // hitbox would only be a way of asking the resolver a question this
+        // has already answered - but armour still applies, and the number
+        // still gets shown.
+        int arc = Math.max(1, Math.round(damage * CHAIN_DAMAGE));
+        if (hurt(best, arc, 20f, null)) {
+            popDamage(best, arc, false);
+            sfx(Assets.Sfx.HIT);
+        }
     }
 
     /**
@@ -2187,8 +2620,14 @@ public final class EntityWorld implements World, AiContext {
             return;
         }
         burnTick = 0;
-        for (Enemy e : within(Modifiers.BURN_RANGE)) {
-            e.takeHit(burn, player.x, player.y, 0f);
+        caught.clear();
+        caught.addAll(within(Modifiers.BURN_RANGE));
+        for (Enemy e : caught) {
+            if (hurt(e, burn, 0f, null)) {
+                popDamage(e, burn, false);
+                setAlight(e, player.mods().burnOnHit());
+                envenom(e, player.mods().venomOnHit());
+            }
         }
     }
 
@@ -2197,6 +2636,46 @@ public final class EntityWorld implements World, AiContext {
         sfx(weapon != null && weapon.thrown() ? Assets.Sfx.THROW
             : weapon != null && weapon.rootSteps > 0 ? Assets.Sfx.SWING_HEAVY
             : Assets.Sfx.SWING);
+        if (weapon == null || !weapon.thrown()) {
+            meleeTrail();
+        }
+    }
+
+    /**
+     * The arc a burning weapon leaves, for an ultimate that names one.
+     *
+     * <p>The ordinary swing has no sprite at all: the white streak a player
+     * sees is drawn into the ninja's own attack sheet, frame by frame, and
+     * there is nothing to recolour. So a fire arc is a strip of its own, laid
+     * along the facing in front of the body - and it exists only while an
+     * ultimate that asked for it is up.
+     *
+     * <p>Half a body in front rather than on it. A trail centred on the player
+     * covers the player, and an arc that hides the thing swinging it reads as
+     * an explosion rather than as a swing.
+     *
+     * <p><b>Mirrored sideways, rotated up and down.</b> The strip is stored as
+     * a downward chop that sweeps left to right, and a rotation cannot produce
+     * its mirror image: turning the arc to face left by 180 degrees flips it
+     * top to bottom as well, so the blade came up from below on one facing and
+     * down from above on the other. Facing right was the wrong one, which is
+     * the bug that was reported - facing left had been accidentally correct
+     * the whole time. A negative x scale is the reflection an angle cannot be.
+     */
+    private void meleeTrail() {
+        SkillDef avatar = player.avatar();
+        if (!player.transformed() || avatar == null || avatar.fx.melee == null) {
+            return;
+        }
+        boolean sideways = player.facing.dy == 0;
+        float angle = sideways ? 0f
+            : com.badlogic.gdx.math.MathUtils.atan2(player.facing.dy, player.facing.dx)
+              * com.badlogic.gdx.math.MathUtils.radiansToDegrees;
+        float scaleX = sideways && player.facing.dx < 0 ? -1f : 1f;
+        skillFx(avatar.fx.melee,
+                player.x + player.facing.dx * MELEE_TRAIL_OUT,
+                player.y + player.facing.dy * MELEE_TRAIL_OUT,
+                true, angle, scaleX, 1f, null, 0f);
     }
 
     private void applyContactDamage() {

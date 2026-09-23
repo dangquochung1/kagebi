@@ -18,6 +18,7 @@ import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.GearDef;
 import com.kagebi.data.def.GemDef;
 import com.kagebi.data.def.QuestDef;
+import com.kagebi.data.def.SkillDef;
 import com.kagebi.data.def.WeaponDef;
 import com.kagebi.entity.ActorSprites;
 import com.kagebi.entity.Intent;
@@ -611,11 +612,17 @@ public class CharacterScreen extends SimScreen {
      * different answers - the sheet always opened pointing at the first ninja
      * whoever was actually playing. A locked ninja can be looked at, not worn.
      *
-     * <p>Three bands: the six faces, the name, and the perk. The perk is what
-     * separates these from the colours they used to be, so it is what the
-     * panel spends its last band on. The skill icons that used to sit here are
-     * gone - all six share one set, so showing it beside each one said the
-     * same thing six times.
+     * <p>Four bands now: the six faces, the name, the perk and - for a
+     * character that has one - its passive. The perk is what separates these
+     * from the colours they used to be, so it is what the panel spends most of
+     * its last band on. The skill icons that used to sit here are gone: they
+     * were drawn when all six shared one set, so showing it beside each one
+     * said the same thing six times.
+     *
+     * <p>The passive is here because there is nowhere else it could be. The
+     * three keyed skills are read by holding shift over their key; a passive
+     * has no key, so without this line a player would have an ability that
+     * the game never mentions.
      */
     private void drawSideChars(SpriteBatch batch, I18n t) {
         int x = PROF_PANEL_X + 4;
@@ -647,6 +654,28 @@ public class CharacterScreen extends SimScreen {
         font.draw(batch, t.get("character." + id + ".desc"), x, y - 4 - Hud.LINE,
                   PERK_W, Align.left, true);
         font.setColor(Color.WHITE);
+        drawSidePassive(batch, t, id, y - 4 - Hud.LINE * 2);
+    }
+
+    /**
+     * The one ability a character has without a key, if it has one.
+     *
+     * <p>Its name and nothing else. The panel has the faces, a name and two
+     * bands of perk text in sixty-five pixels, so what is left after the perk
+     * is one line - and a description cut off halfway is worse than a pointer
+     * to where the whole of it is. That place is the skill bar: shift on its
+     * own raises the same panel the three keys raise, which is where a player
+     * already goes to read about what they can do.
+     */
+    private void drawSidePassive(SpriteBatch batch, I18n t, String id, int y) {
+        SkillDef passive = game.content().passiveFor(id);
+        if (passive == null) {
+            return;
+        }
+        int x = PROF_PANEL_X + 4;
+        batch.setColor(INK);
+        Hud.line(batch, font, t.get(passive.nameKey), x, y);
+        batch.setColor(Color.WHITE);
     }
 
     /** The perk line's wrap width: the panel, less a margin each side. */
@@ -923,16 +952,16 @@ public class CharacterScreen extends SimScreen {
      * An effect's magnitude as a player should read it.
      *
      * <p>Three shapes hide behind one float. A name ending {@code _mult} is a
-     * factor, so 1.08 is eight per cent more; a chance or a lifesteal share is
-     * already a fraction, so 0.02 is two per cent; everything else is a flat
-     * number of hit points or armour. Written once here because the same ten
-     * names are read by gear, by stones and by the forge.
+     * factor, so 1.08 is eight per cent more; a chance is already a fraction,
+     * so 0.02 is two per cent; everything else is a flat number of hit points
+     * or armour. Written once here because the same names are read by gear, by
+     * stones and by the forge.
      */
     static String formatEffect(String effect, float magnitude) {
         if (effect.endsWith("_mult")) {
             return signed(Math.round((magnitude - 1f) * 100f)) + "%";
         }
-        if (effect.endsWith("_chance_add") || "lifesteal".equals(effect)) {
+        if (effect.endsWith("_chance_add")) {
             return signed(Math.round(magnitude * 100f)) + "%";
         }
         return signed(Math.round(magnitude));

@@ -53,6 +53,34 @@ public final class Intent {
      */
     public final boolean[] skill = new boolean[SKILLS];
 
+    /**
+     * The slot being asked about, or -1: shift and a skill key together.
+     *
+     * <p>Here rather than in the HUD because it is input, and the HUD is where
+     * it is drawn. Held rather than buffered: the panel is up exactly while
+     * the keys are, and letting go puts it away, which is the one thing a
+     * player expects of a key they are holding down to read something.
+     */
+    public int asking = -1;
+
+    /**
+     * Shift alone: the question about the ability that has no key.
+     *
+     * <p>A character's passive is never cast, so there is no key to hold over
+     * it - and the character sheet has room for its name and not for what it
+     * does. Shift on its own is the gesture the player has already learnt for
+     * "tell me about my abilities", with nothing else bound to it.
+     */
+    public boolean askingPassive;
+
+    private void asking(int slot, boolean yes) {
+        if (yes && asking < 0) {
+            asking = slot;
+        } else if (!yes && asking == slot) {
+            asking = -1;
+        }
+    }
+
     /** Skill slots, matching {@code ContentValidator.SKILL_SLOTS}. */
     public static final int SKILLS = 3;
 
@@ -73,9 +101,26 @@ public final class Intent {
         roll = src.buffered(GameAction.ROLL, BUFFER_STEPS);
         interact = src.buffered(GameAction.INTERACT, BUFFER_STEPS);
         useItem = src.buffered(GameAction.USE_ITEM, BUFFER_STEPS);
-        for (int i = 0; i < SKILLS; i++) {
-            skill[i] = src.buffered(SKILL_KEYS[i], BUFFER_STEPS);
+        // Shift turns the three skill keys into three questions. Without this
+        // the popup would come up on a skill that had just been cast, which is
+        // the one moment its cooldown makes it useless to read about.
+        boolean reading = src.infoHeld();
+        if (!reading) {
+            asking = -1;
         }
+        for (int i = 0; i < SKILLS; i++) {
+            boolean held = reading && src.isDown(SKILL_KEYS[i]);
+            asking(i, held);
+            if (held) {
+                // Spent, not merely ignored. The press is buffered for six
+                // steps whether or not anything used it, so without this a
+                // player who reads a skill and lets go of shift casts it -
+                // the one outcome a key held to ask a question must not have.
+                src.consume(SKILL_KEYS[i]);
+            }
+            skill[i] = !reading && src.buffered(SKILL_KEYS[i], BUFFER_STEPS);
+        }
+        askingPassive = reading && asking < 0;
     }
 
     public void consumeAttack() {

@@ -79,9 +79,9 @@ public final class DesktopLauncher {
                         boot.seed = Long.parseLong(args[++i]);
                     }
                 }
-                // Who to look at. The roster is four bodies in two animation
-                // shapes, so a shot of the default one says nothing about the
-                // other three.
+                // Who to look at. The six differ by colour, and one of them
+                // carries a skill set nobody else has - so a shot of the
+                // default one says nothing about her three keys.
                 case "--hero" -> {
                     if (hasValue) {
                         boot.hero = args[++i];

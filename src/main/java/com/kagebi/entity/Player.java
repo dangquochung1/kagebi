@@ -70,6 +70,17 @@ public final class Player extends Entity {
     /** Enough that rolling stays a decision rather than a movement mode. */
     public static final int ROLL_COOLDOWN = 10;
 
+    /**
+     * The half-second a charge is untouchable for, out of its three seconds.
+     *
+     * <p>A charge is drawn as a tumble, and a tumble that can be hit while it
+     * tumbles reads as broken. But three seconds of that is not a dash, it is
+     * a nine-second cooldown on being mortal - so the mercy is the length of
+     * one roll and the other two and a half seconds are the player's problem.
+     * Enough to enter a crowd; not enough to cross one.
+     */
+    public static final int CHARGE_IFRAMES = 30;
+
     /** 0.66s of mercy after a hit: long enough to retreat, short enough to feel fair. */
     public static final int HURT_IFRAMES = 40;
     /** Steps of stagger. Any longer and a second enemy gets a free hit. */
@@ -172,6 +183,15 @@ public final class Player extends Entity {
     private boolean swingIsThrow;
     /** Hits landed this step, so the world can shake the camera and freeze a frame. */
     public int hitsLandedThisStep;
+    /**
+     * Whether a blow landed on the player this step.
+     *
+     * <p>The same shape as {@link #hitsLandedThisStep} and for the same
+     * reason: {@code takeHit} is the {@code Combatant} contract and is handed
+     * a position rather than a world, so what it can do is record that it
+     * happened. {@code EntityWorld.stepWard} is what reads it.
+     */
+    public boolean hurtThisStep;
 
     private final java.util.Random rng;
 
@@ -368,6 +388,16 @@ public final class Player extends Entity {
     private float lungeDirX;
     private float lungeDirY;
     private int lungeDamage;
+    private boolean lungeCrit;
+
+    /** The charge that is running, and what it is worth on contact. */
+    private SkillDef charging;
+    private int chargeSteps;
+    private int chargeRearm;
+    private int chargeDamage;
+    private boolean chargeCrit;
+    private final java.util.List<com.kagebi.combat.Combatant> chargeStruck =
+        new java.util.ArrayList<>();
     /** Everything the current lunge has already hit, so nothing is hit twice. */
     private final java.util.List<Combatant> lungeStruck = new java.util.ArrayList<>();
 
@@ -398,6 +428,18 @@ public final class Player extends Entity {
 
     /** Steps a lunge takes. Short: it is a thrust, not a second dash. */
     public static final int LUNGE_STEPS = 12;
+
+    /**
+     * How often a charge forgets who it has already burned.
+     *
+     * <p>A thrust is over in a fifth of a second and hits each enemy once; a
+     * charge runs for three, so "once" would make the second half of it
+     * harmless and standing on one enemy for the whole of it would be worth
+     * exactly one hit. Forgetting twice a second is the middle: an enemy is
+     * shoved clear by the first contact and is worth hitting again if the
+     * player turns round and goes back through it.
+     */
+    public static final int CHARGE_REARM_STEPS = 30;
     /** How often the aura strip is re-cast while the ultimate is up. */
     private static final int AURA_EVERY = 14;
 
@@ -406,6 +448,7 @@ public final class Player extends Entity {
     @Override
     public void step(EntityWorld world) {
         hitsLandedThisStep = 0;
+        hurtThisStep = false;
         spentThisStep = 0;
         stepTimers();
         stepBuffs();
@@ -570,6 +613,9 @@ public final class Player extends Entity {
             auraTick = 0;
             world.avatarAura(avatar);
         }
+        if (charging != null) {
+            stepCharge(world);
+        }
     }
 
     /**
@@ -581,7 +627,7 @@ public final class Player extends Entity {
      * balanced around.
      */
     private boolean canCast() {
-        return alive() && !rolling && lunging == null && hurtSteps == 0
+        return alive() && !rolling && lunging == null && charging == null && hurtSteps == 0
             && (!swing.busy() || swing.cancellable());
     }
 
@@ -602,6 +648,7 @@ public final class Player extends Entity {
                     return false;
                 }
                 break;
+            case CHARGE: beginCharge(s, world); break;
             default: return false;
         }
         cooldown[slot] = s.cooldownSteps;
@@ -630,9 +677,10 @@ public final class Player extends Entity {
             lungeDirX = facing.dx;
             lungeDirY = facing.dy;
         }
+        lungeCrit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
         lungeDamage = Damage.outgoing(weapon == null ? 1 : weapon.damage,
             damageMult * mods.outgoingMult(hpFraction()) * s.damageMult,
-            false, critMult, rng);
+            lungeCrit, critMult * mods.critDamageMult(), rng);
         // The bolt lies along the thrust and rides the body, which is what was
         // asked for: pointing where the player is going, not where they were.
         float angle = MathUtils.atan2(lungeDirY, lungeDirX) * MathUtils.radiansToDegrees;
@@ -643,18 +691,76 @@ public final class Player extends Entity {
     private void advanceLunge(EntityWorld world) {
         float perStep = lunging.range / LUNGE_STEPS;
         moveBy(world.collision(), lungeDirX * perStep, lungeDirY * perStep);
-        world.lungeThrough(lunging, lungeDamage, lungeStruck);
+        world.lungeThrough(lunging, lungeDamage, lungeCrit, lungeStruck);
         if (++lungeElapsed >= LUNGE_STEPS) {
             lunging = null;
         }
     }
 
+    /**
+     * The run: three seconds of speed, wrapped in fire, with the hands full.
+     *
+     * <p>Unlike a lunge it is steered the whole way, so nothing about the
+     * heading is decided here. What is decided here is the damage, once, for
+     * the same reason a swing decides it once: a number that is rerolled on
+     * every contact turns one skill into a slot machine.
+     *
+     * <p>The weapons go away while it runs, and that is the cost. Everything
+     * else about it is a gift - speed, a body that hurts what it touches, and
+     * a knockback that clears a path - so without something taken away it
+     * would simply be a better way to walk.
+     */
+    private void beginCharge(SkillDef s, EntityWorld world) {
+        swing.cancel();
+        charging = s;
+        chargeSteps = s.durationSteps;
+        chargeRearm = 0;
+        chargeStruck.clear();
+        chargeCrit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
+        chargeDamage = Damage.outgoing(weapon == null ? 1 : weapon.damage,
+            damageMult * mods.outgoingMult(hpFraction()) * s.damageMult,
+            chargeCrit, critMult * mods.critDamageMult(), rng);
+        // The same window a roll grants, granted the same way, so a relic that
+        // lengthens a roll lengthens this too - the charge is drawn as a roll
+        // and a player who reads it as one is reading it correctly.
+        iframes.grant(CHARGE_IFRAMES + mods.rollInvulnAdd());
+        // Same rebuild-from-nothing rule the ultimate follows, and the reason
+        // Loadout takes more than one: both can be up at the same time.
+        world.refreshMods();
+        world.chargeBegun(s);
+    }
+
+    private void stepCharge(EntityWorld world) {
+        if (++chargeRearm >= CHARGE_REARM_STEPS) {
+            chargeRearm = 0;
+            chargeStruck.clear();
+        }
+        world.chargeThrough(charging, chargeDamage, chargeCrit, chargeStruck);
+        if (--chargeSteps <= 0) {
+            SkillDef done = charging;
+            charging = null;
+            world.refreshMods();
+            world.chargeEnded(done);
+        }
+    }
+
+    /** The charge that is running, or null; a fifth source of modifiers. */
+    public SkillDef activeCharge() {
+        return charging;
+    }
+
+    /** Whether a charge is running, which is what takes the weapons away. */
+    public boolean charging() {
+        return charging != null;
+    }
+
     private void castNova(SkillDef s, EntityWorld world) {
         swing.cancel();
+        boolean crit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
         int damage = Damage.outgoing(weapon == null ? 1 : weapon.damage,
             damageMult * mods.outgoingMult(hpFraction()) * s.damageMult,
-            false, critMult, rng);
-        world.castNova(s, damage);
+            crit, critMult * mods.critDamageMult(), rng);
+        world.castNova(s, damage, crit);
     }
 
     /**
@@ -686,7 +792,18 @@ public final class Player extends Entity {
         // The numbers change by rebuilding them, so ending is the same act as
         // starting and neither has to know what the other did.
         world.refreshMods();
-        world.avatarFlash();
+        // A transformation that opens with a blast opens with one; the
+        // lightning ultimate names neither strip and keeps its screen-wide
+        // flash. One names only the thing that lands on enemies, because its
+        // opening *is* what lands on them - it reaches the whole room.
+        if (s.fx.cast != null || s.fx.hit != null) {
+            boolean crit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
+            world.avatarBurst(s, Damage.outgoing(weapon == null ? 1 : weapon.damage,
+                damageMult * mods.outgoingMult(hpFraction()) * s.damageMult,
+                crit, critMult * mods.critDamageMult(), rng), crit);
+        } else {
+            world.avatarFlash();
+        }
         world.avatarAura(s);
         return true;
     }
@@ -708,13 +825,25 @@ public final class Player extends Entity {
     }
 
     private boolean canAttack(Intent intent) {
-        return intent.attack && !rolling && !swing.busy() && hurtSteps == 0;
+        return intent.attack && handsFree() && !rolling && !swing.busy() && hurtSteps == 0;
     }
 
     /** Nothing in the off hand means the key does nothing, quietly. */
     private boolean canThrow(Intent intent) {
-        return intent.throwing && throwWeapon != null
+        return intent.throwing && throwWeapon != null && handsFree()
             && !rolling && !swing.busy() && hurtSteps == 0;
+    }
+
+    /**
+     * Whether the hands are free to use a weapon.
+     *
+     * <p>They are not while a charge runs, and that is the whole of what a
+     * charge costs. Everything else it does is a gift - speed, a body that
+     * burns what it touches, a knockback that clears the way - so a charge
+     * that also let the player swing would simply be a better way to walk.
+     */
+    private boolean handsFree() {
+        return charging == null;
     }
 
     /**
@@ -767,11 +896,19 @@ public final class Player extends Entity {
         // and arcs to whatever is close. Both are the ultimate's doing rather
         // than the dash's, so both are asked of the ultimate's definition and
         // neither happens when it is not up.
-        if (transformed()) {
-            world.dashTrail(rollDirX, rollDirY);
+        //
+        // And neither happens for an ultimate that does not name a dash strip.
+        // This used to run for every ultimate, which meant the fire one lit up
+        // in lightning blue and arced to three enemies it was never meant to
+        // touch - a whole extra weapon nobody had balanced, wearing the wrong
+        // element's colours. An ultimate that is only speed says so by leaving
+        // dashVfx out.
+        if (transformed() && avatar.fx.dash != null) {
+            world.dashTrail(avatar.fx.dash, rollDirX, rollDirY);
+            boolean crit = Damage.rollCrit(rng, critChance + mods.critChanceAdd());
             world.dashChain(avatar, Damage.outgoing(weapon == null ? 1 : weapon.damage,
                 damageMult * mods.outgoingMult(hpFraction()) * avatar.damageMult,
-                false, critMult, rng));
+                crit, critMult * mods.critDamageMult(), rng), crit);
         }
     }
 
@@ -898,6 +1035,7 @@ public final class Player extends Entity {
         }
         run.hp = Math.max(0, run.hp - damage);
         hp = run.hp;
+        hurtThisStep = true;
         iframes.grant(HURT_IFRAMES + mods.invulnStepsAdd());
         flashSteps = 8;
         hurtSteps = HURT_STUN;
@@ -1072,6 +1210,15 @@ public final class Player extends Entity {
         }
         if (rolling) {
             return ActorSprites.frameOf(sprites.roll, facing, rollElapsed, ROLL_STEPS);
+        }
+        // A charge is a roll that does not stop. The walk cycle was what it had
+        // before, and a ninja wrapped in fire strolling at one and a half times
+        // walking pace looked like a bug in the speed rather than like a skill.
+        // Wrapped rather than stretched over the whole three seconds, so it
+        // tumbles ten times instead of holding one pose for half a second.
+        if (charging != null) {
+            return ActorSprites.frameOf(sprites.roll, facing,
+                (charging.durationSteps - chargeSteps) % ROLL_STEPS, ROLL_STEPS);
         }
         if (hurtSteps > 0) {
             return ActorSprites.frameOf(sprites.hurt, facing, HURT_STUN - hurtSteps, HURT_STUN);

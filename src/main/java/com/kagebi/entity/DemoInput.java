@@ -30,12 +30,29 @@ public final class DemoInput implements ActionSource {
     private static final float THROW_FROM = 90f;
 
     private final GameAction action;
+    private final GameAction opener;
     private final float strike;
+    private boolean reading;
     private int steps;
     private int moveX;
     private int moveY;
 
     public DemoInput(GameAction action) {
+        this(null, action);
+    }
+
+    /**
+     * One action on a cadence, and optionally one pressed first and held.
+     *
+     * <p>The opener exists for the ultimates, which change what every other
+     * button does. A transformation that gives the sword a flame trail, the
+     * off hand a fireball and every landed hit an explosion cannot be
+     * photographed by a demo that only presses one key: pressing the
+     * ultimate shows none of it, and pressing attack shows the ordinary
+     * swing. So the ultimate goes down first and the swinging follows.
+     */
+    public DemoInput(GameAction opener, GameAction action) {
+        this.opener = opener;
         this.action = action;
         this.strike = action == GameAction.THROW ? THROW_FROM : STRIKE;
     }
@@ -93,6 +110,24 @@ public final class DemoInput implements ActionSource {
         }
     }
 
+    /**
+     * Holds the read key down, instead of pressing anything.
+     *
+     * <p>The panel that explains a skill comes up while shift and that skill's
+     * key are both held, and shift is not a {@code GameAction} - it cannot be,
+     * because Win+Shift+S must never roll the player. So there is no key for a
+     * demo to press: this is the only way the panel is reachable by a camera.
+     */
+    public DemoInput reading() {
+        reading = true;
+        return this;
+    }
+
+    @Override
+    public boolean infoHeld() {
+        return reading;
+    }
+
     /** Advances the clock. Call once per fixed step, before stepping the world. */
     public void tick() {
         steps++;
@@ -105,6 +140,9 @@ public final class DemoInput implements ActionSource {
 
     @Override
     public boolean isDown(GameAction a) {
+        if (reading && a == action) {
+            return true;
+        }
         return switch (a) {
             case MOVE_RIGHT -> moveX > 0;
             case MOVE_LEFT -> moveX < 0;
@@ -114,8 +152,14 @@ public final class DemoInput implements ActionSource {
         };
     }
 
+    /** Steps of opener before the cadence starts: enough for it to land. */
+    private static final int OPENING = 6;
+
     @Override
     public boolean buffered(GameAction a, int window) {
+        if (opener != null && steps < OPENING) {
+            return a == opener;
+        }
         return a == action && sincePress() < window;
     }
 

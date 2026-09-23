@@ -21,8 +21,8 @@ short winters.
 
 One night every keeper went down, and none came back. Only the old Master is
 left, the last of the Flamekeepers, with six apprentices who have never been
-further than the Old Well: Green Shade, Crimson Flame, Blue Current, Black Mist,
-Ember Heart and Water Moon.
+further than the Old Well: Green Shade, Sky Pillar, Thunder Rain, Black Mist,
+Ember Heart and Violet Aster.
 
 The flame is guttering. The goblin miners have climbed up out of pits that
 turned strange, and the skeleton guards who served the old keepers have come out
@@ -71,13 +71,24 @@ At the Flame Core, one of the six will have to choose.
 | Interact, talk, buy | E / Enter |
 | Use the quick item (a meal or a potion) | Q / C |
 | Skills | U / I / O, or 1 / 2 / 3 |
+| Read what a skill does | Hold Shift and its key |
+| Read what your character always does | Hold Shift on its own |
 | Character sheet | Tab / P |
 | Bag (village), inventory (dungeon) | F / B |
 | Floor map | M |
 | Zoom in / out (village) | `=` / `-`, the numpad `+` / `-`, or the mouse wheel |
 | Pause, back | Esc |
 
-Every key except Esc can be rebound under Settings → Controls. In the village,
+Skills are per character, not per game: Hoả Tâm carries three of fire, Tử Uyển
+three of poison, and everyone else the three of lightning. Hold Shift and a
+skill key to read what the one you have does, and let go to put it away.
+
+A character may also carry one ability with no key at all - everything Tử Uyển
+damages is poisoned, and three stacks of it detonate. Its name is on the
+character sheet beside the perk; holding Shift with no key raises the same
+panel the three keys raise and tells you the rest.
+
+Every key except Esc and Shift can be rebound under Settings → Controls. In the village,
 the ninja's badge at the top right opens the character sheet - who you are,
 what you wear, what you carry, what you can make and what you have met - and
 the basket beside it opens the bag.
@@ -156,9 +167,9 @@ python tools/pack_atlas.py     # packs the sprites into assets/atlas
 ```
 
 `build_assets.py` lists any pack it could not find, and exits non-zero if one
-is missing. It also warns about three licence files it cannot find, from Mystic
-Woods, Sprout Lands and the Pixeloid font. Those only refresh `LICENSES/`, which
-is already committed, and do not stop the build.
+is missing. It also warns about the Pixeloid font licence if that download is
+absent. That only refreshes `LICENSES/`, which is already committed, and does
+not stop the build.
 
 ### 3. Play
 
@@ -209,6 +220,7 @@ camera without playing to it.
 | `--frames <n>` | Render this many frames, then act |
 | `--screenshot <path>` | Save a PNG after `--frames` and exit |
 | `--seed <n>` | Pin the dungeon seed, so two screenshots of one feature are taken in the same room |
+| `--hero <id>` | Who to look at, e.g. `ninjafire` or `ninjablue`, the two with skill sets of their own |
 
 Screen names, with what `--page` means for each:
 
@@ -239,6 +251,11 @@ dungeon   --page 1-7   the start room of that stage
 map       --page 1-7   the same, with the floor map expanded
 fight     --page 1-7   the first room of that floor that has enemies in it
 swing     --page 1-7   the same, swinging on a timer so a blade is visible
+skill     --page 1-8   one skill, cast on a timer: 1-3 is the key, 4 casts the
+                       ultimate and then swings under it, 5-7 holds shift on
+                       each key to raise its description panel, 8 holds shift
+                       alone for the keyless one. Pair it with --hero to see a
+                       character's own set
 throw     --page 1-10  the same with a kunai in the off hand, throwing; 6-10 a shuriken
 boss      --page 3,5,6,7 the boss arena of a floor that has one, from the first
                        step of the fight
@@ -249,7 +266,7 @@ slide                  halfway through the first room transition
 exit      --page 1-7   standing on that floor's way down
 pause, inventory       those overlays over floor 1
 victory, gameover      the end screens, over a sample run
-credits   --page 1-4   the roll, starting at that section
+credits   --page 1-5   the roll, starting at that section
 ```
 
 A name that matches nothing falls through to the main menu rather than failing,
@@ -311,6 +328,13 @@ python tools/make_village.py   # rebuild the inside of the house from its art pa
 python tools/make_world.py     # lay out the world map again, keeping its decor layer
 python tools/make_font.py      # rebuild the bitmap font, Vietnamese marks included
 python tools/slice_heroui.py   # cut the forge, equipment and bag windows out of the GUI pack
+python tools/make_ninjas.py    # recolour the six playable ninja from the one animated variant
+python tools/make_skillfx.py   # the three lightning skills, from the Frostwindz pack
+python tools/make_firefx.py    # the three fire skills, from three packs at once
+python tools/make_poisonfx.py  # the three poison skills, from three more
+#   the last two share tools/fxstrip.py, which is the cutting: square cells,
+#   one bounding box across every frame, and the two normalisations a strip
+#   needs before code can rotate it by a heading
 python tools/preview_map.py    # render a .tmx to a PNG; --collision tints what blocks red
 python tools/preview_tiles.py  # render a tileset with its grid, for measuring
 python tools/link_assets.py    # point a git worktree at this checkout's built assets and packs

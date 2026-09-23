@@ -36,6 +36,49 @@ public final class Modifiers {
     public static final int TICK_STEPS = 60;
     /** How far a burn aura reaches, in pixels. */
     public static final float BURN_RANGE = 24f;
+    /**
+     * How long a burn sticks to an enemy: eight ticks, so eight seconds.
+     *
+     * <p>Three, once, and three was too short to see. A burn is the only thing
+     * this game draws on an enemy that is not a number, and at three seconds a
+     * player mid-fight never saw it start or stop - it read as a flicker on
+     * the swing rather than as a state the enemy was in. Eight is most of the
+     * ultimate that applies it, which is the length that makes setting
+     * something alight feel like a thing that happened to it.
+     */
+    public static final int BURN_STEPS = 480;
+    /**
+     * The most a single burn tick may take off one enemy.
+     *
+     * <p>A share of maximum health is the only shape that stays meaningful
+     * from a 25 hit-point goblin to a 900 hit-point boss, and it is also the
+     * shape that turns a boss's health bar into the burn's private resource.
+     * Fifteen is a little under one enhanced swing, so burning a boss is worth
+     * doing and is never the reason it died.
+     */
+    public static final int BURN_TICK_CAP = 15;
+
+    /**
+     * How long venom sticks, and the ceiling on what one tick of it takes.
+     *
+     * <p>Longer than a burn because venom is not reapplied by every blow: it
+     * is counted. A stack that expired before the next one landed could never
+     * reach three, and three is the whole mechanism.
+     */
+    public static final int VENOM_STEPS = 480;
+    public static final int VENOM_TICK_CAP = 12;
+    /**
+     * The stack that detonates, and what detonating costs the target.
+     *
+     * <p>A fifth of maximum health, for the same reason the burn is a share
+     * and for the same price: {@link #VENOM_BURST_CAP} is what stops a fifth
+     * of a boss being the best three blows in the game. Sixty is about four
+     * enhanced swings, so a boss detonation is a real reward for three hits
+     * and is still not how a boss dies.
+     */
+    public static final int VENOM_STACKS = 3;
+    public static final float VENOM_BURST_SHARE = 0.20f;
+    public static final int VENOM_BURST_CAP = 60;
 
     private final Map<String, Float> values = new HashMap<>();
     private int reviveCharges;
@@ -172,10 +215,6 @@ public final class Modifiers {
         return value("crit_damage_mult");
     }
 
-    public float lifesteal() {
-        return value("lifesteal");
-    }
-
     public float chainLightning() {
         return value("chain_lightning");
     }
@@ -190,6 +229,52 @@ public final class Modifiers {
 
     public int burnAura() {
         return intValue("burn_aura");
+    }
+
+    /**
+     * The share of a target's maximum health a burn takes each second.
+     *
+     * <p>A share rather than a number, because the thing it is meant to say -
+     * "this is on fire" - has to stay legible against every health pool in the
+     * game. {@link #BURN_TICK_CAP} is the other half of that bargain.
+     */
+    public float burnOnHit() {
+        return value("burn_on_hit");
+    }
+
+    /**
+     * The share of a target's maximum health one stack of venom takes a second.
+     *
+     * <p>Read per stack, not in total: three stacks tick for three times this
+     * and then detonate. {@link #VENOM_TICK_CAP} caps the whole tick rather
+     * than each stack, so a third stack on a boss is worth stacking and is not
+     * worth three times the second one.
+     */
+    public float venomOnHit() {
+        return value("venom_on_hit");
+    }
+
+    /**
+     * Health recovered each time a blow lands on the player.
+     *
+     * <p>The mirror of an on-hit relic, and the only effect in the game that
+     * pays out for being hit. Flat rather than a share of the blow: a share
+     * would pay most against the thing that hurts most, which is a ward that
+     * rewards standing in the worst place on the floor.
+     */
+    public int healOnHurt() {
+        return intValue("heal_on_hurt");
+    }
+
+    /**
+     * What the off hand's reach is multiplied by.
+     *
+     * <p>Reach is how far a thrown weapon travels before its life runs out, so
+     * this is the throwing arm rather than the blade: the same kunai, sent
+     * further.
+     */
+    public float throwReachMult() {
+        return value("throw_reach_mult");
     }
 
     // ---- the player ---------------------------------------------------------

@@ -2,6 +2,7 @@ package com.kagebi.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,6 +21,7 @@ import com.badlogic.gdx.files.FileHandle;
 import com.kagebi.assets.Assets;
 import com.kagebi.data.def.EnemyDef;
 import com.kagebi.data.def.FloorDef;
+import com.kagebi.data.def.SkillDef;
 
 /**
  * The content on disk, loaded exactly the way the game loads it at boot.
@@ -37,6 +39,83 @@ class ContentLoaderTest {
         return ContentLoader.load(DISK);
     }
 
+    /**
+     * Every character gets three keys, and the ones with a set of their own
+     * get theirs.
+     *
+     * <p>The failure this is here for is silent: {@code skillsFor} takes a
+     * character's own skills if it has any and the shared set otherwise, so a
+     * half-written set does not error - it just leaves two keys dead. Counting
+     * is the only way to see it from outside.
+     *
+     * <p>Keyed rows only. A passive is a fourth row with no slot, so counting
+     * everything would read a whole set plus a passive as one too many - which
+     * is the same mistake in the other direction.
+     */
+    @Test
+    void everyCharacterGetsThreeKeysAndTheOnesWithSetsGetTheirOwn() {
+        ContentRegistry reg = real();
+        for (String id : Assets.Actor.CHARACTERS) {
+            int keys = 0;
+            for (SkillDef s : reg.skillsFor(id)) {
+                if (s.kind != SkillDef.Kind.PASSIVE) {
+                    keys++;
+                }
+            }
+            assertEquals(3, keys, id + " does not have three keyed skills");
+        }
+        for (String own : new String[] {"ninjafire", "ninjablue"}) {
+            for (SkillDef s : reg.skillsFor(own)) {
+                assertEquals(own, s.character, s.id + " is not " + own + "'s");
+            }
+        }
+        for (String id : Assets.Actor.CHARACTERS) {
+            if (id.equals("ninjafire") || id.equals("ninjablue")) {
+                continue;
+            }
+            for (SkillDef s : reg.skillsFor(id)) {
+                assertNull(s.character, id + " was handed " + s.id + ", which is not shared");
+            }
+        }
+    }
+
+    /**
+     * The shipped ultimates that make a dash a weapon still say so.
+     *
+     * <p>{@code dashVfx} gates the behaviour as well as the picture, and it
+     * was added by taking the behaviour off a hard-coded default that every
+     * ultimate got. The fixture test for it passed while the shipped
+     * {@code thunder_avatar} had lost the field - so this one reads the real
+     * file, because a mechanic that disappears in content is invisible.
+     */
+    @Test
+    void theLightningUltimateStillMakesADashAWeapon() {
+        ContentRegistry reg = real();
+        assertNotNull(reg.skill("thunder_avatar").fx.dash,
+            "thunder_avatar names no dashVfx, so dashing under the storm no "
+            + "longer arcs to anything");
+    }
+
+    /**
+     * A passive is found by the character that owns it and by nobody else.
+     *
+     * <p>And it never reaches the bar. {@code Player.setSkills} indexes
+     * {@code slot - 1}, so slot 0 falls outside the array and is dropped - the
+     * whole reason a passive is a skill row at all rather than a second table.
+     */
+    @Test
+    void onlyTheCharacterWithAPassiveHasOneAndItIsNotOnTheBar() {
+        ContentRegistry reg = real();
+        SkillDef passive = reg.passiveFor("ninjablue");
+        assertNotNull(passive, "Tử Uyển has no passive");
+        assertEquals(0, passive.slot, "a passive on a real slot would eat a key");
+        for (String id : Assets.Actor.CHARACTERS) {
+            if (!id.equals("ninjablue")) {
+                assertNull(reg.passiveFor(id), id + " picked up a passive that is not its");
+            }
+        }
+    }
+
     @Test
     void shippedContentLoadsAndPassesEveryCheck() {
         ContentRegistry reg = real();
@@ -44,7 +123,7 @@ class ContentLoaderTest {
         // Five melee and two thrown. There were two spells as well, which were
         // one character's and only hers; they went when she did.
         assertEquals(7, reg.allWeapons().size, "weapons");
-        assertEquals(24, reg.allRelics().size, "relics");
+        assertEquals(23, reg.allRelics().size, "relics");
         assertEquals(23, reg.allItems().size, "items");
         assertEquals(17, reg.allLootTables().size, "loot tables");
         assertEquals(7, reg.allFloors().size, "floors");

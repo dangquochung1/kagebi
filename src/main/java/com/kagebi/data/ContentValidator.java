@@ -52,7 +52,7 @@ public final class ContentValidator {
     public static final Set<String> RELIC_EFFECTS = Set.of(
         "damage_mult", "attack_speed_mult", "damage_taken_mult", "move_speed_mult",
         "reach_add", "max_hp_add", "gold_mult", "luck_add", "invuln_steps_add",
-        "heal_on_kill", "crit_chance_add", "crit_damage_mult", "lifesteal",
+        "heal_on_kill", "crit_chance_add", "crit_damage_mult",
         "chain_lightning", "slow_on_hit", "poison_on_hit", "revive_once",
         "throw_extra", "roll_invuln_add", "damage_mult_low_hp", "burn_aura",
         "glass_cannon", "room_clear_heal");
@@ -64,7 +64,7 @@ public final class ContentValidator {
      * because the two are found in different ways and mean different things to
      * a player. A relic is a run-long surprise pulled out of a chest and may do
      * something strange - chain lightning, a burning aura, glass cannon. Gear
-     * is bought, forged and worn between runs, and is deliberately dull: eight
+     * is bought, forged and worn between runs, and is deliberately dull: nine
      * numbers that go up. Nothing here needs new combat code, which is the
      * point - {@code Loadout} folds gear into the same {@link
      * com.kagebi.combat.Modifiers} everything else already writes to.
@@ -85,7 +85,7 @@ public final class ContentValidator {
     public static final Set<String> GEAR_EFFECTS = Set.of(
         "max_hp_add", "armour_add", "damage_mult", "crit_chance_add",
         "crit_damage_mult", "throw_damage_mult", "attack_speed_mult",
-        "move_speed_mult", "lifesteal", "gold_mult");
+        "move_speed_mult", "gold_mult");
 
     /**
      * Every effect an ultimate may put on the player while it is up.
@@ -99,17 +99,41 @@ public final class ContentValidator {
      * it exists because an ultimate is a trade: the strike is harder and the
      * skin is thinner. Nothing else in the game reduces a statistic, so nothing
      * else needed it.
+     *
+     * <p>Three of these are the fire set's, and two of the three point outward
+     * rather than at the caster - the first skill effects that do. {@code
+     * burn_aura} is borrowed whole from the relics, which is the point of
+     * these being names rather than code: the burning aura was already written
+     * and already tested, and an ultimate that burns what stands near it
+     * needed a magnitude, not a mechanism. {@code damage_taken_mult} is
+     * borrowed the same way and needed nothing at all.
+     *
+     * <p>{@code heal_on_hurt} is the odd one and is the first effect in the
+     * game that pays out for being hit. It exists because a ward that only
+     * reduced damage would be a number the player cannot see working; healing
+     * is the same number said out loud.
      */
     public static final Set<String> SKILL_EFFECTS = Set.of(
         "damage_mult", "crit_chance_add", "crit_damage_mult", "throw_damage_mult",
-        "attack_speed_mult", "move_speed_mult", "armour_mult");
+        "attack_speed_mult", "move_speed_mult", "armour_mult", "damage_taken_mult",
+        "burn_aura", "burn_on_hit", "throw_reach_mult",
+        "venom_on_hit", "heal_on_hurt");
 
-    /** The strips {@code tools/make_skillfx.py} writes, and the only ones a skill may name. */
+    /**
+     * The strips the three {@code tools/make_*fx.py} write, and the only ones
+     * a skill may name.
+     */
     public static final Set<String> SKILL_VFX = Set.of(
-        "bolt", "trail", "strike", "shock", "nova", "aura");
+        "bolt", "trail", "strike", "shock", "nova", "aura",
+        "firerun", "fireburst", "fireblast", "firering", "firestar",
+        "firebloom", "firehit", "flamelash", "sunburn", "brightfire",
+        "venomfall", "venombolt", "venomdash", "venommark",
+        "venomdrain", "venomburst", "starfall", "starcomet", "starward");
 
-    /** Icons that tool writes beside them. */
-    public static final Set<String> SKILL_ICONS = Set.of("bolt", "nova", "shock");
+    /** Icons those tools write beside them. */
+    public static final Set<String> SKILL_ICONS = Set.of(
+        "bolt", "nova", "shock", "fireblast", "firering", "firestar",
+        "starfall", "starcomet", "starward", "venommark");
 
     /**
      * What colour of stone may carry what, which is the whole of the socket
@@ -122,7 +146,7 @@ public final class ContentValidator {
             "GREEN", Set.of("max_hp_add", "armour_add"),
             "BLUE", Set.of("attack_speed_mult", "move_speed_mult"),
             "YELLOW", Set.of("crit_damage_mult", "throw_damage_mult"),
-            "PURPLE", Set.of("lifesteal", "gold_mult"));
+            "PURPLE", Set.of("gold_mult"));
 
     /**
      * The villagers a quest may be given by or sent to.
@@ -288,10 +312,14 @@ public final class ContentValidator {
         for (CraftDef cf : reg.allCrafts()) {
             craft(c, reg, cf);
         }
-        Set<Integer> slots = new java.util.HashSet<>();
+        // One set of slots per character, plus one for the shared set: two
+        // skills may share slot 2 as long as no character can reach both.
+        java.util.Map<String, Set<Integer>> slots = new java.util.HashMap<>();
         for (SkillDef s : reg.allSkills()) {
-            skill(c, s, slots);
+            skill(c, s, slots.computeIfAbsent(String.valueOf(s.character),
+                                              k -> new java.util.HashSet<>()));
         }
+        skillSets(c, reg);
         for (QuestDef q : reg.allQuests()) {
             quest(c, reg, q, VILLAGERS);
         }
@@ -550,6 +578,54 @@ public final class ContentValidator {
      * lunge with no distance, a nova with no radius, an ultimate with no
      * duration. Every one of those loads and runs and simply does nothing.
      */
+    /**
+     * Every character's set is whole, and every named set belongs to somebody.
+     *
+     * <p>{@code skillsFor} takes a character's own skills if it has any and
+     * the shared set otherwise, so a character given one fire skill would
+     * silently lose the other two keys rather than mixing the sets. That is
+     * the failure this catches: a half-written set validates perfectly
+     * skill by skill.
+     *
+     * <p>A passive does not count towards the three. It is optional, at most
+     * one, and a character that has one still owes three keys.
+     */
+    private static void skillSets(Check c, ContentRegistry reg) {
+        java.util.Map<String, Integer> keyed = new java.util.TreeMap<>();
+        java.util.Map<String, Integer> passives = new java.util.TreeMap<>();
+        for (SkillDef s : reg.allSkills()) {
+            if (s.character == null) {
+                continue;
+            }
+            // Counted apart, because a passive is not one of the three keys and
+            // a set of three keys plus a passive is whole, not one too many.
+            if (s.kind == SkillDef.Kind.PASSIVE) {
+                passives.merge(s.character, 1, Integer::sum);
+            } else {
+                keyed.merge(s.character, 1, Integer::sum);
+            }
+        }
+        java.util.Set<String> all = new java.util.TreeSet<>(keyed.keySet());
+        all.addAll(passives.keySet());
+        for (String id : all) {
+            String w = "character '" + id + "'";
+            if (!java.util.Arrays.asList(Assets.Actor.CHARACTERS).contains(id)) {
+                c.fail(w, "has skills but is not in Assets.Actor.CHARACTERS");
+            }
+            int keys = keyed.getOrDefault(id, 0);
+            if (keys != SKILL_SLOTS) {
+                c.fail(w, "has " + keys + " keyed skills of its own, not "
+                    + SKILL_SLOTS + "; a part-written set loses the other keys");
+            }
+            if (passives.getOrDefault(id, 0) > 1) {
+                // ContentRegistry.passiveFor returns the first it finds, so a
+                // second one is a row nothing will ever read.
+                c.fail(w, "has " + passives.get(id)
+                    + " passives; only the first would ever be applied");
+            }
+        }
+    }
+
     private static void skill(Check c, SkillDef s, Set<Integer> slots) {
         String w = "skill '" + s.id + "'";
         c.key(w, "nameKey", s.nameKey);
@@ -562,14 +638,32 @@ public final class ContentValidator {
             c.fail(w, "vfx '" + s.vfx + "' is not one of "
                 + new java.util.TreeSet<>(SKILL_VFX));
         }
-        if (s.slot < 1 || s.slot > SKILL_SLOTS) {
+        for (String name : s.fx.named()) {
+            if (!SKILL_VFX.contains(name)) {
+                c.fail(w, "fx '" + name + "' is not one of "
+                    + new java.util.TreeSet<>(SKILL_VFX));
+            }
+        }
+        boolean passive = s.kind == SkillDef.Kind.PASSIVE;
+        if (s.fx.any() && s.kind != SkillDef.Kind.AVATAR && s.kind != SkillDef.Kind.CHARGE) {
+            c.fail(w, "carries extra fx but is a " + s.kind
+                + ", which has nothing to draw them on");
+        }
+        if (passive) {
+            // Not "slot 0 is allowed" but "slot 0 is required": a passive on a
+            // real slot would take a key away from the set and then not answer
+            // it, because Player.setSkills is the only thing that binds one.
+            if (s.slot != 0) {
+                c.fail(w, "is a PASSIVE on slot " + s.slot + "; a passive has no key");
+            }
+        } else if (s.slot < 1 || s.slot > SKILL_SLOTS) {
             c.fail(w, "slot " + s.slot + " is not 1 to " + SKILL_SLOTS);
         } else if (!slots.add(s.slot)) {
             // Both would be bound to the same key and one of them would never
             // be reachable, silently.
             c.fail(w, "is the second skill on slot " + s.slot);
         }
-        if (s.cooldownSteps <= 0) {
+        if (!passive && s.cooldownSteps <= 0) {
             c.fail(w, "has no cooldown; it would fire every step the key is held");
         }
         switch (s.kind) {
@@ -578,6 +672,15 @@ public final class ContentValidator {
                 break;
             case NOVA:
                 c.atLeast(w, "range", (int) s.range, 1);
+                break;
+            case CHARGE:
+                c.atLeast(w, "range", (int) s.range, 1);
+                if (s.durationSteps <= 0) {
+                    c.fail(w, "is a CHARGE with no duration; it would end the step it began");
+                }
+                if (s.durationSteps >= s.cooldownSteps) {
+                    c.fail(w, "is a CHARGE that lasts as long as its cooldown, so it never ends");
+                }
                 break;
             case AVATAR:
                 if (s.durationSteps <= 0) {
@@ -590,8 +693,24 @@ public final class ContentValidator {
                     c.fail(w, "hpCost " + s.hpCost + " is not a share of health below 1");
                 }
                 break;
+            case PASSIVE:
+                // The only thing a passive is. Without effects it is a row in
+                // the file that costs a character one of its three keys - the
+                // set check counts it - and does nothing at all.
+                if (s.effects.length == 0) {
+                    c.fail(w, "is a PASSIVE that changes nothing");
+                }
+                if (s.durationSteps > 0) {
+                    c.fail(w, "is a PASSIVE with a duration; a passive is the whole run");
+                }
+                break;
             default:
                 break;
+        }
+        if (s.strikeMult < 0f || s.strikeMult >= 1f) {
+            // At 1 the follow-up equals the blow that caused it, which is not a
+            // follow-up; above it the ultimate's decoration is its main weapon.
+            c.fail(w, "strikeMult " + s.strikeMult + " is not a share below 1");
         }
         if (s.effects.length != s.magnitudes.length) {
             c.fail(w, "has " + s.effects.length + " effects and "

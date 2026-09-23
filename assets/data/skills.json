@@ -38,13 +38,202 @@
       "damageMult": 1.0,
       "range": 48,
       "knockback": 40,
+      "strikeMult": 0.35,
       "vfx": "aura",
+      // The streak a dash leaves while the storm is up - and, because naming
+      // one is what says "a dash is a weapon now", the three-target arc that
+      // goes with it. This used to be hard-coded for every ultimate, which is
+      // how the fire set shipped dashing in lightning blue.
+      "dashVfx": "trail",
       "effects": ["damage_mult", "crit_chance_add", "crit_damage_mult",
                   "throw_damage_mult", "attack_speed_mult", "move_speed_mult",
                   "armour_mult"],
       "magnitudes": [1.2, 0.2, 1.2, 1.2, 1.2, 1.2, 0.9],
       "hpCost": 0.1,
       "hpFloor": 0.3
+    },
+
+    // ---------------------------------------------------------------------
+    // Hoả Tâm's three. `character` is what binds them: ContentRegistry
+    // .skillsFor hands a character its own set if it has one, so these sit on
+    // slots 1-3 beside the thunder three without either being unreachable.
+    // ---------------------------------------------------------------------
+
+    {
+      "id": "fire_nova",
+      "character": "ninjafire",
+      "nameKey": "skill.fire_nova.name",
+      "descKey": "skill.fire_nova.desc",
+      "icon": "firering",
+      "slot": 1,
+      "kind": "NOVA",
+      "cooldown": 12,
+      "damageMult": 1.0,
+      "range": 36,
+      // Harder than the thunder ring's 140. The ring is the one that clears a
+      // room's worth of bodies off you, and the fire one is the only skill in
+      // this set whose whole job is the shove.
+      "knockback": 200,
+      "vfx": "firering"
+    },
+    {
+      "id": "fire_charge",
+      "character": "ninjafire",
+      "nameKey": "skill.fire_charge.name",
+      "descKey": "skill.fire_charge.desc",
+      "icon": "fireblast",
+      "slot": 2,
+      "kind": "CHARGE",
+      "cooldown": 9,
+      // Three seconds, and a cooldown that is only three times it: this is the
+      // set's movement, so waiting nine seconds to cross a room is a skill
+      // nobody presses.
+      "duration": 3,
+      "damageMult": 0.9,
+      "range": 14,
+      "knockback": 120,
+      "vfx": "firerun",
+      "castVfx": "fireburst",
+      "hitVfx": "fireblast",
+      // Half again as fast. Faster than that and the player outruns the
+      // camera, which is a bug that looks like a feature until a wall arrives.
+      "effects": ["move_speed_mult"],
+      "magnitudes": [1.5]
+    },
+    {
+      "id": "fire_avatar",
+      "character": "ninjafire",
+      "nameKey": "skill.fire_avatar.name",
+      "descKey": "skill.fire_avatar.desc",
+      "icon": "firestar",
+      "slot": 3,
+      "kind": "AVATAR",
+      "cooldown": 14,
+      "duration": 10,
+      "damageMult": 1.0,
+      "range": 40,
+      "knockback": 150,
+      "strikeMult": 0.35,
+      "vfx": "firebloom",
+      "castVfx": "firestar",
+      "meleeVfx": "flamelash",
+      "hitVfx": "firehit",
+      "throwVfx": "sunburn",
+      "burnVfx": "brightfire",
+      // Costs no health, unlike the storm. It pays in swing speed instead: a
+      // burning weapon is a heavy one, and 0.8 is what leaves room for the
+      // flame arc to finish before the next swing starts.
+      //
+      // burn_aura is four a second, which is well under one enhanced swing -
+      // the aura is for pressure, not for killing, and a player who could
+      // stand still and win would never swing at all.
+      //
+      // burn_on_hit is 4% of what the target can take, three times, capped at
+      // 15 a tick so a boss's health bar is not the burn's private resource.
+      "effects": ["damage_mult", "move_speed_mult", "attack_speed_mult",
+                  "throw_reach_mult", "burn_aura", "burn_on_hit"],
+      "magnitudes": [1.3, 1.15, 0.8, 1.5, 4, 0.04],
+      "hpCost": 0,
+      "hpFloor": 0
+    },
+
+    // ---------------------------------------------------------------------
+    // Tu Uyen's three, and the one that is not on a key. `venom_touch` is a
+    // PASSIVE: no slot, no cooldown, never cast, folded into Modifiers for
+    // the whole run by Loadout the way an ultimate is folded in for ten
+    // seconds. It is here rather than as a second shop perk because the perk
+    // she has was bought with 900 gold and taking it away to pay for her
+    // element would be charging twice.
+    // ---------------------------------------------------------------------
+
+    {
+      "id": "venom_touch",
+      "character": "ninjablue",
+      "nameKey": "skill.venom_touch.name",
+      "descKey": "skill.venom_touch.desc",
+      "icon": "venommark",
+      "slot": 0,
+      "kind": "PASSIVE",
+      // The mark a venomed enemy carries. Read by EntityWorld.venomMarkFx,
+      // which is the one place a passive's own art is asked for.
+      "vfx": "venommark",
+      // Two percent of what the target can take, per stack, per second. One
+      // stack is a nuisance and three are six percent a second - but the DoT
+      // is not the point of it, filling the meter is: three stacks detonate
+      // for a fifth of maximum health and reset to nothing.
+      "effects": ["venom_on_hit"],
+      "magnitudes": [0.02]
+    },
+    {
+      "id": "venom_nova",
+      "character": "ninjablue",
+      "nameKey": "skill.venom_nova.name",
+      "descKey": "skill.venom_nova.desc",
+      "icon": "starfall",
+      "slot": 1,
+      "kind": "NOVA",
+      "cooldown": 11,
+      "damageMult": 1.1,
+      "range": 34,
+      // Three body widths, which is the one number here that can be derived.
+      // Knockback is a velocity that decays linearly to zero over
+      // Knockback.DEFAULT_STEPS - twelve of them - so the distance covered is
+      // strength * 12 / (2 * 60), or strength * 0.1 pixels. The ninja is 16px
+      // across, so three of her is 48px and 48px is 480.
+      "knockback": 480,
+      "vfx": "starfall"
+    },
+    {
+      "id": "venom_lunge",
+      "character": "ninjablue",
+      "nameKey": "skill.venom_lunge.name",
+      "descKey": "skill.venom_lunge.desc",
+      "icon": "starcomet",
+      "slot": 2,
+      "kind": "LUNGE",
+      "cooldown": 6,
+      "damageMult": 1.2,
+      "range": 44,
+      "knockback": 70,
+      "vfx": "starcomet"
+    },
+    {
+      "id": "venom_avatar",
+      "character": "ninjablue",
+      "nameKey": "skill.venom_avatar.name",
+      "descKey": "skill.venom_avatar.desc",
+      "icon": "starward",
+      "slot": 3,
+      "kind": "AVATAR",
+      "cooldown": 15,
+      "duration": 10,
+      "damageMult": 1.0,
+      // The room, not a radius. This is the only skill in the game whose
+      // range is meant to be "everything", and it is a number rather than a
+      // flag because within() already takes one: the largest room in the game
+      // is under 400px across a diagonal.
+      "range": 400,
+      "knockback": 60,
+      "vfx": "starward",
+      // No castVfx. Its opening is what lands on the enemies, not what
+      // happens where the player stands.
+      "hitVfx": "venomfall",
+      "dashVfx": "venomdash",
+      "throwVfx": "venombolt",
+      "burnVfx": "venommark",
+      // Costs no health, like the fire one, and unlike the fire one it is
+      // defensive: a fifth off everything that lands, and four points back
+      // each time something does. heal_on_hurt is also what the ward bites
+      // with, so four is a real number twice over.
+      //
+      // venom_on_hit appears here as well as on the passive, and the two add:
+      // while this is up her poison ticks at twice its usual rate, so the
+      // ultimate sharpens the element rather than replacing it.
+      "effects": ["damage_mult", "attack_speed_mult", "move_speed_mult",
+                  "damage_taken_mult", "heal_on_hurt", "venom_on_hit"],
+      "magnitudes": [1.25, 1.15, 1.15, 0.8, 4, 0.02],
+      "hpCost": 0,
+      "hpFloor": 0
     }
   ]
 }

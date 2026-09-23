@@ -13,7 +13,7 @@ this list. **The list lives in code**, in `ContentValidator.RELIC_EFFECTS` -
 this file is the prose version of it. Adding an effect means adding it in both
 places, and `ContentValidatorTest` will tell you if you forget.
 
-### Relic effects (23)
+### Relic effects (22)
 
 `magnitude` is the number beside the name in `relics.json`.
 
@@ -31,7 +31,6 @@ places, and `ContentValidatorTest` will tell you if you forget.
 | `heal_on_kill` | hit points | on enemy death |
 | `crit_chance_add` | added probability, 0..1 | per hit |
 | `crit_damage_mult` | multiplier when a hit crits | per crit |
-| `lifesteal` | fraction of damage dealt returned as HP | per hit |
 | `chain_lightning` | probability the hit arcs to a second enemy | per hit |
 | `slow_on_hit` | fraction the target's `moveSpeed` drops, for 90 steps | per hit |
 | `poison_on_hit` | damage per 60 steps, for 300 steps | per hit |
@@ -178,7 +177,7 @@ a fourth:
 `ContentValidator.GEAR_EFFECTS` is the list. A shorter list than the relics
 get, on purpose: a relic is a run-long surprise out of a chest and may do
 something strange, while gear is bought and forged between runs and is
-deliberately dull - eight numbers that go up. Nothing here needs new combat
+deliberately dull - nine numbers that go up. Nothing here needs new combat
 code. `Loadout.of` folds worn gear and set stones into the same `Modifiers`
 that relics, village upgrades and character perks already write to.
 
@@ -192,7 +191,6 @@ that relics, village upgrades and character perks already write to.
 | `throw_damage_mult` | off hand only | **no - see below** |
 | `attack_speed_mult` | windup and recover | yes |
 | `move_speed_mult` | walking | yes |
-| `lifesteal` | health back on a hit | yes |
 | `gold_mult` | coin picked up | yes |
 
 Two of those had no source at all before gear existed:
@@ -221,7 +219,7 @@ would teach the player that the colours are decoration.
 | GREEN | `max_hp_add`, `armour_add` |
 | BLUE | `attack_speed_mult`, `move_speed_mult` |
 | YELLOW | `crit_damage_mult`, `throw_damage_mult` |
-| PURPLE | `lifesteal`, `gold_mult` |
+| PURPLE | `gold_mult` |
 
 ## 3c. Quest step kinds
 
@@ -252,10 +250,10 @@ neither of them is named anywhere in it.
 ## 3d. Skill effects, and what a skill is made of
 
 `SkillDef.effects` names these and `ContentValidator.SKILL_EFFECTS` is the
-list. Only an `AVATAR` carries any: it is a timed transformation, and these are
-what it changes while it is up. A short list on purpose - a state that lasts
-eight seconds has to be legible in one line, and eight numbers moving at once
-is not.
+list. An `AVATAR` or a `CHARGE` carries them: both are timed states, and these
+are what they change while they are up. A short list on purpose - a state that
+lasts eight seconds has to be legible in one line, and eight numbers moving at
+once is not.
 
 | effect | what it does | was it already implemented |
 |---|---|---|
@@ -266,6 +264,12 @@ is not.
 | `attack_speed_mult` | windup and recover | yes |
 | `move_speed_mult` | walking | yes |
 | `armour_mult` | share of armour kept | **no - see below** |
+| `damage_taken_mult` | share of an incoming blow that lands | yes, from the relics |
+| `burn_aura` | damage a second to enemies within 24px | yes, from the relics |
+| `burn_on_hit` | share of the target's maximum health, a second, for 8s | **no - see below** |
+| `throw_reach_mult` | how far the off hand's weapon flies | **no - see below** |
+| `venom_on_hit` | share of maximum health, a second, **per stack** | **no - see below** |
+| `heal_on_hurt` | health recovered each time a blow lands on you | **no - see below** |
 
 `armour_mult` is new to the game and is the only reducing effect there is.
 Everything else in the content makes a number go up; an ultimate is a trade,
@@ -273,23 +277,148 @@ so it needed a name for the other direction. It folds into `Modifiers.armourAdd`
 rather than being read on its own, so nothing outside `Modifiers` has to know
 armour has two halves, and it compounds like every other `_mult`.
 
+`burn_aura` is not new at all - it is the relic effect, borrowed whole, and
+that is what these being names rather than code buys. The aura was written,
+tested and already ticking once a second in `EntityWorld.stepBurnAura`; an
+ultimate that burns whatever stands near it needed a magnitude, not a
+mechanism.
+
+`burn_on_hit` and `throw_reach_mult` are the first two skill effects that
+point at something other than the caster. `burn_on_hit` is a **share of the
+target's maximum health**, not a number: the thing it has to say is "this is on
+fire", and that has to read the same on a 25 point goblin and a 900 point boss,
+which a flat number cannot do. `Modifiers.BURN_TICK_CAP` is the other half of
+that bargain, because a share of a boss's health bar is otherwise the best
+damage in the game. It does not stack - a second application refreshes the
+timer, like every other status on `Enemy`.
+
+`venom_on_hit` is priced the same way and **is the exception to that last
+sentence**: it is the first status in the game that counts. Three stacks
+detonate for `Modifiers.VENOM_BURST_SHARE` of maximum health and reset to
+nothing, and `VENOM_TICK_CAP` and `VENOM_BURST_CAP` are its two halves of the
+same bargain the burn strikes.
+
+The exception is worth it for one reason and only under one condition. The
+reason is that a burn is reapplied by every blow while an ultimate is up, so a
+counting burn would be a multiplication table by the third swing - while venom
+belongs to a character rather than to a skill and is *meant* to be built. The
+condition is that filling the meter empties it: without that, a fast weapon
+would run the count away, and with it the third blow is the one worth landing.
+The counting lives on `Enemy.venom`, which returns whether the meter filled
+rather than acting on it, because acting on it means drawing and `Enemy` draws
+nothing; `EntityWorld.envenom` is the other half.
+
+`heal_on_hurt` is the only effect in the game that pays out for being hit, and
+it is flat rather than a share of the blow on purpose - a share would pay most
+against whatever hurts most, which is a ward that rewards standing in the worst
+place on the floor. `EntityWorld.stepWard` spends it three ways at once: it
+heals, it draws, and it hurts whatever is close enough to have been the reason.
+That last part poisons nothing by itself. It does not need to - the bite is the
+player's own damage through `onSkillHitLanded`, so a character whose every blow
+carries venom poisons with it for free, which is the whole argument for the
+venom being a modifier rather than a branch.
+
 The rest of a skill is not an effect name. `SkillDef.Kind` is the one part
 written in code, because it is a shape rather than a number:
 
 | kind | what the player sees | where it lives |
 |---|---|---|
-| `LUNGE` | a thrust along the aim, through whatever is crossed | `Player.beginSkill` |
+| `LUNGE` | a thrust along the aim, through whatever is crossed | `Player.beginLunge` |
 | `NOVA` | a ring around the caster that hurts and shoves | `EntityWorld.castNova` |
-| `AVATAR` | a timed transformation that also changes the dash | `Player.ultimate` |
+| `AVATAR` | a timed transformation that also changes the dash | `Player.beginAvatar` |
+| `CHARGE` | a long, steered run that burns what it touches and cannot swing | `Player.beginCharge` |
+| `PASSIVE` | no key and no cast: effects a character simply has | nowhere - `Loadout` |
 
-Everything else - cooldown, duration, damage, range, knockback, the health it
-costs and the health below which it is free - is a number in
+`CHARGE` is the fourth and it had to be a shape rather than a lunge with longer
+numbers: a lunge fixes its heading at the moment it starts and is over in a
+fifth of a second, while a charge is steered for three seconds and takes the
+weapons out of the player's hands while it runs. That last part is the whole
+cost of the skill, and there was nowhere in a `LUNGE` to put it.
+
+`PASSIVE` is the fifth and it passes the same test differently: it is not a
+shape, it is the absence of one. A character whose element is "everything I do
+poisons" has something that is never cast, never on cooldown and never on a
+key. It sits on slot 0, which `Player.setSkills` drops because it indexes
+`slot - 1`, so it cannot reach the bar without a line of code being written to
+let it; `ContentRegistry.passiveFor` is the only reader, and `Loadout` folds it
+in beside the ultimate. The two alternatives were both worse. A second `effect`
+field on the shop row would have cost that character the perk they paid 900
+gold for, and a branch per character is the thing section 3 records going wrong
+the last time.
+
+Everything else - cooldown, duration, damage, range, knockback, `strikeMult`
+(the share of a blow that an avatar's own strike adds on top of it), the health
+it costs and the health below which it is free - is a number in
 `assets/data/skills.json`, in seconds and virtual pixels. Balance is argued
 about for weeks and a rebuild per argument is how tuning stops happening.
 
 `SkillDef.vfx` and `SkillDef.icon` name strips that `tools/make_skillfx.py`
-writes; `SKILL_VFX` and `SKILL_ICONS` are the lists, and a misspelt one fails
-at boot rather than drawing nothing.
+and `tools/make_firefx.py` write; `SKILL_VFX` and `SKILL_ICONS` are the lists,
+and a misspelt one fails at boot rather than drawing nothing.
+
+`SkillDef.Fx` is five more of those names, and they are optional. They are what
+a timed skill makes the *rest of the game* look like while it is up, which is
+the part an element cannot express as a number:
+
+| json field | what it replaces |
+|---|---|
+| `castVfx` | the ultimate's opening flash, and it shoves as well as draws |
+| `meleeVfx` | an arc in front of the swing; the ordinary swing has no sprite at all |
+| `hitVfx` | what lands on whatever the player's damage touches |
+| `throwVfx` | the off hand's picture, not the off hand's weapon |
+| `burnVfx` | the mark a burning enemy carries |
+| `dashVfx` | the trail a dash leaves - **and whether a dash is a weapon** |
+
+A skill that names none of them carries `Fx.NONE` and changes nothing, which is
+why the lightning set needed no edit when the fire set arrived. The alternative
+was an `element` field switched on in six places, which is the same magic
+string with more of it.
+
+`dashVfx` is the one that gates a mechanic rather than replacing a picture, and
+it does because the mechanic and the picture were one decision. While an
+ultimate was up a dash left a lightning streak and arced to three enemies - for
+every ultimate, from a hard-coded strip - so the fire ultimate, which is meant
+to be a little speed and nothing else, lit up in the wrong element's colours
+and carried a whole extra weapon nobody had balanced. "What does a dash look
+like now" and "is a dash a weapon now" have one answer, so they are one field,
+and an ultimate that is only speed says so by leaving it out.
+
+Six is as many names as this shape should hold. A seventh should turn `Fx`
+into a map keyed by role with a vocabulary in `ContentValidator`, the way
+effect names already work: six nullable fields each read in one place is
+legible, and a dozen is a lookup table written out by hand.
+
+Two things venom draws are **not** here and are constants in `EntityWorld`
+instead - the detonation and the default stack mark. There is one poisoner, and
+a detonation looks like a detonation whoever caused it; the mark is overridable
+because a passive names its own through `vfx`. The day a second element stacks
+something, the burst should follow the mark out of the constants.
+
+## 3e. Skill sets, and who gets which
+
+`SkillDef.character` is null for the set every character gets and a character
+id for a set one character gets. `ContentRegistry.skillsFor` is the only place
+it is read: a character's own three if it has any, the shared three otherwise.
+
+It is all or nothing on purpose, and `ContentValidator.skillSets` enforces it.
+A character given one skill of its own would silently lose the other two keys,
+because `skillsFor` would return a set of one - and the one-skill-per-slot
+check could not see it either, since it looks at one set at a time.
+
+A `PASSIVE` row does not count towards the three. It is optional, at most one,
+and `skillSets` counts the keyed rows separately so that a set of three keys
+plus a passive is whole rather than one too many. `ContentRegistry.passiveFor`
+reads it out of the same set `skillsFor` returns rather than out of a second
+table, so a passive belongs to a character exactly the way the three keys do
+and arrives and leaves with them.
+
+Two skills may share a slot as long as no character can reach both. That is why
+the slot check keys on the character rather than on the slot alone.
+
+This is the second time a rule has given one character something nobody else
+has. The first was a pair of spells only Kitsune could hold; it was written into
+four places, was right in two, and in the end both the spells and the character
+went rather than the rule being fixed. One field, one reader.
 
 ## 4. Seams other agents call
 

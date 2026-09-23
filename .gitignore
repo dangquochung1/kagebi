@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Original asset packs (161 MB) and font downloads.
 # Kept on disk as the reproducible source for tools/build_assets.py, but never
-# committed: several packs forbid redistribution (Mystic Woods, Sprout Lands).
+# committed: some of them forbid redistributing the art itself.
 # ---------------------------------------------------------------------------
 _raw/
 

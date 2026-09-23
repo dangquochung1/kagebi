@@ -180,6 +180,36 @@ class ContentContractTest {
     }
 
     /**
+     * The panel a player holds shift to read gives a skill four wrapped lines,
+     * and a fifth runs off the bottom of it.
+     *
+     * <p>The same failure the stage blurbs had, in a panel that is smaller and
+     * in text that is longer: a skill description has to say what the skill
+     * does, what it costs and what it stops you doing, and the fire ones say
+     * all three. Measured in both languages for the reason that one caught a
+     * Vietnamese overflow in an otherwise green build - the wrap is by pixel
+     * and Vietnamese runs longer for the same sentence.
+     */
+    @Test
+    void everySkillDescriptionFitsTheShiftPanel() {
+        Map<Integer, Integer> advance = glyphAdvances();
+        List<String> tooTall = new ArrayList<>();
+        for (String lang : new String[] {"vi", "en"}) {
+            for (Map.Entry<String, String> e : readStrings(lang).entrySet()) {
+                if (!e.getKey().startsWith("skill.") || !e.getKey().endsWith(".desc")) {
+                    continue;
+                }
+                int lines = wrappedLines(advance, e.getValue(), com.kagebi.ui.Hud.SKILL_INFO_W);
+                if (lines > com.kagebi.ui.Hud.SKILL_INFO_LINES) {
+                    tooTall.add(e.getKey() + " (" + lang + ") wraps to " + lines
+                        + " lines, over " + com.kagebi.ui.Hud.SKILL_INFO_LINES);
+                }
+            }
+        }
+        assertTrue(tooTall.isEmpty(), "skill descriptions that will not fit: " + tooTall);
+    }
+
+    /**
      * The three difficulty labels sit in one row inside the same panel, with
      * {@code WorldMapScreen.CHIP_PAD} around each. They are the longest labels
      * in the interface in both languages, so this row is the tightest thing on

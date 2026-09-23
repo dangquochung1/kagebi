@@ -19,6 +19,12 @@ below was obtained free. Licences are reproduced verbatim in `LICENSES/`.
 | [Fire and Water Spell Effects](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The cove boss's spells, balls and arrows |
 | [RPG Fantasy GUI](https://craftpix.net/) | CraftPix | [CraftPix file licence](https://craftpix.net/file-licenses/) | The forge, equipment and bag windows on the character sheet |
 | Pixel Art Skill Animations - Lightning | Frostwindz | Pack licence agreement, see `LICENSES/` | The three lightning skills, their bolts and their icons |
+| Pixel Art Skill Animations - Fire | Frostwindz | Pack licence agreement, see `LICENSES/` | The fire ring, the bloom and the starburst of Hoả Tâm's three skills |
+| Pixel Art VFX - Poison | Frostwindz | Pack licence agreement, see `LICENSES/` | Tử Uyển's poison: what falls on a room, what she throws, the trail of her dash and the mark a poisoned enemy carries |
+| [Pixel Art VFX - Starcaller](https://frostwindz.itch.io/) | Frostwindz | Pack licence agreement, see `LICENSES/` | Tử Uyển's star: the slam, the comet she rides, and the ward she wears |
+| [Super Pixel Effects Gigapack](https://untiedgames.itch.io/super-pixel-effects-gigapack) | Will Tice / unTied Games | [Pack licence](http://untiedgames.com/files/license.txt) | The ward drinking a blow, and three stacks of poison going off |
+| [Free Pixel Effects Pack](https://codemanu.itch.io/pixel-effects-pack) | CodeManu & DavitMasia | **Public domain**, no credit required | The flame trail on a burning sword, the fireball it throws, and the mark a burning enemy carries |
+| Fire Effect 2 | *unknown — pack shipped no licence or attribution* | Unknown | The fire around Hoả Tâm while she charges, and the burst where she lands |
 
 ## Audio
 
@@ -38,12 +44,23 @@ readme, so neither its author nor its terms are recorded here. Its art is in the
 game and is credited as far as it can be; if the source turns up, this row and
 the `credits.home.*` strings in `assets/i18n/` are the two places to correct.
 
+Fire Effect 2 arrived the same way - two sprite sheets in a bare folder, no
+readme and no author. It is credited as far as it can be, and if its source
+turns up, that row and the `credits.fire2.*` strings are where to correct it.
+
 The Sunnyside World pack came as a folder of art and the GameMaker project it
 was shown off in, with no licence file. The village is built from that
 project's own showcase room by `tools/make_island.py`; the pack itself stays
 out of git (`assets/packs/miniworld/`, under `assets/packs/` in `.gitignore`), and only the images the game loads
 are derived from it. As with the house, this row and the `credits.sunnyside.*`
 strings are the places to correct if its terms turn out to need more.
+
+The unTied Games gigapack allows its art in a game and forbids reuploading the
+art itself, which is the same shape as the CraftPix terms - so it sits in
+`assets/packs/`, which `.gitignore` excludes, and only the strips
+`tools/make_poisonfx.py` derives from it reach `assets/gfx/`. Unlike the
+CraftPix packs it also *requires* attribution, which is why it has a row above
+and a block in the credits roll rather than only this paragraph.
 
 The five CraftPix packs share one licence, and it is not CC0: it allows the
 art in a game and forbids redistributing the art itself. So they sit in
@@ -67,15 +84,7 @@ and carries the same OFL terms.
 
 ## Not used
 
-Three packs were downloaded but deliberately left out of the game because they
-clash with the chosen art direction. They remain untouched in `_raw/`.
-
-- **Mystic Woods** (GameEndeavor) — non-commercial; three sheets are watermarked
-  "Prenium Version!"; 48x48 characters and pure-black outlines do not match.
-- **Sprout Lands Basic** (Cup Nooble) — non-commercial, credit required; pastel
-  high-key palette is two stops brighter than the dungeon art.
-- **Pixel Food** (likely ghostpixxells) — 1,425 colours with antialiasing against
-  28-53 colours and none, elsewhere.
-
-Neither Mystic Woods nor Sprout Lands may be redistributed, which is one reason
-`_raw/` is excluded from version control.
+Packs that are downloaded, tried and then cut are deleted from `_raw/` rather
+than left sitting there. A pack that forbids redistribution is a pack this
+repository must not be able to leak, and the surest way not to leak it is not
+to have it. Nothing in `assets/` was ever derived from one.

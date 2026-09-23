@@ -23,7 +23,7 @@ public final class HitResolver {
     /**
      * As above, additionally collecting who was hit.
      *
-     * <p>A count is enough for hit-stop and for lifesteal, but not for anything
+     * <p>A count is enough for hit-stop and for the sound, but not for anything
      * that marks the target - poison, a slow, a chain - and those have to know
      * which enemy, not how many. Passing a list in rather than returning one
      * keeps the common case free of garbage in a loop that runs every step.

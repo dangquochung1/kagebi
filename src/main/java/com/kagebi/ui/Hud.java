@@ -219,6 +219,142 @@ public final class Hud {
         return SKILL_X + slot * (SKILL_CELL + SKILL_GAP);
     }
 
+    // ---- what a skill does -------------------------------------------------
+
+    /**
+     * How wide the description panel is, and how many lines of it fit.
+     *
+     * <p>Public because {@code ContentContractTest} measures every
+     * {@code skill.*.desc} against them in both languages, the way it already
+     * measures the stage blurbs. Vietnamese runs about a fifth longer than
+     * English, so a line budget checked in English only is a line budget
+     * checked in the easy language.
+     */
+    public static final int SKILL_INFO_W = 136;
+    public static final int SKILL_INFO_LINES = 5;
+
+    /** Where the panel sits above the bar, and how much air is inside it. */
+    private static final int INFO_PAD = 6;
+    private static final int INFO_GAP = 12;
+
+    private static final Color INFO_TITLE = new Color(0xffe6c4ff);
+    private static final Color INFO_TEXT = new Color(0xe8cfa9ff);
+    private static final Color INFO_FACT = new Color(0xffad55ff);
+
+    /**
+     * What a skill does, while the player holds shift and its key.
+     *
+     * <p>Held, not toggled, and gone the moment either key is released. A
+     * panel that has to be dismissed is a panel a player reads once; one that
+     * costs nothing to open is one they check mid-fight, which is when the
+     * question "what does this actually do" is asked.
+     *
+     * <p>Drawn over the world with no shroud behind it. The game does not
+     * pause for this - reading is something the player chooses to do while
+     * something is walking towards them, and freezing the world to explain a
+     * button would be a worse answer than the question deserves.
+     */
+    public void drawSkillInfo(SpriteBatch batch, Skin skin, Player player, int slot) {
+        SkillDef s = slot < 0 ? null : player.skill(slot);
+        if (s == null) {
+            return;
+        }
+        // Right-aligned to the cell it belongs to: the panel is wider than
+        // three cells, so it is anchored to the key being read rather than
+        // centred, and clamped on screen inside drawInfo.
+        drawInfo(batch, skin, s, skillX(slot) + SKILL_CELL);
+    }
+
+    /**
+     * The same panel for the ability that has no key, raised by shift alone.
+     *
+     * <p>Anchored to the right of the bar, where the third key's panel would
+     * be, because there is no cell of its own to point at and the bar is what
+     * shift is about.
+     */
+    public void drawPassiveInfo(SpriteBatch batch, Skin skin, SkillDef passive) {
+        if (passive == null) {
+            return;
+        }
+        drawInfo(batch, skin, passive, skillX(Intent.SKILLS - 1) + SKILL_CELL);
+    }
+
+    private void drawInfo(SpriteBatch batch, Skin skin, SkillDef s, float rightEdge) {
+        String name = i18n.get(s.nameKey);
+        String desc = i18n.get(s.descKey);
+        String facts = facts(s);
+
+        float textH = wrappedHeight(desc, SKILL_INFO_W);
+        float h = INFO_PAD * 2 + LINE + textH + LINE;
+        float w = SKILL_INFO_W + INFO_PAD * 2;
+        // Pulled back on screen: the third cell is four pixels from the edge
+        // and the panel is wider than three cells.
+        float x = Math.round(Math.min(rightEdge - w, Cfg.VIRT_W - MARGIN - w));
+        x = Math.max(MARGIN, x);
+        float y = Math.round(SKILL_Y + SKILL_CELL + INFO_GAP);
+
+        Drawable panel = skin.getDrawable(Assets.Ui.PANEL_2);
+        if (panel != null) {
+            panel.draw(batch, x, y, w, h);
+        }
+
+        float top = y + h - INFO_PAD;
+        batch.setColor(INFO_TITLE);
+        line(batch, font, name, x + INFO_PAD, top);
+        batch.setColor(Color.WHITE);
+
+        font.setColor(INFO_TEXT);
+        font.draw(batch, desc, x + INFO_PAD, top - LINE - font.getAscent(),
+                  SKILL_INFO_W, Align.left, true);
+        font.setColor(Color.WHITE);
+
+        batch.setColor(INFO_FACT);
+        line(batch, font, facts, x + INFO_PAD, top - LINE - textH);
+        batch.setColor(Color.WHITE);
+    }
+
+    /**
+     * The two numbers worth reading off a skill: how long the wait is, and how
+     * long it lasts when it is not instant.
+     *
+     * <p>Not every number it has. A panel that listed six multipliers would be
+     * a statistics screen, and the player holding a key mid-fight is asking a
+     * shorter question than that.
+     */
+    private String facts(SkillDef s) {
+        // A passive has no cooldown and no duration, and "Cooldown 0s" is a
+        // worse answer than the true one.
+        if (s.kind == SkillDef.Kind.PASSIVE) {
+            return i18n.get("skill.info.passive");
+        }
+        String out = i18n.format("skill.info.cooldown", seconds(s.cooldownSteps));
+        if (s.durationSteps > 0) {
+            out = out + "   " + i18n.format("skill.info.duration", seconds(s.durationSteps));
+        }
+        return out;
+    }
+
+    private static String seconds(int steps) {
+        float s = steps * Cfg.STEP;
+        return s >= 10f || s == Math.round(s)
+            ? String.valueOf(Math.round(s))
+            : String.valueOf(Math.round(s * 10f) / 10f);
+    }
+
+    /**
+     * How tall a block of text is once the font has wrapped it, plus the air
+     * under it.
+     *
+     * <p>{@code GlyphLayout.height} is measured to the last line's baseline
+     * box, not to the bottom of its descenders - and Vietnamese hangs below
+     * the baseline. Without the padding the last line of a description and the
+     * cooldown under it share the same few pixels.
+     */
+    private float wrappedHeight(String text, float width) {
+        LAYOUT.setText(font, text, Color.WHITE, width, Align.left, true);
+        return Math.max(LINE, LAYOUT.height + 8);
+    }
+
     // ---- the boss bar ------------------------------------------------------
 
     /** Width of the boss bar, and the thickness of its filled strip. */

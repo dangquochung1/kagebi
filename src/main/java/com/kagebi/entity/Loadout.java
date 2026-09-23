@@ -37,18 +37,22 @@ public final class Loadout {
      */
     public static Modifiers of(RunState run, ContentRegistry content,
                                ShopCatalog shop, Profile profile) {
-        return of(run, content, shop, profile, null);
+        return of(run, content, shop, profile, (SkillDef) null);
     }
 
     /**
-     * @param avatar the ultimate that is up, or null - a fifth source, and the
-     *               only one that is temporary. It folds in here rather than
-     *               being applied and unapplied on the player, because undoing
-     *               five multipliers in the right order is a bug waiting to
-     *               happen and rebuilding from nothing cannot be.
+     * @param timed the skills that are up right now, if any - a fifth source,
+     *              and the only one that is temporary. They fold in here rather
+     *              than being applied and unapplied on the player, because
+     *              undoing five multipliers in the right order is a bug waiting
+     *              to happen and rebuilding from nothing cannot be.
+     *
+     *              <p>More than one, because more than one can be: a charge
+     *              cast while the ultimate is up is two timed effects at once,
+     *              and the two compound like any other pair of sources.
      */
     public static Modifiers of(RunState run, ContentRegistry content,
-                               ShopCatalog shop, Profile profile, SkillDef avatar) {
+                               ShopCatalog shop, Profile profile, SkillDef... timed) {
         Modifiers mods = new Modifiers();
         if (run != null && content != null) {
             for (String id : run.relics) {
@@ -81,9 +85,12 @@ public final class Loadout {
         if (profile != null && content != null) {
             worn(mods, content, profile);
         }
-        if (avatar != null) {
-            for (int i = 0; i < avatar.effects.length && i < avatar.magnitudes.length; i++) {
-                mods.add(avatar.effects[i], avatar.magnitudes[i]);
+        for (SkillDef skill : timed) {
+            if (skill == null) {
+                continue;
+            }
+            for (int i = 0; i < skill.effects.length && i < skill.magnitudes.length; i++) {
+                mods.add(skill.effects[i], skill.magnitudes[i]);
             }
         }
         return mods;

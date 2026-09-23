@@ -349,7 +349,14 @@ public final class Assets {
          * and what you get out of it is your own.
          *
          * <p>The ids are the sprite folders, so nothing has to translate
-         * between a character and its art.
+         * between a character and its art. Two of them are now historical
+         * rather than descriptive: {@code ninjablue} wears violet, and the
+         * order below is the roster's, not the ids'. Renaming either would buy
+         * nothing a player can see and would cost every v4 profile its
+         * characters, because {@code V4ToV5} rebuilds these ids by writing
+         * {@code "ninja"} in front of a saved colour.
+         *
+         * <p>This array is the order the roster draws in, and the only one.
          *
          * <p>The three heroes the Japanese pack drew side-on went with this
          * change. They were a second animation shape - one row of 48px frames
@@ -360,7 +367,7 @@ public final class Assets {
          * branch left to get wrong.
          */
         public static final String[] CHARACTERS = {
-            "ninjagreen", "ninjared", "ninjablue", "ninjadark", "ninjafire", "ninjawater",
+            "ninjagreen", "ninjared", "ninjawater", "ninjadark", "ninjafire", "ninjablue",
         };
 
         /**

@@ -13,7 +13,9 @@ it, and keeps the outline, skin, eyes and red accent identical across all six so
 they read as the same village.
 
 Ramps are read out of the 16x16 variants rather than written down here: whatever
-the artist chose for NinjaRed is what NinjaRed should be.
+the artist chose for NinjaRed is what NinjaRed should be. One is written down,
+because the pack has no violet ninja and two of the six were the same blue -
+see VARIANTS.
 
 Usage:  python tools/make_ninjas.py [--report]
 """
@@ -39,13 +41,28 @@ USED = ("attack", "dead", "hit", "idle", "pickup", "roll", "walk")
 COMMON = {(0x14, 0x1B, 0x1B), (0xEF, 0x91, 0x4F), (0xF2, 0xEA, 0xF1),
           (0xFF, 0xFF, 0xFF), (0xD1, 0x4B, 0x34)}
 
-# id -> the pack folder its ramp is taken from.
+# id -> (pack folder its ramp is taken from, or a ramp written out here).
+#
+# `ninjablue` is the written-out one. It is Tử Uyển, the violet ninja, and none
+# of the pack's seventeen is violet - but the roster had a worse problem than a
+# missing colour: NinjaBlue and NinjaWater share their lightest tone exactly,
+# so two of the six read as the same character at roster size. The three
+# colours below are still the pack's own, counted out of its Actor/Character
+# sheets rather than invented, so the hero stays in the pack's palette instead
+# of becoming a hue rotation of it. The dark tone is NinjaRed's darkest and the
+# light one is NinjaMasked's highlight.
+#
+# The id stays `ninjablue`: it is the sprite folder and V4ToV5 rebuilds it by
+# writing "ninja" in front of a saved colour, so renaming it would cost every
+# v4 profile its characters to fix a word no player ever sees.
+VIOLET = [(0x54, 0x3C, 0x52), (0xA5, 0x60, 0x8B), (0xD3, 0xA2, 0xC0)]
+
 VARIANTS = [
-    ("ninjared", "NinjaRed"),
-    ("ninjablue", "NinjaBlue"),
-    ("ninjadark", "NinjaDark"),
-    ("ninjafire", "NinjaFire"),
-    ("ninjawater", "NinjaWater"),
+    ("ninjared", "NinjaRed", None),
+    ("ninjablue", None, VIOLET),
+    ("ninjadark", "NinjaDark", None),
+    ("ninjafire", "NinjaFire", None),
+    ("ninjawater", "NinjaWater", None),
 ]
 
 
@@ -108,8 +125,8 @@ def build(report=False):
     source_ramp = ramp_of(sheet_of("NinjaGreen"))
     if report:
         print("%-11s %s" % (SOURCE, " ".join("#%02X%02X%02X" % c for c in source_ramp)))
-    for ident, folder in VARIANTS:
-        ramp = ramp_of(sheet_of(folder))
+    for ident, folder, written in VARIANTS:
+        ramp = written if written is not None else ramp_of(sheet_of(folder))
         mapping = dict(zip(source_ramp, ramp))
         count = recolour(src_dir, os.path.join(PLAYER, ident), mapping)
         if report:

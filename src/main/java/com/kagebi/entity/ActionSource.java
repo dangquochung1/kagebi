@@ -26,6 +26,14 @@ public interface ActionSource {
     /** Spends a buffered press so it cannot fire a second time. */
     void consume(GameAction action);
 
+    /**
+     * Whether the player is holding the key that reads a control instead of
+     * using it. False unless something says otherwise, so no test has to care.
+     */
+    default boolean infoHeld() {
+        return false;
+    }
+
     /** Adapts the real service. Declared here so nothing else has to know how. */
     static ActionSource of(InputService input) {
         return new ActionSource() {
@@ -42,6 +50,11 @@ public interface ActionSource {
             @Override
             public void consume(GameAction action) {
                 input.consume(action);
+            }
+
+            @Override
+            public boolean infoHeld() {
+                return input.infoHeld();
             }
         };
     }

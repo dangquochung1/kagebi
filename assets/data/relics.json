@@ -103,16 +103,9 @@
       "effect": "crit_damage_mult", "magnitude": 1.25
     },
 
-    // ---------------- RARE (8) ----------------------------------------
+    // ---------------- RARE (7) ----------------------------------------
     // Each one changes a decision rather than a number.
 
-    {
-      "id": "bloodthorn", "nameKey": "relic.bloodthorn.name", "descKey": "relic.bloodthorn.desc",
-      "icon": "sword_blood", "rarity": "RARE",
-      // 8% of a hammer's 26 is 2 per swing; of a katana's 7 it is 0.56, but
-      // three times as often. Roughly equal per second on purpose.
-      "effect": "lifesteal", "magnitude": 0.08
-    },
     {
       "id": "thunder_seal", "nameKey": "relic.thunder_seal.name", "descKey": "relic.thunder_seal.desc",
       "icon": "lightning", "rarity": "RARE",

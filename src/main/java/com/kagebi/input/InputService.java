@@ -198,6 +198,9 @@ public final class InputService extends InputAdapter {
         java.util.Arrays.fill(justPressed, false);
         java.util.Arrays.fill(stepsHeld, 0);
         modifiersHeld = 0;
+        // Without this, shift held as the player alt-tabs away is shift held
+        // for ever, and every skill key reads instead of casting.
+        shiftHeld = 0;
         pendingScroll = 0f;
         scroll = 0;
         // The pointer position survives: it is where the mouse is, which is
@@ -213,6 +216,31 @@ public final class InputService extends InputAdapter {
         return modifiersHeld > 0;
     }
 
+    /**
+     * Whether shift is being held to read rather than to act.
+     *
+     * <p>Shift is in {@link #RESERVED} and always will be, so it cannot be a
+     * {@code GameAction} and cannot be rebound - which is exactly what makes
+     * it the right key for this. It is not a control; it is the modifier that
+     * turns the controls into their own documentation, the way a
+     * League-of-Legends player reads a spell by holding it over the key.
+     *
+     * <p>Tracked here rather than read off {@code Gdx.input} at the draw site,
+     * so the rule that gameplay never names a keycode holds. It is deliberately
+     * <em>not</em> a system modifier: those suppress every other key, and this
+     * one has to let the skill keys through so it can tell which one is being
+     * asked about.
+     */
+    public boolean infoHeld() {
+        return shiftHeld > 0;
+    }
+
+    private int shiftHeld;
+
+    private static boolean isShift(int keycode) {
+        return keycode == Keys.SHIFT_LEFT || keycode == Keys.SHIFT_RIGHT;
+    }
+
     private static boolean isSystemModifier(int keycode) {
         for (int key : SYSTEM_MODIFIERS) {
             if (key == keycode) {
@@ -224,6 +252,10 @@ public final class InputService extends InputAdapter {
 
     @Override
     public boolean keyDown(int keycode) {
+        if (isShift(keycode)) {
+            shiftHeld++;
+            return false;       // never an action; see infoHeld()
+        }
         if (isSystemModifier(keycode)) {
             modifiersHeld++;
             return false;       // not ours; let anything else have it
@@ -241,6 +273,10 @@ public final class InputService extends InputAdapter {
 
     @Override
     public boolean keyUp(int keycode) {
+        if (isShift(keycode)) {
+            shiftHeld = Math.max(0, shiftHeld - 1);
+            return false;
+        }
         if (isSystemModifier(keycode)) {
             modifiersHeld = Math.max(0, modifiersHeld - 1);
             return false;

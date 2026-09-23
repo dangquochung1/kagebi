@@ -192,9 +192,29 @@ public final class Screens {
                 // photographed in flight at all.
                 return new GameScreen[] {
                     new DungeonScreen(game).openIn(RoomKind.START).throwing()};
-            // One skill, cast on a cadence. Page 1 to 3 is the key.
+            // One skill, cast on a cadence. Page 1 to 3 is the key; page 4
+            // casts the ultimate and then swings under it, which is the only
+            // way to see what a transformation does to an ordinary attack.
             case "skill": {
                 startRun(game, 1);
+                if (page >= 8) {
+                    // Shift and nothing else, which is how the ability with no
+                    // key is read. ATTACK is held so that some key is down and
+                    // none of the three is - the state the panel answers to.
+                    return new GameScreen[] {new DungeonScreen(game)
+                        .openIn(RoomKind.NORMAL).reading(GameAction.ATTACK)};
+                }
+                if (page >= 5) {
+                    // Shift held on each key in turn: pages 5, 6 and 7.
+                    GameAction read = page == 7 ? GameAction.SKILL_3
+                        : page == 6 ? GameAction.SKILL_2 : GameAction.SKILL_1;
+                    return new GameScreen[] {new DungeonScreen(game)
+                        .openIn(RoomKind.NORMAL).reading(read)};
+                }
+                if (page == 4) {
+                    return new GameScreen[] {new DungeonScreen(game).openIn(RoomKind.NORMAL)
+                        .casting(GameAction.SKILL_3, GameAction.ATTACK)};
+                }
                 GameAction key = page >= 3 ? GameAction.SKILL_3
                     : page == 2 ? GameAction.SKILL_2 : GameAction.SKILL_1;
                 return new GameScreen[] {

@@ -243,9 +243,9 @@ class ContentValidatorTest {
         for (Map.Entry<String, Set<String>> e : assets.keysByLanguage.entrySet()) {
             keys.put(e.getKey(), new HashSet<>(e.getValue()));
         }
-        keys.get("en").remove("relic.bloodthorn.desc");
+        keys.get("en").remove("relic.thunder_seal.desc");
         assets = new ContentValidator.AssetIndex(assets.regionsByAtlas, keys, assets.fileExists);
-        expectOne("relic 'bloodthorn'", "relic.bloodthorn.desc", "'en'");
+        expectOne("relic 'thunder_seal'", "relic.thunder_seal.desc", "'en'");
     }
 
     // ---- the shop -------------------------------------------------------------------------

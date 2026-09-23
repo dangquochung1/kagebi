@@ -62,6 +62,18 @@ public final class ScriptedInput implements ActionSource {
         return consumes[a.ordinal()];
     }
 
+    /** Whether shift is held: the key that reads a control instead of using it. */
+    private boolean info;
+
+    public void holdInfo(boolean held) {
+        info = held;
+    }
+
+    @Override
+    public boolean infoHeld() {
+        return info;
+    }
+
     @Override
     public boolean isDown(GameAction a) {
         return down[a.ordinal()];

@@ -245,6 +245,18 @@ public class DungeonScreen extends SimScreen {
         return this;
     }
 
+    /** The ultimate first, then swinging under it: see {@link DemoInput}. */
+    DungeonScreen casting(GameAction opener, GameAction then) {
+        demo = new DemoInput(opener, then);
+        return this;
+    }
+
+    /** Shift and a skill key held, which is what raises the panel. */
+    DungeonScreen reading(GameAction which) {
+        demo = new DemoInput(which).reading();
+        return this;
+    }
+
     DungeonScreen throwing() {
         demo = new DemoInput(GameAction.THROW);
         return this;
@@ -847,8 +859,15 @@ public class DungeonScreen extends SimScreen {
         } else {
             hud.draw(batch, run, Cfg.VIRT_W, Cfg.VIRT_H);
             if (world instanceof EntityWorld) {
-                hud.drawSkills(batch, game.skin(), ((EntityWorld) world).player(),
-                               game.input().map());
+                EntityWorld ew = (EntityWorld) world;
+                hud.drawSkills(batch, game.skin(), ew.player(), game.input().map());
+                // After the bar, so the panel sits over it rather than under.
+                hud.drawSkillInfo(batch, game.skin(), ew.player(), ew.intent().asking);
+                // Shift with no key: the ability that has no key to hold.
+                if (ew.intent().askingPassive) {
+                    hud.drawPassiveInfo(batch, game.skin(),
+                        game.content().passiveFor(run.characterId));
+                }
             }
             drawQuickSlot(batch);
             drawPrompt(batch);

@@ -21,9 +21,19 @@ public final class SkillDef {
     /**
      * What a skill does, which is the one part of it that is code.
      *
-     * <p>Three, because three were asked for. A fourth would be a new branch in
-     * {@code Player}, and the point of everything else being data is that a
-     * fourth <em>variant</em> of these three is not.
+     * <p>The fourth was worth a branch. A {@link #LUNGE} is twelve steps along
+     * one heading, fixed at the moment it starts; a {@link #CHARGE} runs for
+     * three seconds, is steered the whole way, and takes the hands off the
+     * weapons while it does. That is a different shape, not a lunge with
+     * different numbers - which is the test this enum exists to apply.
+     *
+     * <p>{@link #PASSIVE} passes it differently: it is not a shape at all, it
+     * is the absence of one. A character whose whole element is "everything I
+     * do poisons" has something that is never cast, never on cooldown and
+     * never on a key, and the only alternatives were a second perk field on
+     * the shop row - which would have cost that character the perk they paid
+     * for - or a branch per character, which is what notes/d.md section 3
+     * records going wrong the last time.
      */
     public enum Kind {
         /** A thrust: move along the aim and hurt whatever is crossed. */
@@ -32,14 +42,107 @@ public final class SkillDef {
         NOVA,
         /** A timed transformation: change the numbers, and what dashing does. */
         AVATAR,
+        /** A run: fast and steered for a while, and it burns what it touches. */
+        CHARGE,
+        /** No key and no cast: effects a character simply has, for the whole run. */
+        PASSIVE,
+    }
+
+    /**
+     * The strips a skill draws besides its own {@link #vfx}, each null unless
+     * the skill has one.
+     *
+     * <p>Together rather than as six fields on the skill, because they are one
+     * idea: what this element looks like when it is doing something the game
+     * already does. An ultimate that changes how a punch lands has to change
+     * what the punch looks like, or the player is told about it in numbers
+     * only - and an ultimate that changes none of it carries {@link #NONE} and
+     * is unaffected by every line of this.
+     *
+     * <p>Six is as many as this shape should hold. A seventh should turn these
+     * into a map keyed by role name with a vocabulary in
+     * {@code ContentValidator}, the way effect names already work: six
+     * nullable fields each read in one place is legible, and a dozen is a
+     * lookup table someone has written out by hand.
+     */
+    public static final class Fx {
+
+        /** Where the transformation begins, and what it shoves. */
+        public final String cast;
+        /** What the weapon leaves behind on a swing. */
+        public final String melee;
+        /** What appears on whatever the player's damage lands on. */
+        public final String hit;
+        /** What the off hand throws instead of its own art. */
+        public final String thrown;
+        /** What a burning enemy carries while it burns. */
+        public final String burn;
+        /**
+         * The trail a dash leaves - and whether a dash is a weapon at all.
+         *
+         * <p>The one name here that gates a mechanic rather than replacing a
+         * picture, and it does because the mechanic and the picture were the
+         * same decision: while an ultimate is up, a dash used to leave a
+         * lightning streak and arc to three enemies, for every ultimate, from
+         * a hard-coded strip. The fire ultimate is meant to be a little speed
+         * and nothing else, so the question "what does a dash look like now"
+         * and the question "is a dash a weapon now" have one answer.
+         */
+        public final String dash;
+
+        public static final Fx NONE = new Fx(null, null, null, null, null, null);
+
+        public Fx(String cast, String melee, String hit,
+                  String thrown, String burn, String dash) {
+            this.cast = cast;
+            this.melee = melee;
+            this.hit = hit;
+            this.thrown = thrown;
+            this.burn = burn;
+            this.dash = dash;
+        }
+
+        /** Every name set, for the check that they are all strips we ship. */
+        public String[] named() {
+            java.util.List<String> out = new java.util.ArrayList<>();
+            for (String s : new String[] {cast, melee, hit, thrown, burn, dash}) {
+                if (s != null) {
+                    out.add(s);
+                }
+            }
+            return out.toArray(new String[0]);
+        }
+
+        public boolean any() {
+            return named().length > 0;
+        }
     }
 
     public final String id;
+
+    /**
+     * The character this belongs to, or null for the set everyone else gets.
+     *
+     * <p>One field, read in one place - {@code ContentRegistry.skillsFor}.
+     * The last rule in this game that gave one character something of their
+     * own was enforced in four places and correct in two, and it went when she
+     * did; see notes/d.md section 3. A slot is still a slot, so two skills may
+     * share one as long as no character can reach both.
+     */
+    public final String character;
+
     public final String nameKey;
     public final String descKey;
     /** Region under {@code ui/skill/}; see {@code Assets.Ui.skillIcon}. */
     public final String icon;
-    /** 1, 2 or 3 - which key casts it, left to right on the bar. */
+    /**
+     * 1, 2 or 3 - which key casts it, left to right on the bar. 0 for a
+     * {@link Kind#PASSIVE}, which no key reaches.
+     *
+     * <p>{@code Player.setSkills} indexes {@code slot - 1} and ignores
+     * anything outside the array, so a passive cannot reach the bar and cannot
+     * be cast without a line of code being written to let it.
+     */
     public final int slot;
     public final Kind kind;
 
@@ -54,8 +157,22 @@ public final class SkillDef {
     /** Virtual pixels a second, away from the caster. */
     public final float knockback;
 
+    /**
+     * The share of a blow's damage the transformation's own strike adds.
+     *
+     * <p>Zero for everything that is not an {@link Kind#AVATAR}, and zero for
+     * an avatar that does not strike. It is a share rather than a number
+     * because the strike is a follow-up: it has to stay the smaller half of
+     * the exchange whatever weapon is swinging, and a flat number would be
+     * most of a katana's hit and none of a hammer's.
+     */
+    public final float strikeMult;
+
     /** The strip under {@code fx/skill/} this skill draws. */
     public final String vfx;
+
+    /** The strips it draws for the other things it changes; never null. */
+    public final Fx fx;
 
     /**
      * What an {@link Kind#AVATAR} adds while it is up, in the same effect names
@@ -76,11 +193,14 @@ public final class SkillDef {
     public final float hpCost;
     public final float hpFloor;
 
-    public SkillDef(String id, String nameKey, String descKey, String icon, int slot,
+    public SkillDef(String id, String character, String nameKey, String descKey,
+                    String icon, int slot,
                     Kind kind, float cooldownSeconds, float durationSeconds,
-                    float damageMult, float range, float knockback, String vfx,
+                    float damageMult, float range, float knockback, float strikeMult,
+                    String vfx, Fx fx,
                     String[] effects, float[] magnitudes, float hpCost, float hpFloor) {
         this.id = id;
+        this.character = character;
         this.nameKey = nameKey;
         this.descKey = descKey;
         this.icon = icon;
@@ -91,7 +211,9 @@ public final class SkillDef {
         this.damageMult = damageMult;
         this.range = range;
         this.knockback = knockback;
+        this.strikeMult = strikeMult;
         this.vfx = vfx;
+        this.fx = fx == null ? Fx.NONE : fx;
         this.effects = effects;
         this.magnitudes = magnitudes;
         this.hpCost = hpCost;
@@ -109,6 +231,7 @@ public final class SkillDef {
 
     @Override
     public String toString() {
-        return "SkillDef(" + id + ", " + kind + " slot " + slot + ")";
+        return "SkillDef(" + id + ", " + kind + " slot " + slot
+            + (character == null ? "" : ", " + character) + ")";
     }
 }

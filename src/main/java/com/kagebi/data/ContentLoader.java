@@ -259,12 +259,20 @@ public final class ContentLoader {
      */
     private static SkillDef skill(Fields f) {
         String id = f.id();
+        SkillDef.Fx fx = new SkillDef.Fx(
+            f.stringOr("castVfx", null), f.stringOr("meleeVfx", null),
+            f.stringOr("hitVfx", null), f.stringOr("throwVfx", null),
+            f.stringOr("burnVfx", null), f.stringOr("dashVfx", null));
         SkillDef d = new SkillDef(
-            id, f.string("nameKey"), f.string("descKey"), f.string("icon"),
-            f.integer("slot"), f.enumeration("kind", SkillDef.Kind.class),
-            f.number("cooldown"), f.numberOr("duration", 0f),
+            id, f.stringOr("character", null),
+            f.string("nameKey"), f.string("descKey"), f.string("icon"),
+            // A passive has no key, so no slot; everything else must say which.
+            f.integerOr("slot", 0), f.enumeration("kind", SkillDef.Kind.class),
+            // ... and nothing to put a cooldown on either.
+            f.numberOr("cooldown", 0f), f.numberOr("duration", 0f),
             f.numberOr("damageMult", 0f), f.numberOr("range", 0f),
-            f.numberOr("knockback", 0f), f.string("vfx"),
+            f.numberOr("knockback", 0f), f.numberOr("strikeMult", 0f),
+            f.string("vfx"), fx,
             f.stringsOr("effects"), f.numbersOr("magnitudes"),
             f.numberOr("hpCost", 0f), f.numberOr("hpFloor", 0f));
         f.done();

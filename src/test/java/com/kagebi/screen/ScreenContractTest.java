@@ -3,6 +3,8 @@ package com.kagebi.screen;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -238,6 +240,10 @@ class ScreenContractTest {
         }
         keys.add("prompt.enter_home");
         keys.add("hub.zoom.fit");
+        // The two lines the shift-held skill panel prints under a description.
+        keys.add("skill.info.cooldown");
+        keys.add("skill.info.duration");
+        keys.add("skill.info.passive");
         for (GameAction action : GameAction.values()) {
             // Listed by the controls screen straight off the enum, so a new
             // action is a raw key there until someone translates it.
@@ -286,24 +292,54 @@ class ScreenContractTest {
     }
 
     /**
-     * Three packs were downloaded and cut for clashing with the art direction,
-     * and {@code CREDITS.md} says so. Crediting art that is not in the game is
-     * its own kind of misattribution, and the roll is exactly where it would
-     * creep back in.
+     * Every pack the roll names is a pack {@code CREDITS.md} names.
+     *
+     * <p>Crediting art that is not in the game is its own kind of
+     * misattribution, and a pack that is tried and then cut leaves the roll
+     * last - the art goes, the credit stays, and nothing says so. This used to
+     * be a hard-coded list of the packs that had been cut, which only caught
+     * the ones somebody remembered to write down, and which kept their names in
+     * a repository whose whole point was not to carry them. Checking against
+     * {@code CREDITS.md} instead says the thing the screen's own javadoc claims:
+     * that file is the authority.
+     *
+     * <p>Matched on the title's longest word rather than the whole string,
+     * because one roll entry deliberately summarises five CraftPix packs in a
+     * line that appears nowhere in the table.
      */
     @Test
-    void theRollNamesNobodyWhoseArtWasCut() {
+    void everyPackTheRollNamesIsInCreditsMd() throws Exception {
+        String credits = Files.readString(new File("CREDITS.md").toPath(),
+                                          StandardCharsets.UTF_8)
+                              .toLowerCase(java.util.Locale.ROOT);
         for (String lang : new String[] {"vi", "en"}) {
             File file = new File("assets/i18n/" + lang + ".json");
             JsonValue root = new JsonReader().parse(new FileHandle(file));
-            for (String key : CreditsScreen.rollKeys()) {
-                String value = root.getString(key, "").toLowerCase(java.util.Locale.ROOT);
-                for (String cut : new String[] {"sprout", "pixel food", "mystic woods",
-                                                "ghostpixxells", "cup nooble"}) {
-                    assertTrue(!value.contains(cut),
-                        "the credits roll names " + cut + ", whose art was cut (" + key + ")");
-                }
+            for (String key : CreditsScreen.rollNameKeys()) {
+                String title = root.getString(key, "");
+                assertTrue(!title.isEmpty(), lang + ".json has no " + key);
+                String word = longestWord(title);
+                assertTrue(credits.contains(word.toLowerCase(java.util.Locale.ROOT)),
+                    "the credits roll names '" + title + "' (" + key + ", " + lang
+                        + "), which CREDITS.md does not: no '" + word + "' in it");
             }
         }
+    }
+
+    /** The most distinctive part of a pack title: its longest run of letters. */
+    private static String longestWord(String title) {
+        String best = "";
+        StringBuilder word = new StringBuilder();
+        for (int i = 0; i <= title.length(); i++) {
+            if (i < title.length() && Character.isLetterOrDigit(title.charAt(i))) {
+                word.append(title.charAt(i));
+                continue;
+            }
+            if (word.length() > best.length()) {
+                best = word.toString();
+            }
+            word.setLength(0);
+        }
+        return best;
     }
 }

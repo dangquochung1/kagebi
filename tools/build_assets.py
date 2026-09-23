@@ -37,6 +37,7 @@ PACKS = os.path.join(OUT, "packs")
 #: Named once: the pack ships with spaces around the dash, and the word is
 #: "Lightning" rather than "lighting".
 SKILL_PACK = "Pixel Art Skill Animations - Lightning"
+GIGAPACK = "Super Pixel Effects Gigapack (Free Version)"
 HOME = os.path.join(PACKS, "homeassets", "Tiled_files")
 
 # Promo art, contact sheets and editor previews that ship alongside the real
@@ -333,9 +334,6 @@ def build_licenses():
         (os.path.join(SUNNY, "public-license.pdf"), "SunnyLandMusic-CC0.pdf"),
         (os.path.join(SUNNY, "Adventure pack 1 ogg/public-license.txt"),
          "SunnyLandMusic-license.txt"),
-        (os.path.join(RAW, "read_me.txt"), "MysticWoods-NonCommercial.txt"),
-        (os.path.join(RAW, "Sprout Lands - Sprites - Basic pack/read_me.txt"),
-         "SproutLands-NonCommercial.txt"),
         (os.path.join(RAW, "_fonts/Pixeloid_Font_1_0/License.txt"),
          "PixeloidFont-OFL.txt"),
         # The six Craftpix packs. All carry the same file licence, which is not
@@ -352,6 +350,11 @@ def build_licenses():
         # Copied as it is: a licence is evidence, and retyping it is not.
         (os.path.join(PACKS, SKILL_PACK, "Frostwindz Asset License Agreement.docx"),
          "Frostwindz-LightningSkills.docx"),
+        # unTied Games. The same shape as the Craftpix terms - bundled with a
+        # game is fine, reuploaded as art is not - with one addition that is
+        # not optional: it requires attribution, so the credits roll owes it a
+        # block and CREDITS.md owes it a row.
+        (os.path.join(PACKS, GIGAPACK, "license.txt"), "UntiedGames-Gigapack.txt"),
     ]
     ensure(os.path.abspath(dst))
     for src, name in pairs:
@@ -455,6 +458,47 @@ def build_skillfx():
         make_skillfx.build(report=True)
 
 
+def build_firefx():
+    """Hoả Tâm's three skills, from three packs rather than one.
+
+    Separate from build_skillfx because the sources are: Frostwindz ships
+    loose frames, the Free Pixel Effects sheets are square grids, and Fire
+    Effect 2 lays two animations end to end in one row. Same three rules
+    though - square cells, one bounding box across every frame, and a hard
+    alpha cut after the resample. See tools/make_firefx.py.
+    """
+    print("fire skills")
+    import make_firefx
+    missing = [p for p in make_firefx.SOURCE_DIRS if not os.path.isdir(p)]
+    if missing:
+        for p in missing:
+            print("  ! missing source: %s" % p)
+        stats["missing_sources"] += len(missing)
+        return
+    if not DRY:
+        make_firefx.build(report=True)
+
+
+def build_poisonfx():
+    """Tu Uyen's three skills, from three more packs.
+
+    Two of them are Frostwindz and arrive as loose frames like the fire ones;
+    the third is the unTied Games gigapack, whose Fantasy Spells are folders of
+    frame0000.png. Two sources also arrive on a diagonal and are straightened
+    here rather than in the code that aims them. See tools/make_poisonfx.py.
+    """
+    print("poison skills")
+    import make_poisonfx
+    missing = [p for p in make_poisonfx.SOURCE_DIRS if not os.path.isdir(p)]
+    if missing:
+        for p in missing:
+            print("  ! missing source: %s" % p)
+        stats["missing_sources"] += len(missing)
+        return
+    if not DRY:
+        make_poisonfx.build(report=True)
+
+
 def build_sunnyside():
     """The island village's images, from the Sunnyside World pack.
 
@@ -478,7 +522,8 @@ def build_sunnyside():
 
 STEPS = [build_player, build_actors, build_tiles, build_depth_actors,
          build_ui_fx_items, build_audio, build_licenses, build_cove,
-         build_heroui, build_skillfx, enforce_tile_grid, build_sunnyside]
+         build_heroui, build_skillfx, build_firefx, build_poisonfx,
+         enforce_tile_grid, build_sunnyside]
 
 
 def main():

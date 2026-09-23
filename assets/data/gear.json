@@ -109,28 +109,28 @@
     {
       "id": "trinket_t1", "icon": "ring_gold", "slot": "TRINKET", "tier": 1,
       "nameKey": "gear.trinket_t1.name", "descKey": "gear.trinket_t1.desc",
-      "sockets": 0, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.05, 1], "price": 400
+      "sockets": 0, "effects": ["gold_mult"], "magnitudes": [1.05], "price": 400
     },
     {
       "id": "trinket_t2", "icon": "ring_gold", "slot": "TRINKET", "tier": 2,
       "nameKey": "gear.trinket_t2.name", "descKey": "gear.trinket_t2.desc",
-      "sockets": 1, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.1, 2], "price": 900
+      "sockets": 1, "effects": ["gold_mult"], "magnitudes": [1.1], "price": 900
     },
     {
       "id": "trinket_t3", "icon": "ring_gold", "slot": "TRINKET", "tier": 3,
       "nameKey": "gear.trinket_t3.name", "descKey": "gear.trinket_t3.desc",
-      "sockets": 2, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.16, 3], "price": 1800
+      "sockets": 2, "effects": ["gold_mult"], "magnitudes": [1.16], "price": 1800
     },
     {
       "id": "trinket_t4", "icon": "ring_gold", "slot": "TRINKET", "tier": 4,
       "nameKey": "gear.trinket_t4.name", "descKey": "gear.trinket_t4.desc",
-      "sockets": 3, "effects": ["gold_mult", "lifesteal"], "magnitudes": [1.24, 5], "price": 0
+      "sockets": 3, "effects": ["gold_mult"], "magnitudes": [1.24], "price": 0
     }
   ],
 
   // Stones. One effect each, and the colour says which: red is damage,
   // green is survival, blue is speed, yellow is the big hits, purple is
-  // the odd ones. ContentValidator.GEM_COLOURS enforces it at boot, so a
+  // money. ContentValidator.GEM_COLOURS enforces it at boot, so a
   // red stone that made you faster fails the build rather than teaching
   // the player that the colours are decoration.
   //
@@ -190,7 +190,7 @@
     },
     {
       "id": "purple_t2", "nameKey": "gem.purple_t2.name",
-      "icon": "ring_emerald", "colour": "PURPLE", "tier": 2, "effect": "lifesteal", "magnitude": 2, "price": 0
+      "icon": "ring_emerald", "colour": "PURPLE", "tier": 2, "effect": "gold_mult", "magnitude": 1.09, "price": 0
     },
     {
       "id": "purple_t3", "nameKey": "gem.purple_t3.name",

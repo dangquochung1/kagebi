@@ -192,11 +192,22 @@ ATLASES = {
     "fx": {
         "roots": [("fx", os.path.join(GFX, "fx")),
                   ("props", os.path.join(GFX, "props"))],
+        # The pack's slash and attack sheets are a tenth of this page and no
+        # Java file names one of them: the swing's white arc is drawn into the
+        # ninja's own attack sheet, so these were only ever a set of unused
+        # alternatives. They come out because the fire skills need the room -
+        # and if a fire-tinted arc ever wants them back, the art is still in
+        # assets/gfx/fx/ and this is the one line that decides.
+        "exclude_dirs": ["fx/attack", "fx/slash"],
         # Full-screen overlays need Texture.setWrap(Repeat) to scroll, and wrap
         # is per-texture, not per-region: pushing UVs past a region's edge walks
         # into whatever was packed next to it. These stay standalone textures.
         "exclude_files": ["fx/environment/fog", "fx/environment/raylight"],
-        "size": 1024,
+        # 2048 since the poison set. Nine more strips - one of them thirteen
+        # 64px frames - put a 1024 page over the line, and this packer fails
+        # rather than opening a second one. npc is already 2048 and actors is
+        # 4096, so this is the usual size here rather than a new one.
+        "size": 2048,
     },
 }
 

@@ -18,9 +18,11 @@ import com.kagebi.ui.I18n;
  * The credits roll.
  *
  * <p>Who is named comes from {@code CREDITS.md} and nowhere else, and that file
- * is the authority if the two ever disagree. Three packs that were downloaded
- * and then cut - Mystic Woods, Sprout Lands, Pixel Food - are not named here:
- * crediting art that is not in the game is its own kind of misattribution.
+ * is the authority if the two ever disagree. A pack that was downloaded, tried
+ * and then cut is not named here and is not named there: crediting art that is
+ * not in the game is its own kind of misattribution. {@code ScreenContractTest}
+ * checks the roll against {@code CREDITS.md} rather than against a list of
+ * names, so a pack that leaves the game cannot stay in the credits.
  *
  * <p>Pack titles, authors and licences are identical in both language files.
  * They are attribution, and attribution is quoted, not translated; what each
@@ -76,6 +78,22 @@ public class CreditsScreen extends SimScreen {
         {Style.BY, "credits.cove.by"},
         {Style.FOR, "credits.cove.for"},
         {Style.GAP, null},
+        {Style.NAME, "credits.skillfx.name"},
+        {Style.BY, "credits.skillfx.by"},
+        {Style.FOR, "credits.skillfx.for"},
+        {Style.GAP, null},
+        {Style.NAME, "credits.fx.name"},
+        {Style.BY, "credits.fx.by"},
+        {Style.FOR, "credits.fx.for"},
+        {Style.GAP, null},
+        {Style.NAME, "credits.fire2.name"},
+        {Style.BY, "credits.fire2.by"},
+        {Style.FOR, "credits.fire2.for"},
+
+        {Style.NAME, "credits.untied.name"},
+        {Style.BY, "credits.untied.by"},
+        {Style.FOR, "credits.untied.for"},
+        {Style.GAP, null},
 
         {Style.HEAD, "credits.audio"},
         {Style.NAME, "credits.ninja.name"},
@@ -106,8 +124,19 @@ public class CreditsScreen extends SimScreen {
         return keys;
     }
 
+    /** Just the pack titles, for the test that checks them against CREDITS.md. */
+    static Array<String> rollNameKeys() {
+        Array<String> keys = new Array<>();
+        for (Object[] row : ROLL) {
+            if (row[0] == Style.NAME) {
+                keys.add((String) row[1]);
+            }
+        }
+        return keys;
+    }
+
     /** The row each {@code --page} starts at, so any section can be screenshotted. */
-    private static final int[] SECTIONS = {0, 5, 22, 33};
+    private static final int[] SECTIONS = {0, 5, 22, 34, 45};
 
     private static final Color HEAD = new Color(0xffad55ff);
     private static final Color NAME = new Color(0xffe6c4ff);
