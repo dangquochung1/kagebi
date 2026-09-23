@@ -291,9 +291,13 @@ public final class Assets {
         public static final String ICON_SWORD = "items/weapons/sword/sprite";
         public static final String ICON_KUNAI = "items/projectile/kunai";
         public static final String ICON_SHURIKEN = "items/projectile/shuriken";
-        /** Kitsune's two spells, cut from their own flight art by make_jphero.py. */
-        public static final String ICON_FIREBALL = "items/projectile/fireball";
-        public static final String ICON_WATERBALL = "items/projectile/waterball";
+        // Kitsune's fireball and waterball were here. They were cut by
+        // tools/make_jphero.py, which no longer exists, from a pack that is no
+        // longer used - so the two regions could not be rebuilt, and survived
+        // only as stale files in an assets/gfx that had never been cleaned.
+        // Any clone, or any `build_assets.py --clean`, would have failed
+        // AssetsContractTest on them. V4ToV5.REMOVED_WEAPONS already strips
+        // both ids from old saves, so nothing can ask for either icon.
         public static final String ICON_RELIC = "items/scroll/scrollrock";
 
         /**
@@ -321,8 +325,6 @@ public final class Assets {
                 case "pickaxe": return ICON_PICKAXE;
                 case "kunai": return ICON_KUNAI;
                 case "shuriken": return ICON_SHURIKEN;
-                case "fireball": return ICON_FIREBALL;
-                case "waterball": return ICON_WATERBALL;
                 default: return ICON_SWORD;
             }
         }
